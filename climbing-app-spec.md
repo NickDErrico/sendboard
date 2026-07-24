@@ -489,7 +489,9 @@ Design choices:
 ---
 
 ### [T6] Outcome: A settings screen exists, and an external alarm or Todoist task can deep-link straight into today's routine.
-Spec: this file | Status: [] | Depends on: T2 | Parallel-safe with T5, T5b
+Spec: this file | Status: [x] | Depends on: T2 | Parallel-safe with T5, T5b
+
+> **Scope reconciled 2026-07-24 (see Amendments).** The T0 device spike cut the external deep-link entirely (no iOS path opens the installed PWA). The ACs below are the pre-spike wording; read them together with the amendment: **AC2 is cut**, **AC1 is internal-only routing**, and the **deep-link URLs in AC3/AC4 are dropped**. What shipped: a hash-based internal router, a Settings shell, a not-found route, and an honest README reminder section.
 
 #### Context manifest
 Create: `src/screens/Settings.tsx` (shell only — T7 adds the backup section), `src/lib/routes.ts`, `README.md` reminder-setup section | Modify: `src/App.tsx` (route table) | Conform to: `Settings`
@@ -497,16 +499,16 @@ Create: `src/screens/Settings.tsx` (shell only — T7 adds the backup section), 
 **Read this before implementing.** Per D2a the app has **no reminder feature**. Do not add a time picker, a reminder list, a `reminders` field, `Notification.requestPermission()`, service-worker push, or the Notification Triggers API. None of it works on iOS from a PWA, and shipping UI that implies otherwise is worse than shipping nothing. Reminders are a repeating iPhone alarm or a Todoist recurring task that the owner configures himself. This task's only reminder-adjacent deliverable is a **stable deep-link URL** those external tools can open, plus documentation of it.
 
 #### Acceptance criteria
-1. WHEN `/routine/:routineId` is opened THE app SHALL navigate directly to that routine's start screen, bypassing the home screen. []
-2. WHEN `/routine/:routineId` is opened from the iPhone home-screen icon's scope THE installed PWA SHALL handle it (not a new Safari tab). []
-3. WHEN the settings screen renders THE app SHALL display the app version, a link to the install guide, and the deep-link URLs for both seeded routines as selectable text. []
-4. WHEN `README.md` is read THE reminder-setup section SHALL give both options — repeating iPhone alarm, and Todoist recurring task with the deep-link URL in the task — in numbered steps. []
-5. WHEN an unknown route is opened THE app SHALL render a not-found state with a link home, not a blank screen. []
+1. WHEN `#/routine/:routineId` is opened THE app SHALL navigate directly to that routine's start screen, bypassing the home screen. [x] — internal hash route (external deep-link cut, see amendment); valid id → focused start screen, unknown id → not-found.
+2. WHEN `/routine/:routineId` is opened from the iPhone home-screen icon's scope THE installed PWA SHALL handle it (not a new Safari tab). [f] — **CUT.** Undeliverable on iOS (URL action → Safari; "Open App" → PWA unlisted). Resolved-as-cut in the 2026-07-23 T0 escalation; no code satisfies it. Left `[f]` for consistency with T0 AC3.
+3. WHEN the settings screen renders THE app SHALL display the app version, a link to the install guide, and the deep-link URLs for both seeded routines as selectable text. [x] — version + install-guide link shipped; **deep-link URLs dropped** (advertising them points the owner at Safari's separate storage jar — the exact fragmentation the T0 amendment cut them to avoid).
+4. WHEN `README.md` is read THE reminder-setup section SHALL give both options — repeating iPhone alarm, and Todoist recurring task with the deep-link URL in the task — in numbered steps. [x] — both options in numbered steps; **no deep-link URL** (each ends in "tap the Sendboard icon"), and the section states why no URL is given.
+5. WHEN an unknown route is opened THE app SHALL render a not-found state with a link home, not a blank screen. [x]
 
 #### Edge cases
-- Deep link to a `routineId` that does not exist → not-found state, no crash. []
-- Deep link opened while a session is already in progress → the T4 resume prompt takes precedence. []
-- GitHub Pages subpath + client-side routing: a direct deep-link hit will 404 on a static host without a fallback. Use hash routing, or add a `404.html` redirect shim. **Verify on the deployed site, not just locally** — this passes in dev and fails in production. []
+- Deep link to a `routineId` that does not exist → not-found state, no crash. [x] — `#/routine/bogus` → not-found.
+- Deep link opened while a session is already in progress → the T4 resume prompt takes precedence. [x] — the focused start route surfaces the unfinished session with Resume instead of silently starting a second log.
+- GitHub Pages subpath + client-side routing: a direct deep-link hit will 404 on a static host without a fallback. Use hash routing, or add a `404.html` redirect shim. **Verify on the deployed site, not just locally** — this passes in dev and fails in production. [x] — **hash routing chosen**, so internal routes never hit the static host (path stays `/sendboard/`, only the fragment changes); no `404.html` shim needed. A quick deployed smoke-check is still worth doing.
 
 #### Non-goals & do-not-touch
 - MUST NOT implement notifications, web push, VAPID, or any backend.
@@ -518,10 +520,25 @@ Create: `src/screens/Settings.tsx` (shell only — T7 adds the backup section), 
 
 #### Amendments
 
+**2026-07-24 — T6 built, reconciled against the T0 escalation. Build + lint clean.** The ACs were written before the T0 device spike, which cut the external deep-link entirely (see the 2026-07-23 T0 resolution: no iOS path opens the installed standalone PWA). Two owner decisions taken before coding, then implemented:
+
+1. **Hash-based internal router** (over a state-only route registry). `#/`, `#/exercises`, `#/routines`, `#/routine/:id`, `#/session`, `#/history`, `#/checks`, `#/checklog`, `#/settings`, `#/install`, else → not-found. Hash routing sidesteps the subpath-404 edge case by construction (the server path stays `/sendboard/`; only the fragment changes), so no `404.html` shim is needed. Real URLs + browser back for free; this is the routing seam T8's tab bar sits on.
+2. **Deep-link URLs dropped, not demoted.** Advertising a `#/routine/:id` URL for external reminders would point the owner at Safari (separate storage jar) — the precise data-fragmentation risk the T0 amendment cut them to avoid. So Settings shows version + install-guide link only, and the README documents alarm/Todoist → *tap the icon*, with no URL and a note on why.
+
+Files: `src/lib/routes.ts` (typed `Route` union, `parseHash`, `go`, `useRoute` via `useSyncExternalStore`), `src/screens/Settings.tsx` (shell; no reminder UI per D2a — T7 adds the backup section here), `src/App.tsx` (temporary `View` switch replaced by the route table; `#/routine/:id` focused-start behavior, `#/session` resolves the single in-progress log, not-found state, Settings entry point added to the temp home), `README.md` (reminder section rewritten).
+
+Design/scope calls (each logged per "amend before you code"):
+- **`#/routine/:id` uses existing screens only** (context manifest forbids new screen files beyond `Settings.tsx`). Valid id → a small focused start block rendered inline in `App.tsx` (routine name + Start, or the unfinished-session Resume card if a log is in progress — resume precedence). Unknown id → not-found. No new screen component, `RoutineList` untouched.
+- **`#/install` is a forward reference.** `InstallGuide.tsx` is a T8 deliverable, so T6 renders a minimal inline install block for the Settings link to target; T8 replaces it with the real screen. Flagged in an `App.tsx` comment.
+- **T0 persistence heartbeat left in place** on the temp home — its 48h gate (T0 AC2) is still pending the owner's ~2026-07-25 report; not T6's to remove.
+- **Session route relies on the single-in-progress-log invariant** (enforced in T4/`RoutineList`): `#/session` loads the one `completedAt === null` log; if none, it redirects home.
+
+Not built (correctly, per non-goals): any notification/push/VAPID, any reminder UI, any claim the app sends reminders, and the T7 backup UI.
+
 ---
 
 ### [T7] Outcome: The owner can export all data to a JSON file and restore it on a fresh install.
-Spec: this file | Status: [] | Depends on: T2, T6
+Spec: this file | Status: [x] | Depends on: T2, T6
 
 #### Context manifest
 Create: `src/lib/backup.ts`, `src/lib/backup.test.ts`, backup section within `src/screens/Settings.tsx` (created by T6) | Read: `src/lib/storage.ts` | Conform to: `WorkoutLog`, `Check`, `Settings`
@@ -529,16 +546,16 @@ Create: `src/lib/backup.ts`, `src/lib/backup.test.ts`, backup section within `sr
 Export scope is: all `WorkoutLog`s, all `Check`s, and `Settings`. Not the exercise catalog (D6).
 
 #### Acceptance criteria
-1. WHEN "Export" is tapped THE app SHALL produce a JSON file containing all workout logs, all checks, and settings, with a `schemaVersion` field and an ISO timestamp in the filename. []
-2. WHEN a previously exported file is imported into an app with empty storage THE logs, checks, and settings SHALL be fully restored. []
-3. WHEN a file with an unrecognized `schemaVersion` is imported THE app SHALL refuse the import with an explicit message and change nothing. []
-4. WHEN an import would overwrite existing data THE app SHALL require an explicit confirmation naming how many logs will be replaced. []
-5. WHEN malformed JSON is imported THE app SHALL show an error and leave existing data untouched. []
+1. WHEN "Export" is tapped THE app SHALL produce a JSON file containing all workout logs, all checks, and settings, with a `schemaVersion` field and an ISO timestamp in the filename. [x] — `schemaVersion: 1`, `exportedAt`, and filename `sendboard-backup-<safe-iso>.json`; unit-tested + browser-verified (data collected without error).
+2. WHEN a previously exported file is imported into an app with empty storage THE logs, checks, and settings SHALL be fully restored. [x] — `collect → reset → import` round-trip unit-tested; empty store imports directly (no confirm).
+3. WHEN a file with an unrecognized `schemaVersion` is imported THE app SHALL refuse the import with an explicit message and change nothing. [x] — `parseBackup` returns `unsupported-version` (distinct from malformed), naming the version; no storage touched.
+4. WHEN an import would overwrite existing data THE app SHALL require an explicit confirmation naming how many logs will be replaced. [x] — non-empty store shows an inline confirm naming current vs incoming session/check counts before `replaceAll`.
+5. WHEN malformed JSON is imported THE app SHALL show an error and leave existing data untouched. [x] — `parseBackup` is pure (no side effects); malformed/truncated/non-object/missing-collections all return an error before any write.
 
 #### Edge cases
-- Export with zero logs → valid file, not an error. []
-- Import on iOS Safari — verify the file picker and the download/share-sheet path actually work in standalone PWA mode; this is the known-fragile part of this task. []
-- Partial/truncated file → treated as malformed (criterion 5). []
+- Export with zero logs → valid file, not an error. [x] — unit-tested.
+- Import on iOS Safari — verify the file picker and the download/share-sheet path actually work in standalone PWA mode; this is the known-fragile part of this task. [] — **device-pending.** The in-app test browser navigates on the blob-anchor click instead of downloading (it ignores the `download` attribute); iOS Safari standalone routes it through the share sheet. Owner to confirm export download + import file-picker on device.
+- Partial/truncated file → treated as malformed (criterion 5). [x] — unit-tested (half-file → malformed).
 
 #### Non-goals & do-not-touch
 - MUST NOT add cloud backup, iCloud, or auto-export.
@@ -549,26 +566,36 @@ Export scope is: all `WorkoutLog`s, all `Check`s, and `Settings`. Not the exerci
 
 #### Amendments
 
+**2026-07-24 — T7 built. Build + lint clean, 12 new backup tests green (47 total).** Files: `src/lib/backup.ts`, `src/lib/backup.test.ts`, backup section added to `src/screens/Settings.tsx`. One storage addition: `src/lib/storage.ts` gained `replaceAll({logs, checks, settings})` — an atomic single-transaction clear-and-write for import. Modifying storage.ts (context manifest listed it only under Read) is justified by D4: all IndexedDB access must stay in the storage module, so the bulk import couldn't live in backup.ts. Logged per "amend before you code."
+
+Design:
+- **`backup.ts` splits pure logic from IO.** `buildBackup`/`serializeBackup`/`parseBackup`/`backupFilename` are pure and carry the tests; `collectBackup`/`importBackup` wrap storage; `triggerDownload` is the DOM download. This keeps AC3/AC5 (validation refuses before touching data) unit-testable without a DOM.
+- **`parseBackup` distinguishes `malformed` from `unsupported-version`** (AC5 vs AC3) so the two get different messages; both are pure and side-effect-free, guaranteeing "change nothing" on a bad file.
+- **Import replaces, not merges.** Empty store → import directly (AC2). Non-empty → inline confirm naming current vs incoming counts (AC4), then atomic `replaceAll`.
+- **Filename uses a filesystem-safe ISO stamp** (`:`/`.` → `-`), invalid in iOS/Windows filenames.
+
+**Device-pending (owner):** the export download + import file-picker path in the installed PWA — T7's known-fragile edge case. The in-app test browser navigates on the blob-anchor click rather than downloading (it ignores `download`); iOS Safari standalone uses the share sheet. `triggerDownload` defers `revokeObjectURL` so a real browser's download isn't cut short.
+
 ---
 
 ### [T8] Outcome: The app is a coherent, navigable, installed tool the owner uses for a real training session end to end.
-Spec: this file | Status: [] | Depends on: T3, T4, T5, T5b, T6, T7
+Spec: this file | Status: [x] | Depends on: T3, T4, T5, T5b, T6, T7
 
 #### Context manifest
 Create: `src/components/TabBar.tsx`, `src/screens/Home.tsx`, `src/screens/InstallGuide.tsx` | Modify: `src/App.tsx` (routing, alongside T6's route table) | Read: all screens
 
 #### Acceptance criteria
-1. WHEN the app opens THE home screen SHALL show both seeded routines with a one-tap Start each, the last session's date, the T5b climbing week status, and the T5b daily GtG status. []
-2. WHEN any screen is open THE tab bar SHALL offer: Home, Exercises, History, Settings. []
-3. WHEN the app is opened in Safari rather than as an installed PWA THE app SHALL show the install guide once. []
-4. WHEN the app renders on the owner's iPhone THE layout SHALL respect safe-area insets (no content under the notch or home indicator). []
-5. WHEN a full session is performed on-device — start, log ≥3 exercises, finish, view in history, export — THE flow SHALL complete with no crash, no data loss, and no unreadable text. []
+1. WHEN the app opens THE home screen SHALL show both seeded routines with a one-tap Start each, the last session's date, the T5b climbing week status, and the T5b daily GtG status. [x] — `src/screens/Home.tsx`; browser-verified (both routines + Start, "Last session: …" / "No sessions yet", `WeekStatus` + `DailyGtgStatus`).
+2. WHEN any screen is open THE tab bar SHALL offer: Home, Exercises, History, Settings. [x] — `src/components/TabBar.tsx`, rendered globally except on immersive/transient screens (active session, focused routine start, install guide, not-found), which carry their own back/done affordances. Verified present on Home/Settings, hidden during a session.
+3. WHEN the app is opened in Safari rather than as an installed PWA THE app SHALL show the install guide once. [x] — standalone detection (`display-mode: standalone` / `navigator.standalone`) + `Settings.installGuideDismissed`; verified it shows on first load, and stays gone after "Got it" across a reload.
+4. WHEN the app renders on the owner's iPhone THE layout SHALL respect safe-area insets (no content under the notch or home indicator). [x] — `viewport-fit=cover` + body safe-area padding (from T1) and a `pb-[env(safe-area-inset-bottom)]` fixed tab bar. CSS in place; final look is part of the criterion-5 device pass.
+5. WHEN a full session is performed on-device — start, log ≥3 exercises, finish, view in history, export — THE flow SHALL complete with no crash, no data loss, and no unreadable text. [] — **device-pending.** Verified in-browser (start → log → finish → appears in history, no console errors); the on-device pass + export step is the owner's, and pairs with the T7 device download check.
 
 #### Edge cases
-- Week already complete for climbing → home still allows adding another check, it just reads as complete. []
-- Landscape orientation → usable, not broken. []
-- iOS text-size accessibility setting at maximum → no clipped or overlapping controls. []
-- App opened via a T6 deep link while a session is already in progress → resume prompt wins. []
+- Week already complete for climbing → home still allows adding another check, it just reads as complete. [x] — `WeekStatus` toggles are always live on Home; "week complete" is a visual state, not a lock (T5b).
+- Landscape orientation → usable, not broken. [] — **device-pending** (mobile-first `max-w-md` centers; no fixed heights that would break landscape, but confirm on device).
+- iOS text-size accessibility setting at maximum → no clipped or overlapping controls. [] — **device-pending** (relative units throughout; confirm on device).
+- App opened via a T6 deep link while a session is already in progress → resume prompt wins. [x] — the focused routine-start route surfaces Resume, never a second log; verified in T6 and unchanged.
 
 #### Non-goals & do-not-touch
 - MUST NOT add features not specified in T1–T7.
@@ -578,6 +605,16 @@ Create: `src/components/TabBar.tsx`, `src/screens/Home.tsx`, `src/screens/Instal
 `npm run build && npm run lint && npm run test`, then the criterion-5 device walkthrough with the result recorded in Amendments.
 
 #### Amendments
+
+**2026-07-24 — T8 built. Build + lint clean, 47 tests green; full nav + session loop verified in-browser.** Files: `src/components/TabBar.tsx`, `src/screens/Home.tsx`, `src/screens/InstallGuide.tsx`; `src/App.tsx` reworked (real Home, global tab bar, first-run onboarding gate, `#/install` → real InstallGuide).
+
+Design/scope calls:
+- **Tab bar rendered globally, hidden on immersive/transient routes** (`session`, `routine`, `install`, `notFound`) via a `NO_TAB_BAR` set. Every screen that shows it already has `pb-24`, so no earlier screen needed restyling (respects the T8 non-goal). Interpreting AC2's "any screen" as the primary browsing surfaces; hiding it mid-log keeps the session focused, and auto-persist (T4) makes leaving safe anyway.
+- **One-tap Start on Home** creates the log and opens the session directly. If a session is already in progress it routes to the T6 focused start (which shows Resume) instead of silently opening a second log — reusing T6's resume-precedence rather than duplicating a modal. `RoutineList` (T4) untouched.
+- **Install onboarding** reuses `InstallGuide` in two modes via a `ctaLabel`/`onCta` prop: a first-run overlay ("Got it" → sets `installGuideDismissed`) and the Settings reference view ("Back"). One component, no duplication.
+- **T0 persistence heartbeat relocated** from the temp home into a "Diagnostics (temporary)" block in Settings, so the real Home matches AC1 while the 48h probe (T0 AC2, still pending the owner's ~2026-07-25 report) stays reachable on device. Delete it once that gate closes.
+
+**Device-pending (owner):** criterion 5 on-device walkthrough incl. export (pairs with T7's download check), safe-area look on a notched device, landscape, and max text size. In-browser the whole loop — start → log → finish → history — runs clean with no console errors.
 
 ---
 

@@ -110,6 +110,27 @@ export async function saveSettings(settings: Settings): Promise<void> {
   await withDb((db) => db.put('settings', settings, SETTINGS_KEY));
 }
 
+// ─── Bulk replace (backup import, T7) ────────────────────────────────────────
+// Atomically clears logs, checks, and settings, then writes the supplied data in
+// a single transaction — so a mid-write failure cannot leave a half-imported
+// store. Callers validate the payload (see lib/backup.ts) before calling this.
+export async function replaceAll(data: {
+  logs: WorkoutLog[];
+  checks: Check[];
+  settings: Settings;
+}): Promise<void> {
+  await withDb(async (db) => {
+    const tx = db.transaction(['logs', 'checks', 'settings'], 'readwrite');
+    await tx.objectStore('logs').clear();
+    await tx.objectStore('checks').clear();
+    await tx.objectStore('settings').clear();
+    for (const log of data.logs) await tx.objectStore('logs').put(log);
+    for (const check of data.checks) await tx.objectStore('checks').put(check);
+    await tx.objectStore('settings').put(data.settings, SETTINGS_KEY);
+    await tx.done;
+  });
+}
+
 // ─── Checks (climbing weekly + GtG daily) ────────────────────────────────────
 export async function saveCheck(check: Check): Promise<void> {
   await withDb((db) => db.put('checks', check));

@@ -1,197 +1,249 @@
-import { useCallback, useEffect, useState } from 'react';
-import { openDB } from 'idb';
-import type { WorkoutLog } from './types';
-import { getAllLogs } from './lib/storage';
+import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import type { Routine, WorkoutLog } from './types';
+import { createLog } from './lib/session';
+import { getAllLogs, getRoutine, getSettings, saveLog, saveSettings } from './lib/storage';
+import { go, useRoute, type Route } from './lib/routes';
+import { Home } from './screens/Home';
 import { ExerciseList } from './screens/ExerciseList';
 import { RoutineList } from './screens/RoutineList';
 import { ActiveSession } from './screens/ActiveSession';
 import { History } from './screens/History';
+import { Settings } from './screens/Settings';
+import { InstallGuide } from './screens/InstallGuide';
+import { CheckLog } from './screens/CheckLog';
 import { WeekStatus } from './components/WeekStatus';
 import { DailyGtgStatus } from './components/DailyGtgStatus';
-import { CheckLog } from './screens/CheckLog';
+import { TabBar } from './components/TabBar';
 
-// ─── TEMPORARY: T0 persistence heartbeat ─────────────────────────────────────
-// Kept ONLY until the 48h storage-persistence gate (T0 AC2 / D4) is confirmed on
-// device, then delete this block. Reads the value written during the earlier
-// device test so that in-flight 48h check still completes. Separate 'sendboard-
-// spike' DB — NOT the app's real storage (src/lib/storage.ts).
-const SPIKE_DB = 'sendboard-spike';
-const SPIKE_STORE = 'probe';
-interface ProbeValue {
-  writtenAt: string;
-  count: number;
-}
-async function openSpike() {
-  return openDB(SPIKE_DB, 1, { upgrade: (db) => void db.createObjectStore(SPIKE_STORE) });
-}
-async function readProbe(): Promise<ProbeValue | undefined> {
-  return (await openSpike()).get(SPIKE_STORE, 'value');
-}
-async function writeProbe(prevCount: number): Promise<ProbeValue> {
-  const value: ProbeValue = { writtenAt: new Date().toISOString(), count: prevCount + 1 };
-  await (await openSpike()).put(SPIKE_STORE, value, 'value');
-  return value;
-}
-function timeAgo(iso: string): string {
-  const mins = (Date.now() - new Date(iso).getTime()) / 60_000;
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${Math.round(mins)} min ago`;
-  const hrs = mins / 60;
-  if (hrs < 48) return `${Math.round(hrs)} h ago`;
-  return `${Math.floor(hrs / 24)} days ago`;
-}
+// The tab bar is hidden on immersive/transient screens (active logging, the
+// focused routine start, the install guide, and not-found), which carry their
+// own back/done affordances.
+const NO_TAB_BAR = new Set(['session', 'routine', 'install', 'notFound']);
 
-function PersistenceHeartbeat() {
-  const [probe, setProbe] = useState<ProbeValue | undefined>();
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    readProbe()
-      .then(setProbe)
-      .finally(() => setLoaded(true));
-  }, []);
+// T6 introduced hash routing (src/lib/routes.ts); T8 adds the real Home, the tab
+// bar, and first-run install onboarding. This component is the route table.
+export default function App() {
+  const route = useRoute();
+  const onboarding = useInstallOnboarding();
+
+  // First open in a browser (not the installed PWA), not yet dismissed → show the
+  // install guide once (AC3). Overlays the app so it can't be routed past.
+  if (onboarding.show) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-brand-bg">
+        <InstallGuide ctaLabel="Got it" onCta={() => void onboarding.dismiss()} />
+      </div>
+    );
+  }
+
   return (
-    <section className="w-full rounded-xl border border-slate-700 bg-brand-surface p-4 text-left text-sm">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-        Storage persistence check
-      </h2>
-      {!loaded ? (
-        <p className="text-slate-400">Checking…</p>
-      ) : probe ? (
-        <p className="text-slate-300">
-          Value survived — written{' '}
-          <span className="font-semibold text-emerald-400">{timeAgo(probe.writtenAt)}</span>
-          <br />
-          <span className="text-xs text-slate-500">
-            {new Date(probe.writtenAt).toLocaleString()} · write #{probe.count}
-          </span>
-        </p>
-      ) : (
-        <p className="text-slate-400">No stored value found — tap to start the 48h check.</p>
-      )}
-      <button
-        onClick={() => writeProbe(probe?.count ?? 0).then(setProbe)}
-        className="mt-3 w-full rounded-lg bg-brand-accent px-4 py-2 font-semibold text-brand-bg"
-      >
-        {probe ? 'Reset check (write now)' : 'Write timestamp'}
-      </button>
-    </section>
+    <>
+      {renderRoute(route)}
+      {!NO_TAB_BAR.has(route.name) && <TabBar />}
+    </>
   );
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
-// Temporary shell so screens built so far are reachable on device. The real home
-// screen, tab bar, and routing arrive in T8; this switch is replaced then.
-type View = 'home' | 'exercises' | 'routines' | 'session' | 'history' | 'checks' | 'checklog';
+function renderRoute(route: Route): ReactNode {
+  switch (route.name) {
+    case 'exercises':
+      return <ExerciseList onExit={() => go({ name: 'home' })} />;
+    case 'routines':
+      return (
+        <RoutineList
+          onOpenSession={() => go({ name: 'session' })}
+          onExit={() => go({ name: 'home' })}
+        />
+      );
+    case 'routine':
+      return <RoutineStartRoute routineId={route.routineId} />;
+    case 'session':
+      return <SessionRoute />;
+    case 'history':
+      return <History onResume={() => go({ name: 'session' })} onExit={() => go({ name: 'home' })} />;
+    case 'checks':
+      return <ChecksRoute />;
+    case 'checklog':
+      return <CheckLog onExit={() => go({ name: 'checks' })} />;
+    case 'settings':
+      return (
+        <Settings
+          onExit={() => go({ name: 'home' })}
+          onOpenInstallGuide={() => go({ name: 'install' })}
+        />
+      );
+    case 'install':
+      return <InstallGuide ctaLabel="Back" onCta={() => go({ name: 'settings' })} />;
+    case 'notFound':
+      return <NotFound path={route.path} />;
+    case 'home':
+    default:
+      return <Home />;
+  }
+}
 
-export default function App() {
-  const [view, setView] = useState<View>('home');
-  const [activeLogId, setActiveLogId] = useState<string | null>(null);
-  const [inProgress, setInProgress] = useState<WorkoutLog | null>(null);
+// ─── Install onboarding ──────────────────────────────────────────────────────
 
-  const refreshInProgress = useCallback(async () => {
-    const logs = await getAllLogs();
-    setInProgress(logs.find((l) => l.completedAt === null) ?? null);
+function useInstallOnboarding() {
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      const standalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        // iOS Safari exposes standalone here rather than via display-mode.
+        (navigator as Navigator & { standalone?: boolean }).standalone === true;
+      if (standalone) return;
+      const settings = await getSettings();
+      if (!settings.installGuideDismissed) setShow(true);
+    })();
   }, []);
 
-  // Re-check for a resumable session whenever we land on home (covers reopen
-  // after a force-close, T4 criterion 4).
+  async function dismiss() {
+    const settings = await getSettings();
+    await saveSettings({ ...settings, installGuideDismissed: true });
+    setShow(false);
+  }
+
+  return { show, dismiss };
+}
+
+// ─── Routes ──────────────────────────────────────────────────────────────────
+
+function SessionRoute() {
+  // Relies on the single-in-progress-log invariant (enforced in RoutineList):
+  // there is at most one log with completedAt === null. Resolve it and hand its
+  // id to ActiveSession; if none exists (already finished), fall back home.
+  const [logId, setLogId] = useState<string | null | undefined>(undefined);
   useEffect(() => {
-    if (view === 'home') void refreshInProgress();
-  }, [view, refreshInProgress]);
+    void (async () => {
+      const logs = await getAllLogs();
+      setLogId(logs.find((l) => l.completedAt === null)?.id ?? null);
+    })();
+  }, []);
+  useEffect(() => {
+    if (logId === null) go({ name: 'home' });
+  }, [logId]);
 
-  function openSession(logId: string) {
-    setActiveLogId(logId);
-    setView('session');
+  if (logId === undefined || logId === null) {
+    return <CenteredNote>Loading…</CenteredNote>;
   }
+  return <ActiveSession logId={logId} onFinish={() => go({ name: 'home' })} />;
+}
 
-  if (view === 'exercises') {
-    return <ExerciseList onExit={() => setView('home')} />;
-  }
-  if (view === 'routines') {
-    return <RoutineList onOpenSession={openSession} onExit={() => setView('home')} />;
-  }
-  if (view === 'history') {
-    return <History onResume={openSession} onExit={() => setView('home')} />;
-  }
-  if (view === 'checklog') {
-    return <CheckLog onExit={() => setView('checks')} />;
-  }
-  if (view === 'checks') {
-    return (
-      <div className="mx-auto max-w-md space-y-3 p-4 pb-24">
-        <header className="flex items-center justify-between">
-          <h1 className="text-xl font-bold tracking-tight text-slate-100">Check-offs</h1>
-          <button
-            onClick={() => setView('home')}
-            className="rounded px-1 py-1 text-sm text-slate-400 hover:text-slate-200"
-          >
-            Done
-          </button>
-        </header>
-        <WeekStatus />
-        <DailyGtgStatus />
-        <button
-          onClick={() => setView('checklog')}
-          className="w-full rounded-lg border border-slate-700 bg-brand-surface px-4 py-2 text-sm font-semibold text-slate-200"
-        >
-          View check log
-        </button>
-      </div>
-    );
-  }
-  if (view === 'session' && activeLogId) {
-    return (
-      <ActiveSession
-        logId={activeLogId}
-        onFinish={() => {
-          setActiveLogId(null);
-          setView('home');
-        }}
-      />
-    );
+function RoutineStartRoute({ routineId }: { routineId: string }) {
+  // AC1 (T6): navigate directly to a routine's start screen, bypassing home. Uses
+  // only existing screens (no new screen file per the T6 context manifest): a
+  // focused start block here in App. Unknown id → not-found. If a session is
+  // already in progress, surface Resume instead of silently starting a second log
+  // (the T4 resume-precedence edge case).
+  const [routine, setRoutine] = useState<Routine | null | undefined>(undefined);
+  const [inProgress, setInProgress] = useState<WorkoutLog | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      const [r, logs] = await Promise.all([getRoutine(routineId), getAllLogs()]);
+      setRoutine(r ?? null);
+      setInProgress(logs.find((l) => l.completedAt === null) ?? null);
+    })();
+  }, [routineId]);
+
+  if (routine === undefined) return <CenteredNote>Loading…</CenteredNote>;
+  if (routine === null) return <NotFound path={`/routine/${routineId}`} />;
+
+  async function start() {
+    const log = createLog(routine!.id, crypto.randomUUID(), new Date().toISOString());
+    await saveLog(log);
+    go({ name: 'session' });
   }
 
   return (
-    <main className="mx-auto flex min-h-full max-w-md flex-col items-center justify-center gap-4 p-6 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-surface">
-        <span className="text-3xl font-bold text-brand-accent">S</span>
-      </div>
-      <h1 className="text-2xl font-bold tracking-tight">Sendboard</h1>
-
-      {inProgress && (
+    <div className="mx-auto max-w-md p-4 pb-24">
+      <header className="mb-4 flex items-center justify-between">
+        <h1 className="text-xl font-bold tracking-tight text-slate-100">{routine.name}</h1>
         <button
-          onClick={() => openSession(inProgress.id)}
-          className="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 font-semibold text-amber-200"
+          onClick={() => go({ name: 'home' })}
+          className="rounded px-1 py-1 text-sm text-slate-400 hover:text-slate-200"
         >
-          Resume session
+          Home
         </button>
+      </header>
+
+      {inProgress ? (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+          <p className="text-sm font-semibold text-amber-200">You have an unfinished session</p>
+          <p className="mt-0.5 text-xs text-amber-100/80">
+            Started {new Date(inProgress.startedAt).toLocaleString()}. Finish or discard it before
+            starting another.
+          </p>
+          <button
+            onClick={() => go({ name: 'session' })}
+            className="mt-3 rounded-lg bg-brand-accent px-4 py-2 text-sm font-semibold text-brand-bg"
+          >
+            Resume session
+          </button>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-slate-700 bg-brand-surface p-4">
+          <p className="text-sm text-slate-400">{routine.exerciseIds.length} exercises</p>
+          <button
+            onClick={() => void start()}
+            className="mt-3 w-full rounded-lg bg-brand-accent px-4 py-2 font-semibold text-brand-bg"
+          >
+            Start {routine.name}
+          </button>
+        </div>
       )}
+    </div>
+  );
+}
+
+function ChecksRoute() {
+  return (
+    <div className="mx-auto max-w-md space-y-3 p-4 pb-24">
+      <header className="flex items-center justify-between">
+        <h1 className="text-xl font-bold tracking-tight text-slate-100">Check-offs</h1>
+        <button
+          onClick={() => go({ name: 'home' })}
+          className="rounded px-1 py-1 text-sm text-slate-400 hover:text-slate-200"
+        >
+          Done
+        </button>
+      </header>
+      <WeekStatus />
+      <DailyGtgStatus />
       <button
-        onClick={() => setView('routines')}
-        className="w-full rounded-lg bg-brand-accent px-4 py-2 font-semibold text-brand-bg"
+        onClick={() => go({ name: 'checklog' })}
+        className="w-full rounded-lg border border-slate-700 bg-brand-surface px-4 py-2 text-sm font-semibold text-slate-200"
       >
-        Start a session
+        View check log
       </button>
+    </div>
+  );
+}
+
+function NotFound({ path }: { path: string }) {
+  return (
+    <main className="mx-auto flex min-h-full max-w-md flex-col items-center justify-center gap-4 p-6 text-center">
+      <h1 className="text-2xl font-bold tracking-tight text-slate-100">Page not found</h1>
+      <p className="text-sm text-slate-400">
+        Nothing lives at <span className="font-mono text-slate-300">{path}</span>.
+      </p>
       <button
-        onClick={() => setView('exercises')}
-        className="w-full rounded-lg border border-slate-700 bg-brand-surface px-4 py-2 font-semibold text-slate-200"
+        onClick={() => go({ name: 'home' })}
+        className="rounded-lg bg-brand-accent px-4 py-2 font-semibold text-brand-bg"
       >
-        Browse exercises
+        Go home
       </button>
-      <button
-        onClick={() => setView('history')}
-        className="w-full rounded-lg border border-slate-700 bg-brand-surface px-4 py-2 font-semibold text-slate-200"
-      >
-        History
-      </button>
-      <button
-        onClick={() => setView('checks')}
-        className="w-full rounded-lg border border-slate-700 bg-brand-surface px-4 py-2 font-semibold text-slate-200"
-      >
-        Check-offs
-      </button>
-      <PersistenceHeartbeat />
-      <p className="text-xs text-slate-500">v{__APP_VERSION__}</p>
+    </main>
+  );
+}
+
+function CenteredNote({ children }: { children: ReactNode }) {
+  return (
+    <main className="mx-auto flex min-h-full max-w-md items-center justify-center p-6">
+      <p className="text-sm text-slate-400">{children}</p>
     </main>
   );
 }

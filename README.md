@@ -10,7 +10,11 @@ The full build specification and its decision log live in
 
 ## Status
 
-Scaffold (T1): installable, auto-deploying PWA shell. Feature tasks T2–T8 follow.
+Feature-complete (T1–T8): data layer, exercise browsing, session logging, history,
+climbing/GtG check-offs, settings with JSON backup export/import, hash routing, a
+home + tab-bar navigation shell, and install onboarding. Remaining is the on-device
+acceptance pass (T0 48h storage gate, T7 export/import on iOS Safari, T8 criterion-5
+walkthrough).
 
 ## Stack
 
@@ -36,9 +40,32 @@ subpath — `base` in [`vite.config.ts`](vite.config.ts) must match the repo nam
 
 Live URL: https://nickderrico.github.io/sendboard/
 
-> **Reminders:** the app intentionally has no reminder feature (spec decision D2a).
-> Scheduling lives in an external repeating iPhone alarm or a Todoist recurring task.
-> The reminder-setup steps and deep-link URLs will be documented here in task T6.
+## Reminders
+
+The app has **no built-in reminders** (spec decision D2a), and none is coming: iOS
+Safari cannot fire notifications from an installed PWA, and no external trigger can
+open the installed app directly (the T0 spike in
+[`climbing-app-spec.md`](climbing-app-spec.md) confirmed this on device). So the
+*timing* lives in a tool you already have, and you open Sendboard by tapping its
+home-screen icon. Pick either option:
+
+**Option A — repeating iPhone alarm**
+
+1. Open the Clock app → **Alarms** → **+**.
+2. Set your training time; under **Repeat**, choose your training days.
+3. Label it "Sendboard — train" so the alarm text names the task.
+4. When it goes off, tap the **Sendboard** icon on your home screen.
+
+**Option B — Todoist recurring task**
+
+1. Create a task "Sendboard training" with a recurring due date (e.g. `every Mon, Wed, Fri, Sat`).
+2. Turn on Todoist's reminder for the task's due time.
+3. When the reminder fires, tap the **Sendboard** icon on your home screen.
+
+> There is deliberately **no deep-link URL** to paste into the alarm or task. On iOS
+> an `https` URL opens Safari — a separate storage context from the installed app —
+> which would split your logged data across two stores. Tapping the installed icon is
+> the only reliable way in.
 
 ## Regenerating icons
 
