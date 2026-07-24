@@ -1,0 +1,80 @@
+import { useEffect, useState } from 'react';
+import type { Exercise, WorkoutLog } from '../types';
+import { getAllExercises, getRoutine } from '../lib/storage';
+
+// Read-only view of a completed session (T5 non-goal: no editing in v1).
+export function LogDetail({ log, onBack }: { log: WorkoutLog; onBack: () => void }) {
+  const [routineName, setRoutineName] = useState(log.routineId);
+  const [exercisesById, setExercisesById] = useState<Map<string, Exercise>>(new Map());
+
+  useEffect(() => {
+    void (async () => {
+      const [routine, all] = await Promise.all([getRoutine(log.routineId), getAllExercises()]);
+      setRoutineName(routine?.name ?? log.routineId);
+      setExercisesById(new Map(all.map((e) => [e.id, e])));
+    })();
+  }, [log.routineId]);
+
+  const when = log.completedAt ?? log.startedAt;
+
+  return (
+    <div className="mx-auto max-w-md p-4 pb-24">
+      <button
+        onClick={onBack}
+        className="mb-4 -ml-1 flex items-center gap-1 rounded px-1 py-1 text-sm text-slate-400 hover:text-slate-200"
+      >
+        <span aria-hidden>←</span> Back
+      </button>
+
+      <h1 className="text-xl font-bold tracking-tight text-slate-100">{routineName}</h1>
+      <p className="mt-0.5 text-xs text-slate-500">{new Date(when).toLocaleString()}</p>
+
+      {log.entries.length === 0 ? (
+        <p className="mt-6 text-sm text-slate-400">No exercises were logged in this session.</p>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {log.entries.map((entry) => {
+            // Missing catalog entry → show the raw id, never crash (edge case).
+            const name = exercisesById.get(entry.exerciseId)?.name ?? entry.exerciseId;
+            return (
+              <section
+                key={entry.exerciseId}
+                className="rounded-xl border border-slate-700 bg-brand-surface p-3"
+              >
+                <h2 className="font-semibold text-slate-100">{name}</h2>
+                {entry.sets.length === 0 ? (
+                  <p className="mt-1 text-xs text-slate-500">No sets.</p>
+                ) : (
+                  <ul className="mt-2 space-y-1">
+                    {entry.sets.map((set, i) => (
+                      <li key={i} className="flex items-center gap-2 text-sm text-slate-200">
+                        <span className="w-4 shrink-0 text-xs text-slate-500">{i + 1}</span>
+                        <span className="flex-1 break-words">{set.load || '—'}</span>
+                        <span className="flex-1 break-words">{set.reps || '—'}</span>
+                        <span className="w-14 shrink-0 text-right text-xs text-slate-400">
+                          {set.rpe === null ? '' : `RPE ${set.rpe}`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {entry.notes.trim() !== '' && (
+                  <p className="mt-2 break-words text-sm italic text-slate-400">{entry.notes}</p>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      )}
+
+      {log.sessionNotes.trim() !== '' && (
+        <section className="mt-4 rounded-xl border border-slate-700 bg-brand-surface p-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Session notes
+          </h2>
+          <p className="mt-1 break-words text-sm text-slate-200">{log.sessionNotes}</p>
+        </section>
+      )}
+    </div>
+  );
+}

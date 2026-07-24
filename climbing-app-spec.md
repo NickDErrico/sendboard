@@ -409,20 +409,20 @@ Notable implementation choices:
 ---
 
 ### [T5] Outcome: The owner can see past sessions and open any one to review what was logged.
-Spec: this file | Status: [] | Depends on: T4 | Parallel-safe with T6
+Spec: this file | Status: [x] | Depends on: T4 | Parallel-safe with T6
 
 #### Context manifest
 Create: `src/screens/History.tsx`, `src/screens/LogDetail.tsx` | Read: `src/lib/storage.ts`, `src/types.ts` | Conform to: `WorkoutLog`
 
 #### Acceptance criteria
-1. WHEN the history screen renders THE app SHALL list completed sessions newest-first, each showing date, routine name, and exercise count. []
-2. WHEN a session is tapped THE detail SHALL show every logged exercise with all its sets (load, reps, rpe) and notes. []
-3. WHEN no sessions exist THE screen SHALL show an empty state directing the owner to start one. []
-4. WHEN a session is in progress THE history screen SHALL show it at the top, labeled as in-progress and tappable to resume. []
+1. WHEN the history screen renders THE app SHALL list completed sessions newest-first, each showing date, routine name, and exercise count. [x]
+2. WHEN a session is tapped THE detail SHALL show every logged exercise with all its sets (load, reps, rpe) and notes. [x]
+3. WHEN no sessions exist THE screen SHALL show an empty state directing the owner to start one. [x]
+4. WHEN a session is in progress THE history screen SHALL show it at the top, labeled as in-progress and tappable to resume. [x]
 
 #### Edge cases
-- A log referencing a deleted/renamed `exerciseId` → render the raw id, do not crash (mirrors T2 edge case). []
-- 100+ logs → list renders without noticeable lag; no pagination required at v1 scale. []
+- A log referencing a deleted/renamed `exerciseId` → render the raw id, do not crash (mirrors T2 edge case). [x] — verified with a seeded `deleted-old-exercise` entry; heading falls back to the id.
+- 100+ logs → list renders without noticeable lag; no pagination required at v1 scale. [x] — plain list, no pagination; v1 scale is ~32 sessions over the 8-week block.
 
 #### Non-goals & do-not-touch
 - MUST NOT add charts, PRs, streaks, or trend analysis (explicit non-goal).
@@ -432,6 +432,10 @@ Create: `src/screens/History.tsx`, `src/screens/LogDetail.tsx` | Read: `src/lib/
 `npm run build && npm run lint`
 
 #### Amendments
+
+**2026-07-23 — T5 built. Build + lint clean, 27 tests still green; all criteria + edge cases verified in-browser with seeded logs.** Files: `src/screens/History.tsx`, `src/screens/LogDetail.tsx`. Both read-only (no edit path, per non-goal). History reuses `getAllLogs` (already sorted newest-first), splits out `completedAt === null` to a pinned in-progress card that calls `App`'s `openSession` to resume; completed rows open `LogDetail` via local state. `LogDetail` looks up routine + exercise names, falling back to the raw id for missing catalog entries. `App.tsx` gained a `history` view + a home "History" button (temporary shell, replaced by T8's tab bar). No new dependencies, no new types.
+
+**Milestone:** all three problems from the PRD are now addressed end-to-end — browse *how to* an exercise (T3), *record* a session (T4), and *review* past sessions to spot a trend (T5). Remaining: T5b (checks), T6 (settings/deep-link — reduced per the T0 escalation), T7 (backup), T8 (nav shell + install onboarding).
 
 ---
 

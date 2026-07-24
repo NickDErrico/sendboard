@@ -5,6 +5,7 @@ import { getAllLogs } from './lib/storage';
 import { ExerciseList } from './screens/ExerciseList';
 import { RoutineList } from './screens/RoutineList';
 import { ActiveSession } from './screens/ActiveSession';
+import { History } from './screens/History';
 
 // ─── TEMPORARY: T0 persistence heartbeat ─────────────────────────────────────
 // Kept ONLY until the 48h storage-persistence gate (T0 AC2 / D4) is confirmed on
@@ -77,7 +78,7 @@ function PersistenceHeartbeat() {
 
 // Temporary shell so screens built so far are reachable on device. The real home
 // screen, tab bar, and routing arrive in T8; this switch is replaced then.
-type View = 'home' | 'exercises' | 'routines' | 'session';
+type View = 'home' | 'exercises' | 'routines' | 'session' | 'history';
 
 export default function App() {
   const [view, setView] = useState<View>('home');
@@ -105,6 +106,9 @@ export default function App() {
   }
   if (view === 'routines') {
     return <RoutineList onOpenSession={openSession} onExit={() => setView('home')} />;
+  }
+  if (view === 'history') {
+    return <History onResume={openSession} onExit={() => setView('home')} />;
   }
   if (view === 'session' && activeLogId) {
     return (
@@ -144,6 +148,12 @@ export default function App() {
         className="w-full rounded-lg border border-slate-700 bg-brand-surface px-4 py-2 font-semibold text-slate-200"
       >
         Browse exercises
+      </button>
+      <button
+        onClick={() => setView('history')}
+        className="w-full rounded-lg border border-slate-700 bg-brand-surface px-4 py-2 font-semibold text-slate-200"
+      >
+        History
       </button>
       <PersistenceHeartbeat />
       <p className="text-xs text-slate-500">v{__APP_VERSION__}</p>
