@@ -328,25 +328,25 @@ Per D9 there are **no** climbing routines. The two climbing exercises stay in th
 ---
 
 ### [T3] Outcome: The owner can browse all exercises and open one to see how to perform it and what equipment it needs.
-Spec: this file | Status: [] | Depends on: T2 | Parallel-safe with T4
+Spec: this file | Status: [x] | Depends on: T2 | Parallel-safe with T4
 
 #### Context manifest
 Create: `src/screens/ExerciseList.tsx`, `src/screens/ExerciseDetail.tsx`, `src/components/EquipmentBadge.tsx` | Read: `src/types.ts`, `src/lib/storage.ts` | Conform to: `Exercise` type | Imitate: n/a (first UI task — establishes the pattern others follow)
 
 #### Acceptance criteria
-1. WHEN the exercise list renders THE screen SHALL show all 20 seeded exercises grouped by `category`, each row showing name, `summary`, and equipment badges. []
-1a. WHEN an exercise has `gtgEligible: true` THE row and detail screen SHALL show a distinct "GtG" badge, and a filter SHALL exist to show only GtG-eligible exercises. []
-2. WHEN a filter control is set to an `Equipment` value THE list SHALL show only exercises whose `equipment` array contains it. []
-3. WHEN an exercise row is tapped THE detail screen SHALL render `name`, `prescription`, all `howTo` steps as an ordered list, all `cues`, and all `safetyNotes`. []
-4. WHEN an exercise has a non-empty `safetyNotes` array THE notes SHALL render in a visually distinct warning block, not as body text. []
-5. WHEN the detail screen is open on a 390px-wide viewport THE full `prescription` SHALL be readable without horizontal scrolling. []
-6. WHEN an exercise has `isoType` of `overcoming` or `yielding` THE detail screen SHALL display that label. []
+1. WHEN the exercise list renders THE screen SHALL show all 20 seeded exercises grouped by `category`, each row showing name, `summary`, and equipment badges. [x]
+1a. WHEN an exercise has `gtgEligible: true` THE row and detail screen SHALL show a distinct "GtG" badge, and a filter SHALL exist to show only GtG-eligible exercises. [x]
+2. WHEN a filter control is set to an `Equipment` value THE list SHALL show only exercises whose `equipment` array contains it. [x]
+3. WHEN an exercise row is tapped THE detail screen SHALL render `name`, `prescription`, all `howTo` steps as an ordered list, all `cues`, and all `safetyNotes`. [x]
+4. WHEN an exercise has a non-empty `safetyNotes` array THE notes SHALL render in a visually distinct warning block, not as body text. [x]
+5. WHEN the detail screen is open on a 390px-wide viewport THE full `prescription` SHALL be readable without horizontal scrolling. [x]
+6. WHEN an exercise has `isoType` of `overcoming` or `yielding` THE detail screen SHALL display that label. [x]
 
 #### Edge cases
-- Exercise with empty `safetyNotes` → warning block omitted entirely, no empty container. []
-- Filter selection matching zero exercises → explicit empty state, not a blank screen. []
-- Long `howTo` step text → wraps, does not clip. []
-- Back navigation from detail → returns to the list with the filter still applied. []
+- Exercise with empty `safetyNotes` → warning block omitted entirely, no empty container. [x] — conditional on `safetyNotes.length > 0`.
+- Filter selection matching zero exercises → explicit empty state, not a blank screen. [x] — verified with GtG-only + Hangboard (0 matches → empty state + Clear filters).
+- Long `howTo` step text → wraps, does not clip. [x] — verified no horizontal scroll at 390px.
+- Back navigation from detail → returns to the list with the filter still applied. [x] — filter state lives in `ExerciseList`; detail is a conditional render, so it is preserved.
 
 #### Non-goals & do-not-touch
 - MUST NOT allow editing or creating exercises.
@@ -357,6 +357,12 @@ Create: `src/screens/ExerciseList.tsx`, `src/screens/ExerciseDetail.tsx`, `src/c
 `npm run build && npm run lint`, plus device check of criteria 3–5 on the installed PWA.
 
 #### Amendments
+
+**2026-07-23 — T3 built. Build + lint (0 warnings) + 17 tests green; all criteria verified in a 390px browser.** Files: `src/components/EquipmentBadge.tsx` (equipment + GtG badges), `src/screens/ExerciseList.tsx`, `src/screens/ExerciseDetail.tsx`. Two deliberate additions beyond the 3-file context manifest, both to keep this pattern-setting task clean:
+- **`src/lib/equipment.ts`** — holds `EQUIPMENT_LABELS`/`EQUIPMENT_OPTIONS`. Moved out of the component file because `react-refresh/only-export-components` warns on exporting an object constant alongside components; a shared non-component module is the rule's own recommended fix.
+- **Navigation is local component state, not a router.** No router exists yet (T6 creates `routes.ts`, T8 wires `App`). ExerciseList holds filter + selected-id state and conditionally renders ExerciseDetail, which is what makes "back preserves the filter" fall out for free. `App.tsx` gained a **temporary** `home`↔`exercises` switch so the screen is reachable on device; this is replaced by T8's tab bar. The persistence heartbeat stays on the temporary home until the 48h gate closes.
+
+Pattern established for T4/T5b/T5 to imitate: screen components under `src/screens`, shared bits under `src/components`, mobile-first `max-w-md` layout, brand-surface cards, load data via the `storage.ts` async API in `useEffect`.
 
 ---
 
