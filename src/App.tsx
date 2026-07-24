@@ -1,6 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { openDB } from 'idb';
+import type { WorkoutLog } from './types';
+import { getAllLogs } from './lib/storage';
 import { ExerciseList } from './screens/ExerciseList';
+import { RoutineList } from './screens/RoutineList';
+import { ActiveSession } from './screens/ActiveSession';
 
 // ─── TEMPORARY: T0 persistence heartbeat ─────────────────────────────────────
 // Kept ONLY until the 48h storage-persistence gate (T0 AC2 / D4) is confirmed on
@@ -73,13 +77,45 @@ function PersistenceHeartbeat() {
 
 // Temporary shell so screens built so far are reachable on device. The real home
 // screen, tab bar, and routing arrive in T8; this switch is replaced then.
-type View = 'home' | 'exercises';
+type View = 'home' | 'exercises' | 'routines' | 'session';
 
 export default function App() {
   const [view, setView] = useState<View>('home');
+  const [activeLogId, setActiveLogId] = useState<string | null>(null);
+  const [inProgress, setInProgress] = useState<WorkoutLog | null>(null);
+
+  const refreshInProgress = useCallback(async () => {
+    const logs = await getAllLogs();
+    setInProgress(logs.find((l) => l.completedAt === null) ?? null);
+  }, []);
+
+  // Re-check for a resumable session whenever we land on home (covers reopen
+  // after a force-close, T4 criterion 4).
+  useEffect(() => {
+    if (view === 'home') void refreshInProgress();
+  }, [view, refreshInProgress]);
+
+  function openSession(logId: string) {
+    setActiveLogId(logId);
+    setView('session');
+  }
 
   if (view === 'exercises') {
     return <ExerciseList onExit={() => setView('home')} />;
+  }
+  if (view === 'routines') {
+    return <RoutineList onOpenSession={openSession} onExit={() => setView('home')} />;
+  }
+  if (view === 'session' && activeLogId) {
+    return (
+      <ActiveSession
+        logId={activeLogId}
+        onFinish={() => {
+          setActiveLogId(null);
+          setView('home');
+        }}
+      />
+    );
   }
 
   return (
@@ -88,9 +124,24 @@ export default function App() {
         <span className="text-3xl font-bold text-brand-accent">S</span>
       </div>
       <h1 className="text-2xl font-bold tracking-tight">Sendboard</h1>
+
+      {inProgress && (
+        <button
+          onClick={() => openSession(inProgress.id)}
+          className="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 font-semibold text-amber-200"
+        >
+          Resume session
+        </button>
+      )}
+      <button
+        onClick={() => setView('routines')}
+        className="w-full rounded-lg bg-brand-accent px-4 py-2 font-semibold text-brand-bg"
+      >
+        Start a session
+      </button>
       <button
         onClick={() => setView('exercises')}
-        className="w-full rounded-lg bg-brand-accent px-4 py-2 font-semibold text-brand-bg"
+        className="w-full rounded-lg border border-slate-700 bg-brand-surface px-4 py-2 font-semibold text-slate-200"
       >
         Browse exercises
       </button>

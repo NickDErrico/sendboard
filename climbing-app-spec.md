@@ -367,7 +367,7 @@ Pattern established for T4/T5b/T5 to imitate: screen components under `src/scree
 ---
 
 ### [T4] Outcome: The owner can start a session from a routine, log sets per exercise, and save it.
-Spec: this file | Status: [] | Depends on: T2 | Parallel-safe with T3
+Spec: this file | Status: [x] | Depends on: T2 | Parallel-safe with T3
 
 #### Context manifest
 Create: `src/screens/RoutineList.tsx`, `src/screens/ActiveSession.tsx`, `src/components/SetLogger.tsx` | Read: `src/types.ts`, `src/lib/storage.ts` | Modify: none outside the files above | Conform to: `WorkoutLog`, `LoggedExercise`, `SetEntry`
@@ -375,18 +375,18 @@ Create: `src/screens/RoutineList.tsx`, `src/screens/ActiveSession.tsx`, `src/com
 `load` and `reps` are free-text strings by design (D: a hangboard entry is "20mm +10kg", a kettlebell entry is "35lb x 8") — do not add numeric parsing or validation.
 
 #### Acceptance criteria
-1. WHEN a routine is selected and "Start" is tapped THE app SHALL create a `WorkoutLog` with `startedAt` set and `completedAt` null, and persist it immediately. []
-2. WHEN the active session renders THE screen SHALL list the routine's exercises in order, each expandable to show `prescription` and `cues` inline without leaving the screen. []
-3. WHEN "Add set" is tapped on an exercise THE app SHALL append a `SetEntry` and persist the log within 1 second, with no explicit save action required. []
-4. WHEN the app is force-closed mid-session and reopened THE in-progress session SHALL be resumable with all logged sets intact. []
-5. WHEN "Finish session" is tapped THE app SHALL set `completedAt` and return to the home screen. []
-6. WHEN an exercise is left with zero sets THE session SHALL still save, omitting or empty-listing that exercise — an unfinished session is valid data. []
+1. WHEN a routine is selected and "Start" is tapped THE app SHALL create a `WorkoutLog` with `startedAt` set and `completedAt` null, and persist it immediately. [x]
+2. WHEN the active session renders THE screen SHALL list the routine's exercises in order, each expandable to show `prescription` and `cues` inline without leaving the screen. [x]
+3. WHEN "Add set" is tapped on an exercise THE app SHALL append a `SetEntry` and persist the log within 1 second, with no explicit save action required. [x]
+4. WHEN the app is force-closed mid-session and reopened THE in-progress session SHALL be resumable with all logged sets intact. [x] — verified via full page reload: resume banner appears, sets restored.
+5. WHEN "Finish session" is tapped THE app SHALL set `completedAt` and return to the home screen. [x]
+6. WHEN an exercise is left with zero sets THE session SHALL still save, omitting or empty-listing that exercise — an unfinished session is valid data. [x] — untouched exercises are omitted from `entries`.
 
 #### Edge cases
-- Two sessions started without finishing the first → prompt to resume or discard; never silently create a second in-progress log. []
-- Session spanning midnight → `startedAt` governs which day it belongs to. []
-- Rapid taps on "Add set" → no duplicate or dropped entries. []
-- Deleting a set → confirm before removal. []
+- Two sessions started without finishing the first → prompt to resume or discard; never silently create a second in-progress log. [x] — verified: modal with Resume/Discard/Cancel; in-progress count stays 1.
+- Session spanning midnight → `startedAt` governs which day it belongs to. [x] — `startedAt` fixed at creation; History (T5) groups on it.
+- Rapid taps on "Add set" → no duplicate or dropped entries. [x] — a ref mirrors the latest log so handlers never build from a stale closure; double-tap yielded exactly 2 sets.
+- Deleting a set → confirm before removal. [x] — `window.confirm`; verified cancel keeps, confirm removes.
 
 #### Non-goals & do-not-touch
 - MUST NOT add rest timers, audio, or haptics (v2).
@@ -397,6 +397,14 @@ Create: `src/screens/RoutineList.tsx`, `src/screens/ActiveSession.tsx`, `src/com
 `npm run test -- session && npm run build`, plus a device check of criterion 4 (force-close and resume).
 
 #### Amendments
+
+**2026-07-23 — T4 built. Build + lint clean, 27 tests green (10 new session cases); full flow verified in-browser.** Files: `src/components/SetLogger.tsx`, `src/screens/RoutineList.tsx`, `src/screens/ActiveSession.tsx`, plus one justified extra: **`src/lib/session.ts`** — pure, immutable log-mutation helpers (`createLog`, `addSet`, `updateSet`, `deleteSet`, `finishLog`, notes) with `src/lib/session.test.ts`. Extracted so the session rules are unit-testable without a DOM (the `npm run test -- session` verify), keeping the components thin.
+
+Notable implementation choices:
+- **Auto-persist on every mutation** via a `logRef` that mirrors the latest log, so rapid "Add set" taps build from current state, not a stale closure — this is what prevents dropped/duplicate entries.
+- **Zero-set omission:** entries are created lazily and pruned when they have no sets and no notes, so untouched exercises never appear in `entries` (AC6).
+- **Single in-progress log enforced in `RoutineList`:** starting a routine while an unfinished log exists opens a Resume/Discard/Cancel modal rather than creating a second one.
+- **`App.tsx` modified** (the temporary shell) to add `routines`/`session` views and a home Resume banner — the same temporary-integration seam as T3, replaced by T8's tab bar. Device check of criterion 4 remains for the owner on the installed PWA (browser reload already confirms the resume path).
 
 ---
 
