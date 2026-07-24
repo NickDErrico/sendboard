@@ -109,10 +109,10 @@ Spec: this file | Status: [] | Depends on: none
 Create: throwaway repo or branch `spike/ios-pwa`. Nothing from this task ships. | Conform to: nothing | Imitate: nothing
 
 #### Acceptance criteria
-1. WHEN a minimal Vite PWA is deployed to GitHub Pages over HTTPS THE owner SHALL be able to add it to the iPhone home screen and launch it in standalone mode (no Safari chrome visible). []
+1. WHEN a minimal Vite PWA is deployed to GitHub Pages over HTTPS THE owner SHALL be able to add it to the iPhone home screen and launch it in standalone mode (no Safari chrome visible). [x]
 2. WHEN a value is written to IndexedDB, the app is closed, and it is reopened after ≥48h with no intervening use THE stored value SHALL still be present. []
-3. WHEN an iOS Shortcuts personal automation is set to run at a specified time with an "Open URL" action pointing at the PWA URL THE automation SHALL fire and open the installed PWA (not Safari). []
-4. WHEN the automation fires THE owner SHALL confirm whether it required manual confirmation or ran automatically, and this SHALL be recorded in the spike report. []
+3. WHEN an iOS Shortcuts personal automation is set to run at a specified time with an "Open URL" action pointing at the PWA URL THE automation SHALL fire and open the installed PWA (not Safari). [f] — FAILED: the automation fired but the "Open URLs" action opened **Safari**, not the installed standalone PWA. See T0 amendment 2026-07-23 (device pass). This is a known iOS behavior, not a bug in the app; it forces a change to T6/D2a (escalated below), not to D1/D4.
+4. WHEN the automation fires THE owner SHALL confirm whether it required manual confirmation or ran automatically, and this SHALL be recorded in the spike report. [x] — ran **automatically**, no manual confirmation required (with "Ask Before Running" off).
 
 #### Edge cases
 - Airplane mode / offline at launch → app must still open from cache (service worker). []
@@ -127,6 +127,19 @@ Create: throwaway repo or branch `spike/ios-pwa`. Nothing from this task ships. 
 `npm run build` succeeds; then a written spike report appended to this file under "Amendments" stating pass/fail per criterion and the observed iOS version. If criterion 2 or 3 fails, STOP and escalate — decisions D1/D2 must be revisited.
 
 #### Amendments (append-only: date — what changed — why)
+
+**2026-07-23 — T0 device pass results (owner, against the live URL).** Owner installed the deployed shell on their iPhone and ran the checks:
+
+- **AC1 standalone launch — PASS.** Added to home screen from Safari, launches with no browser chrome; probe reads "standalone ✓".
+- **AC2 48h persistence — PENDING.** Immediate write→close→reopen persisted correctly. The ≥48h eviction check (the D4 gate) is still running; owner reports back ~2026-07-25.
+- **AC3 Shortcuts opens the installed PWA — FAIL.** A Time-of-Day personal automation with an "Open URLs" action pointed at the PWA URL fired automatically, but opened the URL in **Safari**, not the installed standalone PWA. This is expected iOS behavior: iOS has no URL-scheme routing that hands an https URL to an installed home-screen web app the way Android deep-links to an installed PWA scope. An "Open URLs" action therefore always lands in the default browser.
+- **AC4 manual vs automatic — PASS/recorded.** Ran fully automatically, no confirmation tap.
+- Also passing (T1 AC4): offline launch from the icon rendered from the service-worker cache.
+- **iOS version:** _pending from owner._
+
+**Escalation — impact on D2a / T6 (the deep-link deliverable).** D2a kept exactly one reminder-adjacent feature: a deep link so an external alarm/Todoist/Shortcut could "open the app straight to today's routine." AC3 shows the URL path opens **Safari**, a *different* browsing context from the installed PWA — which on iOS has historically had a **separate storage jar** from the home-screen app. So a URL-based reminder would (a) not land in the installed app, and (b) risk fragmenting logged data into a second Safari-side store. This defeats the deep link's purpose. Two candidate resolutions, owner to choose (see T6 — do not build the URL deep-link as the primary mechanism until decided):
+1. **Shortcuts "Open App" action targeting the installed Sendboard PWA** (iOS 16.4+ lists installed web apps as openable apps). Opens the *real* installed app in the correct storage context, but cannot carry a `/routine/:id` path — it lands wherever the app opens (the T8 home screen, which already gives one-tap Start for both routines). Needs a 30-second device confirmation that the PWA is selectable in "Open App".
+2. **Keep the URL `/routine/:id` route in T6 as a low-value bonus** for the Safari path / manual bookmarks only, and demote it from "T6's main deliverable" to nice-to-have; the primary documented reminder path becomes a repeating alarm + tapping the installed icon (or option 1's "Open App").
 
 **2026-07-23 — T0 folded into T1 as the spike vehicle (owner decision).** The device spike cannot be run by the executor (needs the owner's iPhone + a live HTTPS deploy). Rather than build a throwaway button-and-textfield PWA, the owner approved building the real T1 shell and using *it* to satisfy T0's on-device criteria — T1 acceptance criteria 3–5 overlap T0's 1, 2, and 4. No throwaway work; strict "don't proceed to T1 before T0" is knowingly relaxed, logged here. **Remaining owner actions against https://nickderrico.github.io/sendboard/:** (1) Add to Home Screen, confirm standalone launch [T0 AC1]; (2) write a value, reopen after ≥48h, confirm it persists [T0 AC2 — the one gate that, if it fails, forces revisiting D1/D4]; (3) set an iOS Shortcuts "Open URL" automation at a time, confirm it opens the PWA not Safari, and record whether it needed manual confirmation [T0 AC3/AC4]; record the iOS version. Gate 2 (decomposition review) is unblocked for T2 planning since the build/deploy/subpath assumptions are now machine-confirmed; only the storage-persistence gate (AC2) stays genuinely open pending the 48h check.
 
