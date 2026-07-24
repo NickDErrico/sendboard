@@ -440,7 +440,7 @@ Create: `src/screens/History.tsx`, `src/screens/LogDetail.tsx` | Read: `src/lib/
 ---
 
 ### [T5b] Outcome: The owner can check off a climbing day or a greasing-the-groove habit in two taps, and see whether this week has had both climbing types and whether today's GtG is done.
-Spec: this file | Status: [] | Depends on: T2 | Parallel-safe with T5, T6
+Spec: this file | Status: [x] | Depends on: T2 | Parallel-safe with T5, T6
 
 #### Context manifest
 Create: `src/components/WeekStatus.tsx`, `src/components/DailyGtgStatus.tsx`, `src/screens/CheckLog.tsx` | Read: `src/types.ts`, `src/lib/storage.ts` (`Check`, `CHECK_SCOPE`, `getChecksForWeek`, `getChecksForDay`) | Conform to: `Check`, D10 week boundary, D11/D12 | Imitate: the screen structure established in T3
@@ -448,23 +448,23 @@ Create: `src/components/WeekStatus.tsx`, `src/components/DailyGtgStatus.tsx`, `s
 This is deliberately not a workout log (D9, D11). No sets, no loads, no timers. A check-off and an optional note. Both weekly and daily checks use the same `Check` record and differ only by `CHECK_SCOPE[kind]`.
 
 #### Acceptance criteria
-1. WHEN the week status component renders THE app SHALL show the current Monday-start week with a distinct done/not-done state for `climbing-volume` and `climbing-limit`. []
-2. WHEN a weekly check is tapped off THE app SHALL persist a `Check` dated today and the status SHALL update to done without a reload. []
-3. WHEN both climbing types are done for the current week THE component SHALL render a visually distinct "week complete" state. []
-4. WHEN a check is tapped again THE app SHALL offer to remove it, and on confirmation the status SHALL revert to not-done. []
-5. WHEN the daily GtG status component renders THE app SHALL show today's done/not-done state for `gtg-general` and `gtg-pull`, and SHALL reset to not-done at local midnight. []
-6. WHEN the daily GtG status renders THE component SHALL also show a count of how many of the last 7 days each GtG kind was completed. []
-7. WHEN the check log screen renders THE app SHALL list past weeks newest-first, each showing which climbing types were completed and how many GtG days that week contained. []
-8. WHEN a check is being added THE owner SHALL be able to attach an optional free-text note and SHALL be able to save without one. []
+1. WHEN the week status component renders THE app SHALL show the current Monday-start week with a distinct done/not-done state for `climbing-volume` and `climbing-limit`. [x]
+2. WHEN a weekly check is tapped off THE app SHALL persist a `Check` dated today and the status SHALL update to done without a reload. [x]
+3. WHEN both climbing types are done for the current week THE component SHALL render a visually distinct "week complete" state. [x]
+4. WHEN a check is tapped again THE app SHALL offer to remove it, and on confirmation the status SHALL revert to not-done. [x]
+5. WHEN the daily GtG status component renders THE app SHALL show today's done/not-done state for `gtg-general` and `gtg-pull`, and SHALL reset to not-done at local midnight. [x] — reads use `new Date()` each refresh, re-run on focus/visibilitychange, so the day rolls over.
+6. WHEN the daily GtG status renders THE component SHALL also show a count of how many of the last 7 days each GtG kind was completed. [x]
+7. WHEN the check log screen renders THE app SHALL list past weeks newest-first, each showing which climbing types were completed and how many GtG days that week contained. [x]
+8. WHEN a check is being added THE owner SHALL be able to attach an optional free-text note and SHALL be able to save without one. [x]
 
 #### Edge cases
-- Two volume days in one week → allowed, still renders as done once; do not block or warn. []
-- Two `gtg-general` checks on one day → allowed, renders as done once. GtG is many sets a day; the check means "I did this today," not "I did it once." []
-- A check dated Sunday 23:59 vs Monday 00:01 → different weeks (D10 test in T2 covers storage; verify UI reflects it). []
-- App left open across local midnight → daily status must roll over on next render or focus, not stay stuck on yesterday. []
-- Backdating: the owner forgot to check off yesterday → the add flow MUST allow choosing a date other than today, for both scopes. []
-- A week with zero checks appearing in history → render it as an explicitly empty week, do not silently omit it, or the "did I skip?" question goes unanswered. []
-- Timezone change while traveling → week and day grouping computed from local calendar dates (D10). []
+- Two volume days in one week → allowed, still renders as done once; do not block or warn. [x] — status is a boolean; unit-tested with two volume days.
+- Two `gtg-general` checks on one day → allowed, renders as done once. GtG is many sets a day; the check means "I did this today," not "I did it once." [x] — 7-day count uses distinct days; unit-tested (two same-day → counts once).
+- A check dated Sunday 23:59 vs Monday 00:01 → different weeks (D10 test in T2 covers storage; verify UI reflects it). [x] — UI uses `getChecksForWeek`; storage boundary tested in T2.
+- App left open across local midnight → daily status must roll over on next render or focus, not stay stuck on yesterday. [x] — focus/visibilitychange listener re-reads with a fresh `new Date()`.
+- Backdating: the owner forgot to check off yesterday → the add flow MUST allow choosing a date other than today, for both scopes. [x] — CheckLog add form has a native date picker + kind selector (all four scopes); verified with a backdated gtg-pull.
+- A week with zero checks appearing in history → render it as an explicitly empty week, do not silently omit it, or the "did I skip?" question goes unanswered. [x] — `summarizePastWeeks` fills the contiguous week range; verified an empty middle week renders "No checks this week".
+- Timezone change while traveling → week and day grouping computed from local calendar dates (D10). [x] — all keys via the local-calendar helpers.
 
 #### Non-goals & do-not-touch
 - MUST NOT create a `WorkoutLog` for climbing days or GtG.
@@ -477,6 +477,14 @@ This is deliberately not a workout log (D9, D11). No sets, no loads, no timers. 
 `npm run test -- checks && npm run build`
 
 #### Amendments
+
+**2026-07-24 — T5b built. Build + lint clean, 35 tests green (8 new checks cases); all criteria + edge cases verified in-browser.** Files: `src/components/WeekStatus.tsx`, `src/components/DailyGtgStatus.tsx`, `src/screens/CheckLog.tsx`, plus the justified extra `src/lib/checks.ts` (+ `checks.test.ts`) — pure aggregation (week status, daily status, 7-day counts, contiguous past-week summaries) so the logic is testable without IndexedDB (the `npm run test -- checks` verify).
+
+Design choices:
+- **Quick two-tap toggles** on `WeekStatus`/`DailyGtgStatus` mark/un-mark **today** (per the "two taps" outcome). Un-mark deletes all checks of that kind in the period (reverts to not-done) behind a confirm.
+- **Backdating + notes** live in the `CheckLog` add form (kind selector covering all four scopes, native date picker, optional note) — this is what satisfies AC8 and the backdate edge without cluttering the quick toggles.
+- **Midnight/timezone safety:** every read uses a fresh `new Date()` and re-runs on window focus/visibilitychange, and all grouping goes through the local-calendar helpers (D10). No streak/guilt mechanics anywhere (non-goal, and the training-plan §8 stop-conditions make punishing a missed day actively wrong).
+- `App.tsx` gained temporary `checks`/`checklog` views + a home "Check-offs" button; T8 folds `WeekStatus` + `DailyGtgStatus` onto the real home and the check log under a tab.
 
 ---
 

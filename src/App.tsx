@@ -6,6 +6,9 @@ import { ExerciseList } from './screens/ExerciseList';
 import { RoutineList } from './screens/RoutineList';
 import { ActiveSession } from './screens/ActiveSession';
 import { History } from './screens/History';
+import { WeekStatus } from './components/WeekStatus';
+import { DailyGtgStatus } from './components/DailyGtgStatus';
+import { CheckLog } from './screens/CheckLog';
 
 // ─── TEMPORARY: T0 persistence heartbeat ─────────────────────────────────────
 // Kept ONLY until the 48h storage-persistence gate (T0 AC2 / D4) is confirmed on
@@ -78,7 +81,7 @@ function PersistenceHeartbeat() {
 
 // Temporary shell so screens built so far are reachable on device. The real home
 // screen, tab bar, and routing arrive in T8; this switch is replaced then.
-type View = 'home' | 'exercises' | 'routines' | 'session' | 'history';
+type View = 'home' | 'exercises' | 'routines' | 'session' | 'history' | 'checks' | 'checklog';
 
 export default function App() {
   const [view, setView] = useState<View>('home');
@@ -109,6 +112,32 @@ export default function App() {
   }
   if (view === 'history') {
     return <History onResume={openSession} onExit={() => setView('home')} />;
+  }
+  if (view === 'checklog') {
+    return <CheckLog onExit={() => setView('checks')} />;
+  }
+  if (view === 'checks') {
+    return (
+      <div className="mx-auto max-w-md space-y-3 p-4 pb-24">
+        <header className="flex items-center justify-between">
+          <h1 className="text-xl font-bold tracking-tight text-slate-100">Check-offs</h1>
+          <button
+            onClick={() => setView('home')}
+            className="rounded px-1 py-1 text-sm text-slate-400 hover:text-slate-200"
+          >
+            Done
+          </button>
+        </header>
+        <WeekStatus />
+        <DailyGtgStatus />
+        <button
+          onClick={() => setView('checklog')}
+          className="w-full rounded-lg border border-slate-700 bg-brand-surface px-4 py-2 text-sm font-semibold text-slate-200"
+        >
+          View check log
+        </button>
+      </div>
+    );
   }
   if (view === 'session' && activeLogId) {
     return (
@@ -154,6 +183,12 @@ export default function App() {
         className="w-full rounded-lg border border-slate-700 bg-brand-surface px-4 py-2 font-semibold text-slate-200"
       >
         History
+      </button>
+      <button
+        onClick={() => setView('checks')}
+        className="w-full rounded-lg border border-slate-700 bg-brand-surface px-4 py-2 font-semibold text-slate-200"
+      >
+        Check-offs
       </button>
       <PersistenceHeartbeat />
       <p className="text-xs text-slate-500">v{__APP_VERSION__}</p>
