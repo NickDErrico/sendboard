@@ -1,0 +1,169 @@
+import type { Exercise } from '../types';
+
+// The in-session hold/rest timer (T10), as a pure state machine over
+// (state, now). Deliberately has no `Date.now()` inside it, no React import, and
+// no storage import — for the same reason checks.ts, session.ts, and rotation.ts
+// don't: the interval math has to be testable without a DOM or a clock.
+//
+// D18: every phase stores the absolute epoch-ms instant it began, and every
+// reading is computed as (now - startedAt). Nothing accumulates ticks. That is
+// what makes a backgrounded iOS PWA come back with the *correct* time rather
+// than one short by however long it was suspended — not persistence, which this
+// module deliberately has none of.
+
+export interface HoldSpec {
+  min: number; // seconds
+  max: number; // seconds; equal to min for a fixed target
+}
+
+export type TimerPhase = 'idle' | 'holding' | 'resting';
+
+export interface TimerState {
+  phase: TimerPhase;
+  /** The exercise the timer belongs to; retained after a hold so its result can be logged. */
+  exerciseId: string | null;
+  /** Epoch ms the current phase began. Meaningless when idle. */
+  startedAt: number;
+  /** Resting only: the full prescribed rest, in ms. */
+  restMs: number;
+  /** Measured duration of the hold that just finished, in ms; null once logged or cleared. */
+  heldMs: number | null;
+}
+
+export const IDLE_TIMER: TimerState = {
+  phase: 'idle',
+  exerciseId: null,
+  startedAt: 0,
+  restMs: 0,
+  heldMs: null,
+};
+
+/** Reads an exercise's optional timing fields (D17) into the shapes this module uses. */
+export function holdSpecOf(exercise: Exercise | undefined): HoldSpec | null {
+  if (!exercise?.holdSeconds) return null;
+  const [min, max] = exercise.holdSeconds;
+  return { min, max };
+}
+export function restMsOf(exercise: Exercise | undefined): number | null {
+  return exercise?.restSeconds == null ? null : exercise.restSeconds * 1000;
+}
+
+/** True when the timer bar has anything to show — a running phase or an unlogged result. */
+export function isTimerVisible(state: TimerState): boolean {
+  return state.phase !== 'idle' || state.heldMs !== null;
+}
+
+// ─── Transitions ─────────────────────────────────────────────────────────────
+
+// Starting a hold always takes over the single timer slot, discarding any
+// running rest and any unlogged result: there is one timer because there is one
+// owner with two hands, and the thing they just tapped is the thing they mean.
+export function startHold(exerciseId: string, now: number): TimerState {
+  return { phase: 'holding', exerciseId, startedAt: now, restMs: 0, heldMs: null };
+}
+
+export function startRest(exerciseId: string, restMs: number, now: number): TimerState {
+  return { phase: 'resting', exerciseId, startedAt: now, restMs, heldMs: null };
+}
+
+/**
+ * Ends a hold, keeping its measured duration so it can be logged (AC6).
+ *
+ * With a prescribed rest, the countdown starts in the same transition — the
+ * whole ergonomic point is that finishing a hang and starting its 3 minutes is
+ * one tap, not two. With none (the wall press), it lands idle but still holding
+ * its result, so the log control survives.
+ */
+export function stopHold(state: TimerState, now: number, restMs: number | null): TimerState {
+  if (state.phase !== 'holding') return state;
+  const heldMs = Math.max(0, now - state.startedAt);
+  if (restMs === null) {
+    return { ...IDLE_TIMER, exerciseId: state.exerciseId, heldMs };
+  }
+  return { phase: 'resting', exerciseId: state.exerciseId, startedAt: now, restMs, heldMs };
+}
+
+/** Pushes the rest target out without restarting it — the remaining time grows by `seconds`. */
+export function extendRest(state: TimerState, seconds: number): TimerState {
+  if (state.phase !== 'resting') return state;
+  return { ...state, restMs: state.restMs + seconds * 1000 };
+}
+
+/** Drops the result after it has been written to a set, leaving any running phase alone. */
+export function clearHeld(state: TimerState): TimerState {
+  return state.heldMs === null ? state : { ...state, heldMs: null };
+}
+
+/** Dismisses the timer entirely (Skip, or done with a finished rest). */
+export function clearTimer(): TimerState {
+  return IDLE_TIMER;
+}
+
+// ─── Readings ────────────────────────────────────────────────────────────────
+
+/** Elapsed hold time in ms; 0 unless a hold is running. Never negative. */
+export function elapsedMs(state: TimerState, now: number): number {
+  if (state.phase !== 'holding') return 0;
+  return Math.max(0, now - state.startedAt);
+}
+
+/** Remaining rest in ms, clamped at 0; 0 unless a rest is running. */
+export function restRemainingMs(state: TimerState, now: number): number {
+  if (state.phase !== 'resting') return 0;
+  return Math.max(0, state.startedAt + state.restMs - now);
+}
+
+export function isRestComplete(state: TimerState, now: number): boolean {
+  return state.phase === 'resting' && restRemainingMs(state, now) === 0;
+}
+
+export type HoldStatus = 'under' | 'in' | 'over';
+
+/**
+ * Where an elapsed hold sits against its target range.
+ *
+ * Both bounds are inclusive, so a 7–10s hang reads "in range" at exactly 7.0s
+ * and still at exactly 10.0s. The range is the prescription; going past its top
+ * is information, not failure, which is why this reports `over` rather than
+ * stopping the hold (the owner decides when to drop off, not the timer).
+ */
+export function holdStatus(elapsed: number, hold: HoldSpec): HoldStatus {
+  if (elapsed < hold.min * 1000) return 'under';
+  if (elapsed <= hold.max * 1000) return 'in';
+  return 'over';
+}
+
+/** Fraction of the way to the top of the range, clamped to [0, 1], for the progress bar. */
+export function holdFraction(elapsed: number, hold: HoldSpec): number {
+  if (hold.max <= 0) return 0;
+  return Math.min(1, Math.max(0, elapsed / (hold.max * 1000)));
+}
+
+/** Where the target band starts, as a fraction of the bar. 0 for a fixed target. */
+export function holdBandStart(hold: HoldSpec): number {
+  if (hold.max <= 0) return 0;
+  return Math.min(1, Math.max(0, hold.min / hold.max));
+}
+
+// ─── Formatting ──────────────────────────────────────────────────────────────
+
+/** "8.4s" — one decimal, which is the honest resolution for a hand-stopped hold. */
+export function formatHold(ms: number): string {
+  return `${(Math.max(0, ms) / 1000).toFixed(1)}s`;
+}
+
+/**
+ * "2:47" — for a countdown, so it reads 3:00 the instant a 3 min rest starts and
+ * only reaches 0:00 when the rest is actually over.
+ */
+export function formatClock(ms: number): string {
+  const total = Math.ceil(Math.max(0, ms) / 1000);
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${mins}:${String(secs).padStart(2, '0')}`;
+}
+
+/** "7–10s" / "5s" — the target as shown next to the running count. */
+export function formatHoldTarget(hold: HoldSpec): string {
+  return hold.min === hold.max ? `${hold.max}s` : `${hold.min}–${hold.max}s`;
+}

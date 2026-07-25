@@ -10,11 +10,30 @@ The full build specification and its decision log live in
 
 ## Status
 
-Feature-complete (T1–T8): data layer, exercise browsing, session logging, history,
+Feature-complete (T1–T11): data layer, exercise browsing, session logging, history,
 climbing/GtG check-offs, settings with JSON backup export/import, hash routing, a
-home + tab-bar navigation shell, and install onboarding. Remaining is the on-device
-acceptance pass (T0 48h storage gate, T7 export/import on iOS Safari, T8 criterion-5
-walkthrough).
+home + tab-bar navigation shell, install onboarding, routine rotation with preview and
+per-exercise completion, an in-session hold + rest timer, and last-time carry-forward.
+
+Remaining is the on-device acceptance pass (T0 48h storage gate, T7 export/import on
+iOS Safari, T8 criterion-5 walkthrough) — plus three items T10 could not verify off
+the device: rest-complete beep audibility, screen wake-lock acquisition, and a real
+background/resume cycle mid-interval.
+
+## Timing a session
+
+Exercises the training plan gives a duration for carry a **Start hold** control during
+a session. The hold counts *up* with its target range banded — 7–10s reads amber below
+7s, green inside the range, and keeps counting past 10s rather than stopping itself,
+because the plan prescribes ranges and you decide when to drop off. Stopping measures
+the hold, starts its prescribed rest in the same tap, and offers to log the measured
+duration as a set with last session's load carried forward.
+
+Two platform limits worth knowing: iOS suspends a backgrounded PWA, so the
+rest-complete beep only fires while Sendboard is on screen (the app holds a screen wake
+lock during a session for that reason), and a force-quit discards a running timer. The
+countdown itself is computed from wall-clock instants, so backgrounding and returning
+never makes it drift.
 
 ## Stack
 

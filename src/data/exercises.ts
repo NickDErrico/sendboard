@@ -41,6 +41,8 @@ export const EXERCISES: Exercise[] = [
       'Repeat for about 10 minutes.',
     ],
     prescription: '10s on / 50s off, ~10 min at light intensity; optionally twice daily, ≥6h apart',
+    holdSeconds: [10, 10],
+    restSeconds: 50,
     cues: [
       'Keep it genuinely easy — this primes connective tissue, it is not a strength set.',
       'Use it as a warm-up before Day 1 and climbing days, not as a daily habit.',
@@ -86,6 +88,11 @@ export const EXERCISES: Exercise[] = [
     ],
     prescription:
       'Peak: 4–6 sets x 3–5s @ 100% effort, 3 min rest. Tendon variant (weeks 1–4): 5 sets x 4 reps x 3s @ ~90%, ~10s between reps, 3 min between sets.',
+    // Times the peak variant's 3–5s effort. The weeks 1–4 rep-structured variant
+    // nests a second interval (~10s between reps) inside the set; T10 explicitly
+    // does not build a cadence runner for it — the 3s rep is inside this range.
+    holdSeconds: [3, 5],
+    restSeconds: 180,
     cues: [
       'Progress by feel, not by adding weight — this is neural recruitment and rate of force.',
       'Keep your feet planted; nothing should actually move.',
@@ -112,6 +119,8 @@ export const EXERCISES: Exercise[] = [
     ],
     prescription:
       'Peak: 4–6 sets x 3–5s @ 100% effort, 3 min rest. Tendon variant (weeks 1–4): 5 sets x 4 reps x 3s @ ~90%, ~10s between reps, 3 min between sets.',
+    holdSeconds: [3, 5],
+    restSeconds: 180,
     cues: [
       'Rotate to open-hand every other session to protect the A2 pulleys.',
       'Progress by feel, not by adding weight.',
@@ -133,6 +142,8 @@ export const EXERCISES: Exercise[] = [
       'Rest 3 minutes; repeat for 5 sets.',
     ],
     prescription: '5 sets x 7–10s hang @ ~85–90% of max for the edge, 3 min rest',
+    holdSeconds: [7, 10],
+    restSeconds: 180,
     cues: [
       'Should be hard by rep 3, not failing before then.',
       'Keep one standard edge (14–20mm) for the whole block so retests compare.',
@@ -157,6 +168,8 @@ export const EXERCISES: Exercise[] = [
       'Rest 3 minutes; repeat for 5 sets.',
     ],
     prescription: '5 sets x 7–10s hang @ ~85–90% of max for the edge, 3 min rest',
+    holdSeconds: [7, 10],
+    restSeconds: 180,
     cues: [
       'Alternate with the half-crimp version session to session.',
       'Keep the same standard edge all block for valid retests.',
@@ -178,6 +191,8 @@ export const EXERCISES: Exercise[] = [
       'Hold 5 seconds, then rest 2 minutes.',
     ],
     prescription: '3 sets x 5s max effort, 2 min rest (one of 3 angles in the session)',
+    holdSeconds: [5, 5],
+    restSeconds: 120,
     cues: [
       'Rotate grip attachments across sessions (narrow, wide, neutral).',
       'If you always leave the ground, substitute a banded/KB-anchored row or a yielding lock-off (plan §5A).',
@@ -199,6 +214,8 @@ export const EXERCISES: Exercise[] = [
       'Rest 2 minutes; 3 sets.',
     ],
     prescription: '3 sets x 5s max effort, 2 min rest',
+    holdSeconds: [5, 5],
+    restSeconds: 120,
     cues: ["Start at the angle you're weakest at — usually 90° for climbers."],
     safetyNotes: [],
     gtgEligible: false,
@@ -217,6 +234,8 @@ export const EXERCISES: Exercise[] = [
       'Rest 2 minutes; 3 sets.',
     ],
     prescription: '3 sets x 5s max effort, 2 min rest',
+    holdSeconds: [5, 5],
+    restSeconds: 120,
     cues: ['Third of the three session angles: extended, 90°, near-top.'],
     safetyNotes: [],
     gtgEligible: false,
@@ -235,6 +254,8 @@ export const EXERCISES: Exercise[] = [
       'Rest 2 minutes; 3 holds.',
     ],
     prescription: '3 holds x 8–10s, 2 min rest; add kettlebell via dip belt as it gets easy (start bodyweight)',
+    holdSeconds: [8, 10],
+    restSeconds: 120,
     cues: ['Complements the overcoming bar pulls — same angle, yielding instead of overcoming.'],
     safetyNotes: ['Never grease-the-groove weighted lock-offs (plan §8).'],
     gtgEligible: false,
@@ -331,6 +352,10 @@ export const EXERCISES: Exercise[] = [
       '3 efforts (session) or 1–2 for a GtG dose.',
     ],
     prescription: 'Session: 5s x 3. GtG: 5s x 1–2 in any doorway',
+    // No restSeconds: plan §5D prescribes no rest interval for the wall press, and
+    // inventing one would be exactly the fabrication D17 exists to prevent. The
+    // hold still times; it just ends without starting a countdown.
+    holdSeconds: [5, 5],
     cues: [
       'Zero equipment — usable in any doorway.',
       'Max effort, short duration; stop well before strain.',

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Exercise, Routine, SetEntry, WorkoutLog } from '../types';
-import { getAllExercises, getLog, getRoutine, saveLog } from '../lib/storage';
+import { getAllExercises, getAllLogs, getLog, getRoutine, saveLog } from '../lib/storage';
 import {
   addSet,
   deleteSet,
@@ -12,7 +12,33 @@ import {
   setSessionNotes,
   updateSet,
 } from '../lib/session';
+import {
+  describeWhen,
+  lastPerformanceMap,
+  seedForNextSet,
+  summarizeSets,
+  type LastPerformance,
+} from '../lib/lastTime';
+import {
+  IDLE_TIMER,
+  clearHeld,
+  clearTimer,
+  extendRest,
+  formatClock,
+  formatHold,
+  formatHoldTarget,
+  holdSpecOf,
+  isTimerVisible,
+  restMsOf,
+  startHold,
+  startRest,
+  stopHold,
+  type TimerState,
+} from '../lib/timer';
+import { primeAudio } from '../lib/beep';
+import { useWakeLock } from '../lib/wakeLock';
 import { SetLogger } from '../components/SetLogger';
+import { SessionTimer } from '../components/SessionTimer';
 import { ExerciseDetail } from './ExerciseDetail';
 
 export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: () => void }) {
@@ -22,9 +48,18 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [detailId, setDetailId] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
+  // T10: exactly one timer for the whole session, held here rather than per card
+  // so it survives opening an exercise's detail view. Never persisted (D18).
+  const [timer, setTimer] = useState<TimerState>(IDLE_TIMER);
+  // T11: every exercise's previous performance, resolved once on load.
+  const [lastByExercise, setLastByExercise] = useState<Map<string, LastPerformance>>(new Map());
   // Ref mirrors the latest log so rapid taps build from current state, never a
   // stale closure — otherwise concurrent "Add set" taps would drop entries.
   const logRef = useRef<WorkoutLog | null>(null);
+
+  // Keeps the screen on while logging: the phone is on the floor, and a sleeping
+  // screen takes the rest countdown (and its beep) with it.
+  useWakeLock(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,10 +72,16 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
       }
       logRef.current = loaded;
       setLog(loaded);
-      const [r, all] = await Promise.all([getRoutine(loaded.routineId), getAllExercises()]);
+      const [r, all, logs] = await Promise.all([
+        getRoutine(loaded.routineId),
+        getAllExercises(),
+        getAllLogs(),
+      ]);
       if (cancelled) return;
       setRoutine(r ?? null);
       setExercisesById(new Map(all.map((e) => [e.id, e])));
+      // This log is excluded, so an exercise can never cite itself (T11).
+      setLastByExercise(lastPerformanceMap(logs, r?.exerciseIds ?? [], new Date(), logId));
     })();
     return () => {
       cancelled = true;
@@ -72,6 +113,39 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
     onFinish();
   }
 
+  // ─── Timer (T10) ───────────────────────────────────────────────────────────
+  // Every transition is a functional update reading the live state, so a tap
+  // never acts on a stale closure — the same rule `mutate` follows for the log.
+  // primeAudio runs on these taps because they are the user gesture iOS requires
+  // before an AudioContext will make any sound at all.
+
+  function beginHold(exerciseId: string) {
+    primeAudio();
+    setTimer(startHold(exerciseId, Date.now()));
+  }
+
+  function beginRest(exerciseId: string, restMs: number) {
+    primeAudio();
+    setTimer(startRest(exerciseId, restMs, Date.now()));
+  }
+
+  function handleStop() {
+    setTimer((t) => stopHold(t, Date.now(), restMsOf(exercisesById.get(t.exerciseId ?? ''))));
+  }
+
+  // Writes the measured hold as a set, carrying last time's load forward (T11
+  // AC5) — the duration is the thing that was just measured, so it wins on reps.
+  // Explicit tap only; this never marks the exercise completed (D16, D19).
+  function handleLogHeld(heldMs: number) {
+    const exerciseId = timer.exerciseId;
+    if (!exerciseId) return;
+    mutate((l) => {
+      const seed = seedForNextSet(getSets(l, exerciseId), lastByExercise.get(exerciseId) ?? null);
+      return addSet(l, exerciseId, { ...seed, reps: formatHold(heldMs) });
+    });
+    setTimer(clearHeld);
+  }
+
   function toggleExpanded(id: string) {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -95,16 +169,37 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
     return <p className="mx-auto max-w-md p-4 text-sm text-slate-400">Loading session…</p>;
   }
 
-  // AC6: full protocol without leaving the session. Rendered over the session
+  // The timer belongs to the session, not to a card, so it renders over the
+  // exercise detail view too — reading the cues is exactly what the owner does
+  // during a 3 minute rest, and the countdown must not vanish to allow it.
+  const timerExercise = timer.exerciseId ? exercisesById.get(timer.exerciseId) : undefined;
+  const timerBar = isTimerVisible(timer) ? (
+    <SessionTimer
+      state={timer}
+      exerciseName={timerExercise?.name ?? timer.exerciseId ?? ''}
+      hold={holdSpecOf(timerExercise)}
+      onStop={handleStop}
+      onSkip={() => setTimer(clearTimer())}
+      onExtend={(seconds) => setTimer((t) => extendRest(t, seconds))}
+      onLogHeld={handleLogHeld}
+    />
+  ) : null;
+
+  // T9 AC6: full protocol without leaving the session. Rendered over the session
   // rather than routed to, so back returns here with every set intact — and
   // auto-persist (T4) means nothing is riding on component state anyway.
   const detailExercise = detailId === null ? undefined : exercisesById.get(detailId);
   if (detailExercise) {
-    return <ExerciseDetail exercise={detailExercise} onBack={() => setDetailId(null)} />;
+    return (
+      <>
+        <ExerciseDetail exercise={detailExercise} onBack={() => setDetailId(null)} />
+        {timerBar}
+      </>
+    );
   }
 
   return (
-    <div className="mx-auto max-w-md p-4 pb-28">
+    <div className={`mx-auto max-w-md p-4 ${timerBar ? 'pb-72' : 'pb-28'}`}>
       <header className="mb-4">
         <p className="text-xs uppercase tracking-wide text-slate-500">Session</p>
         <h1 className="text-xl font-bold tracking-tight text-slate-100">{routine.name}</h1>
@@ -122,6 +217,10 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
           const isOpen = expanded.has(exId);
           const entryNotes = log.entries.find((e) => e.exerciseId === exId)?.notes ?? '';
           const done = isExerciseCompleted(log, exId);
+          const last = lastByExercise.get(exId) ?? null;
+          const holdSpec = holdSpecOf(exercise);
+          const restMs = restMsOf(exercise);
+          const isTiming = timer.exerciseId === exId && timer.phase !== 'idle';
           return (
             <section
               key={exId}
@@ -165,9 +264,46 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
                 </div>
               )}
 
+              {/* T11: what this exercise looked like last time, where the
+                  decision is made — §4F asks for small increments, which is not
+                  possible against a number you have to leave the session to find. */}
+              {last && (
+                <p className="mt-2 text-xs leading-snug text-slate-400">
+                  <span className="font-semibold uppercase tracking-wide text-slate-500">
+                    Last {describeWhen(last.daysAgo)}
+                  </span>{' '}
+                  <span className="text-slate-300">{summarizeSets(last.sets)}</span>
+                </p>
+              )}
+
+              {/* T10: a hold if the plan prescribes a duration, otherwise a bare
+                  rest if it prescribes only that. Untimed movements (rows,
+                  squats, get-ups, prehab) get neither and read exactly as before. */}
+              {holdSpec ? (
+                <button
+                  onClick={() => beginHold(exId)}
+                  disabled={isTiming}
+                  className="mt-2 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-semibold text-slate-200 disabled:opacity-40"
+                >
+                  {isTiming ? 'Timing…' : `▶ Start hold · ${formatHoldTarget(holdSpec)}`}
+                </button>
+              ) : (
+                restMs !== null && (
+                  <button
+                    onClick={() => beginRest(exId, restMs)}
+                    disabled={isTiming}
+                    className="mt-2 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-semibold text-slate-200 disabled:opacity-40"
+                  >
+                    {isTiming ? 'Resting…' : `▶ Start rest · ${formatClock(restMs)}`}
+                  </button>
+                )
+              )}
+
               <SetLogger
                 sets={sets}
-                onAdd={() => mutate((l) => addSet(l, exId))}
+                onAdd={() =>
+                  mutate((l) => addSet(l, exId, seedForNextSet(getSets(l, exId), last)))
+                }
                 onUpdate={(index, patch: Partial<SetEntry>) =>
                   mutate((l) => updateSet(l, exId, index, patch))
                 }
@@ -221,6 +357,8 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
       >
         Finish session
       </button>
+
+      {timerBar}
     </div>
   );
 }

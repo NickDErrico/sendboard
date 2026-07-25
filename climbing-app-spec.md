@@ -1,7 +1,7 @@
 # SPEC: Personal Climbing Training App ("Sendboard")
 
-Version 1.4 — 2026-07-24
-Status: PRD approved with amendments — Gate 1 passed. T1–T8 built. See the Amendments log at the end of this file for what changed from v1.0 and why.
+Version 1.5 — 2026-07-24
+Status: PRD approved with amendments — Gate 1 passed. T1–T9 built. See the Amendments log at the end of this file for what changed from v1.0 and why.
 
 > **Executor note:** This file is the source of truth. Read it in full before writing code. Mark task status markers in place as you go. If a decision you need was not made here, STOP, mark the task `[f]` with one line why, and escalate — do not improvise.
 
@@ -39,8 +39,8 @@ Explicitly out of scope. Do not build these; do not add scaffolding "in case."
 - Automatic periodization, adaptive load calculation, or 1RM estimation
 - Apple Watch app, HealthKit integration
 - **In-app reminder scheduling, storage, or notification delivery of any kind** (D2a — owned by an external alarm/Todoist)
-- Rest timers with audio (nice-to-have, deferred to v2)
-- Charts/analytics beyond a plain reverse-chronological history list
+- ~~Rest timers with audio (nice-to-have, deferred to v2)~~ **BUILT in T10 (2026-07-24).** This was deferred, not rejected; the deferral expired when the owner asked for it. See D17–D19.
+- Charts/analytics beyond a plain reverse-chronological history list — **still out of scope.** T11 is deliberately the *precondition* for a chart, not a chart: see its "What a chart would still need" note before reversing this.
 - Editing the exercise catalog from inside the app (catalog is code-seeded in v1)
 
 ### Prior decisions & constraints
@@ -64,6 +64,9 @@ Recorded once here so no downstream task re-derives or contradicts them.
 | D7 | **Hosting: GitHub Pages from the repo, via GitHub Actions on push to `main`** | Free, no account beyond GitHub, HTTPS by default (required for PWA install), deploys from Windows with no extra tooling. |
 | D8 | **Routines are first-class; a workout log always references a routine** | The plan is structured as named days (Day 1 Fingerboard, Day 3 Pull/Antagonist, etc.), not a flat exercise pool. Logging "did some exercises" would not answer "did I complete week 3." |
 | D15 | **"Which routine am I supposed to do" is answered by rotation order, never by a calendar day** | Owner decision 2026-07-24. The two strength routines alternate (A → B → A), so "up next" is derivable from *which was completed least recently* with no schedule state at all. A day-of-week assignment would reverse D2a (which removed scheduling), require a rest-day/missed-day concept, and produce a "you're behind" state on any week that shifts — which training plan §3's "rest 2–3 days" and §4F's "take a lighter week regardless of the schedule" both explicitly invite. Rotation degrades correctly: a skipped or shifted week just changes what is oldest. `Routine.dayOfWeek` stays `null` on both seeds and remains unused. |
+| D17 | **Hold and rest durations are typed catalog fields (`holdSeconds`, `restSeconds`), never parsed out of `prescription` text** | `prescription` is prose written for a human mid-session ("5 sets x 7–10s hang @ ~85–90% of max for the edge, 3 min rest"), and several entries carry two variants in one string (§4B's weeks 1–4 vs 5–8 PIMA). A regex over that is a silent-wrong-number machine on a max-effort finger protocol, which is the exact failure the PRD's problem #2 names. Typed optional fields cost two lines per exercise in a file that is already the hand-authored source of truth (D6). Absent field = that exercise simply has no timer; nothing is invented for the rep-based movements. |
+| D18 | **Timer state is ephemeral and session-local: never persisted, never in a backup, never a data type** | The timer answers "how long have I been pulling *right now*." Nothing downstream reads it, so persisting it would add a store, a schema version, and a stale-timer-on-resume problem in exchange for nothing. It is held as React state with an **absolute target timestamp** rather than a tick counter, so backgrounding, re-render, and iOS throttling cannot drift it — that, not persistence, is what makes it correct. A force-quit loses a running timer, which is acceptable: the owner has lost track of the interval by then anyway. `DB_VERSION` and `BACKUP_SCHEMA_VERSION` do not change. |
+| D19 | **Prefilled set values are a draft, never a claim.** Carry-forward seeds the input; it never marks an exercise completed and never writes a set the owner did not ask for | Preserves D16's separation of "logged numbers" from "I did this." A prefilled row appears only on an explicit `+ Add set` or `Log Ns` tap, and every field stays editable — so a seeded value that is wrong costs one edit, never a corrupted record. The rule that makes this safe: prefill copies *what you last did*, and the app never infers what you *should* do next (that would be adaptive load calculation, a standing non-goal). |
 | D16 | **A logged exercise carries an explicit `completed` flag, separate from its sets** | T4 AC6 omits zero-set exercises from `entries`, which makes "did it, didn't log numbers" indistinguishable from "skipped it." Several plan items have nothing numeric worth typing (warm-up progression, Turkish get-ups, the wall press), so the owner is forced to either fabricate a set row or lose the record. A boolean answers "was this session actually completed" without weakening AC6 for genuinely untouched exercises. |
 
 **Documented alternative, not chosen:** Expo + EAS Build → real native app with `expo-notifications` scheduling reminders in-app. Gate to revisit: owner is willing to pay $99/yr for the Apple Developer Program **and** external reminders have proven insufficient in real use (e.g. he wants the notification itself to name the day's routine). Revisit no earlier than the end of the 8-week block. Do not build toward this in v1.
@@ -96,6 +99,8 @@ Risk-first ordering. T0 is a spike: the entire architecture rests on assumptions
 | T7 | Backup export/import | T2, T6 | — |
 | T8 | Navigation shell, install onboarding, final device pass | T3–T7 | — |
 | T9 | Routine rotation, routine preview, in-session detail + per-exercise completion | T8 | — |
+| T10 | In-session hold + rest timer (audio, wake lock, one-tap log) | T9 | T11 |
+| T11 | Last-time carry-forward on the exercise card | T9 | T10 |
 
 **Gate 2 (decomposition review) happens here** — before T1 starts, after T0 reports.
 
@@ -680,6 +685,125 @@ Design calls (each logged per "amend before you code"):
 
 ---
 
+### [T10] Outcome: The owner can time a hold and its prescribed rest without leaving the session or reaching for the Clock app, and log the held duration in one tap.
+Spec: this file | Status: [x] | Depends on: T9
+
+#### Context manifest
+Create: `src/lib/timer.ts` (+ `timer.test.ts`), `src/components/SessionTimer.tsx`, `src/lib/beep.ts`, `src/lib/wakeLock.ts` | Modify: `src/types.ts` (`Exercise.holdSeconds`, `Exercise.restSeconds`), `src/data/exercises.ts` (timing on the timed entries only), `src/screens/ActiveSession.tsx` | Read: `src/lib/session.ts`, `src/components/SetLogger.tsx` | Conform to: D17, D18, D19, D16
+
+**Why this reverses a non-goal, and why that is in bounds.** "Rest timers with audio" was listed as *deferred to v2*, not rejected — the v1 line was a scoping call, not a judgment that timers are wrong. The training plan is built out of intervals (§4B 3 min between sets and ~10s between reps; §4C 3 min; §5A 2 min; §5B 2 min; §8 Abrahangs 10s on / 50s off), and the owner currently leaves the PWA for the Clock app to run them. That is the same "reopen another thing mid-session" failure the PRD's problem #2 names, and rest length is a *training variable* on a max-effort protocol, so guessing it degrades the block rather than merely annoying.
+
+`timer.ts` is pure — a state machine over (state, now) with no `Date.now()` inside it and no React import — for the same reason `checks.ts`, `session.ts`, and `rotation.ts` are: the interval math must be testable without a DOM or a clock.
+
+#### Acceptance criteria
+1. WHEN an exercise with `holdSeconds` is shown in an active session THE app SHALL offer a "Start hold" control on that exercise. [x]
+2. WHEN a hold is running THE app SHALL count **up** from zero and render the target range as a band, visibly distinguishing below-range, in-range, and past-max — never counting down from a single invented target (a range is a range). [x]
+3. WHEN a hold is stopped THE app SHALL report the elapsed time to 0.1s, and IF that exercise has `restSeconds` THE rest countdown SHALL start immediately without a second tap. [x]
+4. WHEN a rest countdown is running THE app SHALL show remaining time as `m:ss`, and offer Skip and +30s. [x]
+5. WHEN a rest countdown reaches zero THE app SHALL change state visibly AND emit an audible beep. [x]
+6. WHEN a hold has just completed THE app SHALL offer a one-tap control that appends a set whose `reps` is the measured duration (e.g. `8.4s`), leaving `load` and `rpe` for the owner. [x]
+7. WHEN the app is backgrounded and refocused mid-interval THE displayed time SHALL be correct to the wall clock, not behind by the time spent backgrounded (D18's absolute-timestamp rule). [x]
+8. WHILE a session is open THE app SHALL hold a screen wake lock where the platform supports it, and SHALL re-acquire it on refocus. [x]
+9. WHEN an exercise has `restSeconds` but no `holdSeconds` THE app SHALL offer a standalone "Start rest" control. [x]
+
+#### Edge cases
+- Wake Lock API, Web Audio, or an `AudioContext` unavailable (older iOS, jsdom, a denied lock) → every one of these degrades to a no-op; **the timer itself never depends on any of them.** [x]
+- iOS autoplay policy: an `AudioContext` created without a user gesture is suspended and silent. It is therefore created and resumed on the *first timer tap*, which is always a gesture. [x]
+- App backgrounded when rest hits zero → iOS suspends the PWA, so the beep does not fire. This is a platform limit, not a bug; the wake lock (AC8) is the mitigation, and the rest bar still reads correctly on return (AC7). Do not add a Notification API fallback — that is D2a. [x]
+- A hold left running for minutes (owner forgot to stop) → keeps counting, no cap, no auto-stop. The measured value is still true, and an auto-stop would silently invent a number. [x]
+- Starting a hold on exercise B while A's rest is still running → B takes over the single timer slot. There is exactly one timer, because there is exactly one owner with two hands. [x]
+- Navigating to an exercise's detail view mid-interval and back → the timer survives (it lives in `ActiveSession`, above the detail branch). [x]
+- Finishing the session mid-interval → timer is discarded with the screen; nothing is persisted (D18). [x]
+- An exercise with neither timing field (rows, squats, get-ups, prehab) → no timer controls at all, card unchanged. [x]
+
+#### Non-goals & do-not-touch
+- MUST NOT persist timer state, add a store, or bump `DB_VERSION` / `BACKUP_SCHEMA_VERSION` (D18).
+- MUST NOT use the Notification API, request notification permission, or schedule anything — the beep is Web Audio in the foreground only (D2a is not reversed by this task).
+- MUST NOT auto-mark an exercise completed when a hold finishes or a set is logged (D16, D19).
+- MUST NOT parse durations out of `prescription` strings (D17).
+- MUST NOT add timing fields to exercises the training plan does not prescribe a duration for.
+- MUST NOT add a rep-cadence/EMOM runner for §4B's "~10s between reps" tendon variant in this task — that is a third interval type stacked inside a set, and the plan runs it only in weeks 1–4. Revisit if the owner asks.
+
+#### Verify
+`npm run test -- timer && npm run test -- session && npm run build && npm run lint`, plus an in-browser pass of criteria 1–9 at 390px.
+
+#### Amendments
+
+**2026-07-24 — T10 built. Build + lint clean, 122 tests green (31 new timer cases). Criteria 1–7 and 9 verified in-browser against a seeded session; AC8 (wake lock) is code-verified only — see below.** Files: `src/lib/timer.ts` (+ `timer.test.ts`), `src/components/SessionTimer.tsx`, `src/lib/beep.ts`, `src/lib/wakeLock.ts`; modified `src/types.ts`, `src/data/exercises.ts`, `src/screens/ActiveSession.tsx`. No new dependencies, no storage or backup schema change.
+
+**Verification levels, stated separately because they are not equal.**
+- *In-browser, observed:* the count-up and its band transitions at the exact boundaries (a 3–5s hold read `building`/sky at 1.0s, `✓ in range`/emerald at 3.5s, `past target`/amber at 5.5s); stop measuring 8.0s and starting the 3 min rest in the same tap; `+30s` moving 2:46 → 3:15 without restarting; the rest reaching 0:00 and flipping to "Rest complete — go" with Skip becoming Done; the one-tap log writing `load="20mm +10kg"` (carried from the prior session) and `reps="8.0s"` with RPE left blank; the exercise remaining un-completed afterwards (D16 intact); a hold with no prescribed rest (wall press) ending as a result-only bar with no countdown; untimed movements showing no timer control at all; and the bar surviving a trip into an exercise's detail view, still counting down on return.
+- *Instrumented:* the beep. `AudioContext` was wrapped to count oscillators — exactly 2 started at rest-complete, the context reached state `running` (so `primeAudio()` on the first tap does unlock it), and no further tones fired on later renders, confirming the `beepedFor` guard. **Audibility itself was not confirmed** — that needs the device pass.
+- *Unit test + construction:* AC7. The "backgrounding" cases assert a rest and a hold read correctly across a long gap with no intermediate evaluation, which is the whole content of the claim — readings are `(now - startedAt)`, so there is no accumulator to fall behind. A real iOS suspend/resume is still a device-pass item.
+- *Not verified here:* AC8. `navigator.wakeLock` exists in the preview browser, but a request throws `NotAllowedError: the requesting page is not visible` because the preview pane was hidden. `useWakeLock` guards on `document.visibilityState` before requesting and re-acquires on `visibilitychange`, so it correctly declined to request rather than throwing — but an actual acquired sentinel was never observed. **Add to the on-device pass.**
+
+**AC9's branch is real but the shipped catalog never reaches it.** No exercise has a prescribed rest without a prescribed hold, so "Start rest" cannot appear today. It was verified by temporarily giving `kb-single-arm-row` a `restSeconds` (the control rendered as `▶ Start rest · 1:30`), then reverting. The branch is kept deliberately: `restSeconds` is an independent optional field, and a value the owner adds during the block being *silently ignored* would be a worse trap than twelve lines of currently-unreached UI. This is a judgment call against the "no scaffolding in case" rule and is recorded as such.
+
+Design calls:
+- **Timing is catalog data, not parsed prose (D17).** Two of the timed entries carry both a peak and a weeks-1–4 variant in one `prescription` string; any regex over those picks a number by luck. The typed fields cost two lines each in a file that is already hand-authored.
+- **Count up, not down (AC2).** Every finger and lock-off prescription in the plan is a *range*. Counting down from the top of it would force a single invented target onto the range and would render a deliberately-shortened 6s hang as a failed 10s one, when what actually happened is a 6s hang. Counting up also means the measured value is true whenever the owner drops off, which is what AC6 then logs.
+- **The timer never stops itself.** Passing the top of the range reports `past target` and keeps counting. An auto-stop would silently invent the number that gets logged, and the plan puts "how hard, how long" with the owner (§4B "progress by feel").
+- **One timer, not one per card.** There is one owner with two hands. Starting a hold anywhere takes over the slot and discards an unlogged result, because the thing just tapped is the thing meant. This also removes any question of what several running timers would mean.
+- **The bar renders over the exercise-detail view too**, since reading the cues is exactly what the owner does during a 3 minute rest — a countdown that vanishes to allow that would defeat the feature.
+- **The interval only drives re-renders, never the reading.** `useNow` ticks at 100ms purely to repaint; every displayed value is recomputed from the phase's absolute start instant, so a throttled interval costs a stale frame rather than a drifted timer (D18). It also re-reads on `visibilitychange`/`focus` so the first frame back is correct rather than up to a tick late.
+- **The beep is Web Audio, foreground-only, and D2a is not reversed.** No Notification API, no permission prompt, nothing scheduled. A backgrounded iOS PWA is suspended and cannot beep; the wake lock is the mitigation, and the countdown still reads correctly on return. This limitation is documented rather than worked around.
+
+---
+
+### [T11] Outcome: When logging an exercise the owner can see what they did last time without leaving the session, and a new set starts prefilled from it instead of blank.
+Spec: this file | Status: [x] | Depends on: T9
+
+#### Context manifest
+Create: `src/lib/lastTime.ts` (+ `lastTime.test.ts`) | Modify: `src/screens/ActiveSession.tsx` | Read: `src/lib/session.ts` (`addSet` already takes a seed `SetEntry`), `src/lib/storage.ts` (`getAllLogs`) | Conform to: D19, D16
+
+**Why this is a recall feature, not an analytics feature.** Training plan §4F asks for 1–3% load increments and §7 asks the owner to "note edge size, added weight, and how hangs *felt*, so you can spot a downward trend before it becomes an injury." Neither is possible against a number you cannot see: today, answering "what did I hang last Day 1?" costs History → find the session → open it → read, which is the ~30–60s scroll the PRD's success metrics set out to eliminate. Showing the previous performance *on the card being logged* is the same information the history screen already renders, moved to where the decision is made.
+
+**What a chart would still need (recorded so the next task does not assume this one delivered it).** `SetEntry.load` is free text by design — `"20mm +10kg"`, `"35lb"`, `"BW"` are all valid and all unparseable. A trend line needs (a) this non-goal reversed, (b) structured load: at minimum bodyweight and the standard edge size, since §4E says added-weight numbers are meaningless without bodyweight and a mid-block edge change invalidates the comparison outright, and (c) the §4E retest battery, which is the plan's own before/after instrument. This task is the precondition for all three, because carrying a value forward is what makes consecutive entries *consistent* rather than freshly retyped. It does not deliver any of them.
+
+#### Acceptance criteria
+1. WHEN an exercise is shown during an active session AND it was performed with at least one set in an earlier **completed** session THE card SHALL show that previous performance and how long ago it was. [x]
+2. WHEN more sets were logged last time than fit on one line THE app SHALL summarize compactly rather than wrapping the card (e.g. first few sets, then a count of the rest). [x]
+3. WHEN `+ Add set` is tapped AND the exercise already has sets in the current session THE new row SHALL be prefilled from the **previous set in this session** — the single biggest saving, since a max-hang exercise is five near-identical rows. [x]
+4. WHEN `+ Add set` is tapped AND the exercise has no sets yet in this session THE new row SHALL be prefilled from the corresponding set of the last completed session, or blank if there is none. [x]
+5. WHEN a set is logged from a finished hold (T10 AC6) THE measured duration SHALL win for `reps`, with `load` still carried forward. [x]
+6. WHEN nothing was ever logged for an exercise THE card SHALL render exactly as it does today — no empty "Last: —" row. [x]
+7. WHEN a prefilled value is wrong THE owner SHALL be able to edit it like any other field, and prefill SHALL NOT mark the exercise completed (D19). [x]
+
+#### Edge cases
+- The current in-progress log MUST be excluded from the "last time" lookup, or an exercise would cite itself. [x]
+- Only completed logs count (`completedAt !== null`) — an abandoned session is not a performance, the same rule rotation already applies to "last completed" (D15). [x]
+- The most recent log containing the exercise wins, even if it is a different routine (an exercise can appear in more than one routine). [x]
+- A prior entry with `completed: true` but zero sets → not a performance for prefill purposes; skip it and look further back. [x]
+- Sets whose fields are all empty → prefill produces a blank row, i.e. today's behavior. No crash, no `"undefined"` string. [x]
+- An imported backup immediately produces correct carry-forward, because the lookup is derived from logs rather than stored (same property as rotation). [x]
+
+#### Non-goals & do-not-touch
+- MUST NOT compute, suggest, or auto-increment a *target* load — that is adaptive load calculation / 1RM estimation, a standing v1 non-goal. Carry-forward reports what happened; it never proposes what should happen next.
+- MUST NOT add charts, sparklines, PRs, or trend arrows (standing non-goal — see the note above for what reversing it would actually require).
+- MUST NOT parse or normalize the free-text `load` string.
+- MUST NOT make history editable, or write to any log other than the in-progress one.
+
+#### Verify
+`npm run test -- lastTime && npm run test -- session && npm run build && npm run lint`, plus an in-browser pass of criteria 1–7 with a seeded prior session.
+
+#### Amendments
+
+**2026-07-24 — T11 built. Build + lint clean, 122 tests green (22 new lastTime cases); all 7 criteria verified in-browser against a seeded prior session.** Files: `src/lib/lastTime.ts` (+ `lastTime.test.ts`); modified `src/screens/ActiveSession.tsx`. No new dependencies, no type change, no storage or backup schema change — the whole feature is derived from logs that already existed.
+
+Observed in-browser: a prior session of five identical max hangs rendered as `LAST 3 DAYS AGO 20mm +10kg × 7s @8 ×5`; a varied exercise rendered its sets separately (`20mm +5kg × 8s @7 · 20mm +7kg × 7s @9`); exercises never logged showed no line at all (AC6); `+ Add set` copied the previous set *in the current session* including reps, with RPE blank (AC3, AC7); and the hold-log path carried the prior session's load while the measured duration won on reps (AC5). The prior log's `abrahangs-no-hang` entry — `completed: true` with zero sets — correctly did **not** register as a performance, which is the edge case that would otherwise let one "did it, typed nothing" session hide the last real numbers.
+
+Design calls:
+- **`addSet` needed no signature change.** It already accepted an optional `SetEntry`, so carry-forward is entirely a matter of computing the seed; `session.ts` is untouched and its 17 tests still cover it unchanged.
+- **RPE is never carried forward.** Load and reps describe a setup worth repeating; RPE is a fresh judgment about a set that has not happened yet. Pre-filling it would fabricate precisely the "how did it feel" signal the plan asks the owner to watch for a downward trend (§7) — the one field where a convenient default is actively harmful.
+- **Precedence is this session's previous set, then last session's, then blank.** A max-hang exercise is five near-identical rows, so the within-session copy is the bulk of the saving; the cross-session seed matters only for the first row.
+- **Consecutive identical sets collapse (`×5`).** Five repeated rows is the common case for hangboarding and the compressed form is both shorter and more readable. Distinct runs stay in order, and the line caps at three runs with a `+N more` tail so a varied session summarizes rather than wrapping the card.
+- **Ordering is by `completedAt`, not `startedAt`.** A session opened before midnight and finished after it is the more recent performance; `getAllLogs()` sorts by `startedAt`, so this module sorts for itself rather than inheriting that.
+- **Derived, never stored** — same property as rotation, and the reason an imported backup produces correct carry-forward with no rebuild step. (Verified by construction: the function's only input is the log list. Not separately exercised through the import UI.)
+
+**Explicitly not delivered: charts.** See "What a chart would still need" above. The owner's stated direction is progress charts; this task makes consecutive entries *consistent* (a carried-forward value is reused rather than retyped), which is the precondition, but the free-text `load` field, the missing bodyweight/edge-size context, and the absent §4E retest battery all still stand between here and a trend line. Reversing the charts non-goal without those would produce a graph of unparseable strings.
+
+---
+
 ## Execution notes
 
 - **Gates:** Gate 1 = PRD approved (now, by the owner). Gate 2 = decomposition approved after T0's spike report. Gate 3 = implementation reviewed against acceptance criteria after T8.
@@ -761,3 +885,24 @@ Investigation before scoping found most of that already shipped (two seeded rout
 | 8-week block / periodization tracking explicitly deferred | Owner decision. §4B's week 1–4 vs 5–8 PIMA variants and the week-7 deload stay in the exercise `prescription` text; tracking them needs a block start date and a post-week-8 policy that no decision covers yet. |
 
 **Net effect on scope:** one task, two decisions, one optional type field. No new routines, no catalog change, no storage or backup schema change, no new dependencies, and no reversal of D2a or D9.
+
+---
+
+**2026-07-24 — v1.4 → v1.5 — in-session hold/rest timer and last-time carry-forward (T10, T11 added).**
+
+Owner request, after a review of the app against `docs/training-plan.md` surfaced the gap: "active set for hold and rest timer… then last-time carry forward so we can aim for actual progress charts."
+
+The review's finding was that the two largest remaining gaps are both *in-session* and both concern information the plan already specifies but the app cannot surface at the moment it is needed. The training plan is built out of intervals (§4B, §4C, §5A, §5B, §8), and the owner was leaving the PWA for the Clock app to run them — the same "reopen another thing mid-session" failure the PRD's problem #2 names, except that here the number being guessed is a training variable on a max-effort protocol. Separately, §4F asks for 1–3% load increments and §7 asks the owner to watch for a downward trend, neither of which is possible against a number that costs a four-step trip through History to read.
+
+| Change | Why |
+|---|---|
+| "Rest timers with audio" un-deferred and built as T10 | It was deferred to v2, not rejected; the deferral expired when the owner asked for it. Nothing in the original rationale argued against timers — only against their cost in v1. |
+| D17 added: `Exercise.holdSeconds` / `restSeconds` as typed catalog fields | Two entries carry both a peak and a weeks-1–4 variant in one `prescription` string, so parsing prose picks a number by luck. Optional fields, no schema bump; absent means no timer rather than an invented default. |
+| D18 added: timer state is ephemeral, timestamp-based, never persisted | Nothing downstream reads a timer, so persisting it would buy a store and a stale-timer-on-resume problem for nothing. Absolute start instants — not persistence — are what make a backgrounded iOS PWA come back correct. |
+| D19 added: a prefilled set value is a draft, never a claim | Keeps D16's separation of "logged numbers" from "I did this" intact under carry-forward, and fences the line between *reporting what happened* and *proposing what should happen next* — the latter being adaptive load calculation, a standing non-goal. |
+| T11 added: last-time carry-forward, with RPE deliberately excluded | Load and reps are a setup worth repeating; RPE is a fresh judgment. Pre-filling it would fabricate the exact "how did it feel" signal §7 asks the owner to watch. |
+| Charts non-goal **retained**, with the gap to it recorded | The owner's stated direction is progress charts. T11 is the precondition (consistent values rather than freshly retyped ones), but `load` is free text by design, bodyweight and edge size are untracked though §4E says added-weight numbers are meaningless without them, and the §4E retest battery — the plan's own before/after instrument — does not exist yet. A chart built now would plot unparseable strings. |
+
+**Net effect on scope:** two tasks, three decisions, two optional type fields, and timing data on ten catalog entries. No new dependencies, no storage or backup schema change (`DB_VERSION` and `BACKUP_SCHEMA_VERSION` both unchanged), no new routines, and no reversal of D2a, D9, or D15 — the beep is foreground Web Audio, not a notification.
+
+**Carried to the on-device pass:** beep audibility on iOS, wake-lock acquisition (unobservable in a hidden preview pane), and a real background/resume cycle mid-interval.

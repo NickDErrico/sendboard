@@ -29,6 +29,12 @@ export interface Exercise {
   summary: string; // one line, shown in list view
   howTo: string[]; // ordered steps, shown in detail view
   prescription: string; // e.g. "4-6 sets x 3-5s @ 100% effort, 3 min rest"
+  // D17: the machine-readable half of `prescription`, typed rather than parsed
+  // out of that prose — several entries carry two variants in one string, and a
+  // regex over them is a silent-wrong-number machine on a max-effort protocol.
+  // Both optional: absent means this exercise simply has no timer (T10).
+  holdSeconds?: [min: number, max: number]; // min === max for a fixed target
+  restSeconds?: number; // prescribed rest between sets
   cues: string[]; // form/technique reminders
   safetyNotes: string[]; // may be empty; rendered visually distinct
   gtgEligible: boolean; // true = suitable for greasing-the-groove use; drives a badge in T3
