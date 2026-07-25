@@ -328,3 +328,39 @@ describe('formatting', () => {
     expect(formatHoldTarget(FIXED)).toBe('5s');
   });
 });
+
+// ─── heldAuto (T14 AC2/AC3) ──────────────────────────────────────────────────
+// The one bit that tells the set logger whether the app ended the hold or the
+// owner did. It exists so an auto-stop can record `endReason: 'target'` without
+// a tap, while a manual stop stays ambiguous and records nothing (D27).
+
+describe('heldAuto', () => {
+  it('is true after an auto-stop, with and without a prescribed rest', () => {
+    const holding = startHold('max-hang-half-crimp', T0);
+    expect(autoStopHold(holding, HANG, MIN_3).heldAuto).toBe(true);
+    expect(autoStopHold(holding, HANG, null).heldAuto).toBe(true);
+  });
+
+  it('is false after a manual stop, even one that happens to land on the target', () => {
+    const holding = startHold('max-hang-half-crimp', T0);
+    expect(stopHold(holding, T0 + 6_000, MIN_3).heldAuto).toBe(false);
+    // Exactly 10.000s by hand is still the owner's number, not the prescription's.
+    expect(stopHold(holding, T0 + 10_000, MIN_3).heldAuto).toBe(false);
+    expect(stopHold(holding, T0 + 6_000, null).heldAuto).toBe(false);
+  });
+
+  it('is false while a phase is running and on the idle timer', () => {
+    expect(IDLE_TIMER.heldAuto).toBe(false);
+    expect(startHold('x', T0).heldAuto).toBe(false);
+    expect(startRest('x', MIN_3, T0).heldAuto).toBe(false);
+  });
+
+  it('is cleared with the result it describes', () => {
+    const auto = autoStopHold(startHold('x', T0), FIXED, MIN_3);
+    const cleared = clearHeld(auto);
+    expect(cleared.heldMs).toBeNull();
+    expect(cleared.heldAuto).toBe(false);
+    // The running rest is untouched — only the result is dropped.
+    expect(cleared.phase).toBe('resting');
+  });
+});

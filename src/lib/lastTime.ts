@@ -1,6 +1,7 @@
 import type { ProgressMetric, SetEntry, WorkoutLog } from '../types';
 import { METRIC_CONFIG } from './progress';
 import { daysBetween } from './rotation';
+import { summaryReason } from './setReason';
 
 /**
  * The measurements carry-forward repeats (T12 AC4).
@@ -91,12 +92,19 @@ export function describeWhen(daysAgo: number): string {
 }
 
 /**
- * One set as a single line, with `@rpe` appended when it was rated.
+ * One set as a single line, with `@rpe` appended when it was rated and a
+ * safety-signal end reason appended after that.
  *
  * Two shapes, because the three measured exercises replaced their free-text
  * fields with numbers (D21): a measured set reads `20mm · +35lb · 7.4s`, and
  * everything else keeps the original `load × reps`. Measurements win when both
  * are somehow present, since they are the structured record.
+ *
+ * The reason comes last, as an annotation on the numbers rather than one of them,
+ * and only `pain` / `form` appear (T14 AC7, see `setReason.summaryReason`) — a
+ * hold that hit its target or ran out is already legible from `holdSec` against
+ * the prescribed range, and restating it would crowd out the numbers on a card
+ * built for a glance mid-session.
  */
 export function formatSet(set: SetEntry): string {
   const measured = METRIC_INPUT_ORDER.filter((m) => typeof set[m] === 'number').map((m) =>
@@ -112,8 +120,12 @@ export function formatSet(set: SetEntry): string {
     core = load && reps ? `${load} × ${reps}` : load || reps;
   }
 
-  if (!core) return set.rpe === null ? '—' : `@${set.rpe}`;
-  return set.rpe === null ? core : `${core} @${set.rpe}`;
+  const reason = summaryReason(set.endReason);
+  const rated = set.rpe === null ? core : core ? `${core} @${set.rpe}` : `@${set.rpe}`;
+  if (rated) return reason === null ? rated : `${rated} · ${reason}`;
+  // A set with no numbers and no rating still has something to say if it ended
+  // for pain — that is the whole case for asking on the PIMA pulls (D27).
+  return reason ?? '—';
 }
 
 /**
@@ -151,6 +163,12 @@ export function summarizeSets(sets: SetEntry[], maxRuns = 3): string {
  * that has not happened yet, and pre-filling it would quietly fabricate exactly
  * the "how did it feel" signal the plan asks the owner to watch for a downward
  * trend (§7). A prefilled value is a draft, never a claim (D19).
+ *
+ * `endReason` is excluded for the same reason and more strongly (D27): carrying
+ * `pain` forward would invent a symptom, and carrying `target` forward would
+ * claim a hold succeeded before it was attempted. The seed is built field by
+ * field rather than spread from `source`, so a new measurement added to
+ * `SetEntry` is opt-in here rather than silently copied.
  */
 export function seedForNextSet(
   currentSets: SetEntry[],

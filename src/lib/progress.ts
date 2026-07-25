@@ -1,4 +1,4 @@
-import type { ProgressMetric, SetEntry, WorkoutLog } from '../types';
+import type { ProgressMetric, SetEndReason, SetEntry, WorkoutLog } from '../types';
 
 // Progress series for the three exercises the training plan actually progresses
 // (D20). Pure — a function of (logs, exerciseId, metric) — like timer.ts,
@@ -50,6 +50,11 @@ export interface ProgressPoint {
   at: string; // ISO completedAt
   value: number;
   edgeMm: number | null; // the edge this value was recorded on, if any
+  // D27: why the set behind this point ended, when it was recorded. Carried so
+  // the chart can mark a hold that stopped for pain or a form breakdown
+  // differently from one that stopped for strength — the same number, and a
+  // completely different training fact (§7).
+  endReason: SetEndReason | null;
 }
 
 /** A contiguous run of sessions sharing one edge. `edgeMm: null` = not recorded. */
@@ -79,7 +84,13 @@ function readMetric(set: SetEntry, metric: ProgressMetric): number | undefined {
  * "Best" follows the metric's direction — the heaviest load, the longest hold,
  * the smallest edge. The returned `edgeMm` is the edge of *that* set rather than
  * the session's smallest, so a point is always the best effort together with the
- * condition it was actually produced under.
+ * condition it was actually produced under. `endReason` travels with it for the
+ * same reason.
+ *
+ * A set that ended for pain is *not* excluded from the comparison (T14 edge
+ * case). It was a real measurement, and dropping it would erase the low points
+ * that make a declining line visible — which is the one thing §7 asks this chart
+ * to show. It is marked instead, and the interpretation stays the owner's.
  */
 function sessionValue(
   log: WorkoutLog,
@@ -105,6 +116,7 @@ function sessionValue(
     at: log.completedAt,
     value: best.value,
     edgeMm: readMetric(best.set, 'edgeMm') ?? null,
+    endReason: best.set.endReason ?? null,
   };
 }
 

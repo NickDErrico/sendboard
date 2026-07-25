@@ -216,3 +216,38 @@ describe('metric formatting', () => {
     expect(METRIC_CONFIG.addedLb.lowerIsBetter).toBe(false);
   });
 });
+
+// ─── End reason on a charted point (T14 AC6) ─────────────────────────────────
+
+describe('end reason travels with the point', () => {
+  const point = (s: ReturnType<typeof buildSeries>) => s!.segments[0].points[0];
+
+  it('carries the reason of the best set', () => {
+    const sets = [set({ holdSec: 6, edgeMm: 18, endReason: 'pain' })];
+    expect(point(buildSeries([log('a', '2026-06-02T18:00', sets)], EX, 'holdSec', true)).endReason)
+      .toBe('pain');
+  });
+
+  it('reads an unrecorded reason as null, so pre-T14 sets still plot', () => {
+    const sets = [set({ holdSec: 7.5, edgeMm: 20 })];
+    expect(point(buildSeries([log('a', '2026-06-02T18:00', sets)], EX, 'holdSec', true)).endReason)
+      .toBeNull();
+  });
+
+  it('does not exclude or downweight a set that ended on pain', () => {
+    // §7 asks the owner to watch for a downward trend; dropping the low points
+    // would erase the only thing that makes one visible. The point is marked in
+    // the chart, never removed here.
+    const sets = [set({ holdSec: 9, edgeMm: 18 }), set({ holdSec: 11, edgeMm: 18, endReason: 'pain' })];
+    const series = buildSeries([log('a', '2026-06-02T18:00', sets)], EX, 'holdSec', true)!;
+    expect(series.max).toBe(11);
+    expect(point(series).endReason).toBe('pain');
+  });
+
+  it('takes the reason from the best set, not from another set in the session', () => {
+    const sets = [set({ holdSec: 5, edgeMm: 18, endReason: 'pain' }), set({ holdSec: 9, edgeMm: 18 })];
+    const series = buildSeries([log('a', '2026-06-02T18:00', sets)], EX, 'holdSec', true)!;
+    expect(series.max).toBe(9);
+    expect(point(series).endReason).toBeNull();
+  });
+});

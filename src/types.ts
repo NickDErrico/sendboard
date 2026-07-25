@@ -56,6 +56,12 @@ export interface Routine {
 // it is what moves session to session (D22).
 export type ProgressMetric = 'holdSec' | 'addedLb' | 'edgeMm';
 
+// D27: why a hold ended. A closed enum, because the value has to be countable
+// and comparable across a block — free text for anything these four miss already
+// exists in `LoggedExercise.notes`. `target` is the only value the app ever writes
+// on its own (the T13 auto-stop, where the app itself ended the hold).
+export type SetEndReason = 'target' | 'dropped' | 'form-broke' | 'pain';
+
 export interface SetEntry {
   // Free text, unchanged, and still the only fields on the seventeen exercises
   // that declare no metrics. On the three that do, the numeric fields below
@@ -70,6 +76,10 @@ export interface SetEntry {
   holdSec?: number; // measured, not carried forward — see lastTime.CARRIED_METRICS
   addedLb?: number;
   edgeMm?: number;
+  // D27: why the hold ended. Optional so pre-T14 sets and backups read as
+  // "not recorded" with no migration, and absent entirely on the rep-based
+  // exercises, which declare no `holdSeconds` and so are never asked.
+  endReason?: SetEndReason;
 }
 
 export interface LoggedExercise {

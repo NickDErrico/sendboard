@@ -36,6 +36,7 @@ import {
   stopHold,
   type TimerState,
 } from '../lib/timer';
+import { reasonApplies } from '../lib/setReason';
 import { primeAudio } from '../lib/beep';
 import { useWakeLock } from '../lib/wakeLock';
 import { SetLogger } from '../components/SetLogger';
@@ -148,6 +149,12 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   function handleLogHeld(heldMs: number) {
     const exerciseId = timer.exerciseId;
     if (!exerciseId) return;
+    // T14 AC2/AC3: an auto-stop knows why the hold ended — the app ended it,
+    // because it reached the prescribed maximum — so the reason is recorded with
+    // no tap. A manual stop is the ambiguous case (dropped? pain? form?) and
+    // records nothing, leaving SetLogger's chips open on the new row. Inferring
+    // it from the duration is exactly what D27 forbids.
+    const endReason = timer.heldAuto ? ('target' as const) : undefined;
     // T12: where the exercise declares `holdSec`, the measurement lands in the
     // numeric field — that is the charted value, and the free-text `reps` has
     // been replaced there (D21). Everywhere else it keeps writing the text form.
@@ -157,7 +164,7 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
       const measured = tracksHold
         ? { holdSec: Math.round((heldMs / 1000) * 10) / 10 }
         : { reps: formatHold(heldMs) };
-      return addSet(l, exerciseId, { ...seed, ...measured });
+      return addSet(l, exerciseId, { ...seed, ...measured, endReason });
     });
     setTimer(clearHeld);
   }
@@ -318,6 +325,7 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
               <SetLogger
                 sets={sets}
                 metrics={exercise?.metrics}
+                askEndReason={reasonApplies(exercise)}
                 onAdd={() =>
                   mutate((l) => addSet(l, exId, seedForNextSet(getSets(l, exId), last)))
                 }

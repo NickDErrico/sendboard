@@ -5,6 +5,7 @@ import {
   type ProgressSegment,
   type ProgressSeries,
 } from '../lib/progress';
+import { isSafetySignal } from '../lib/setReason';
 
 // Inline SVG, no charting dependency — the whole thing is a polyline, some
 // circles, and labels, and every prior task shipped without adding a package.
@@ -42,6 +43,7 @@ export function ProgressChart({ series }: { series: ProgressSeries }) {
   // A flat series has no range to label twice; showing one value is honest and
   // avoids an axis that reads "8 / 8".
   const flat = series.max === series.min;
+  const flagged = series.segments.some((s) => s.points.some((p) => isSafetySignal(p.endReason)));
   const axisTop = config.lowerIsBetter ? series.min : series.max;
   const axisBottom = config.lowerIsBetter ? series.max : series.min;
 
@@ -53,7 +55,11 @@ export function ProgressChart({ series }: { series: ProgressSeries }) {
         role="img"
         aria-label={`${config.label} from ${shortDate(series.startAt)} to ${shortDate(
           series.endAt,
-        )}, ${config.format(series.min)} to ${config.format(series.max)}`}
+        )}, ${config.format(series.min)} to ${config.format(series.max)}${
+          // The ring is invisible to a screen reader, so the fact it carries is
+          // spoken instead of lost.
+          flagged ? '. Some sets ended on pain or form' : ''
+        }`}
       >
         <line
           x1={PAD.left}
@@ -104,9 +110,15 @@ export function ProgressChart({ series }: { series: ProgressSeries }) {
           </text>
         )}
       </svg>
-      {config.lowerIsBetter && (
-        <figcaption className="mt-1 text-center text-[10px] text-slate-500">
-          Axis inverted — a smaller edge sits higher
+      {/* T14 AC6: a ringed point is a set that ended for pain or a form
+          breakdown. Stated rather than left to be inferred — the mark exists so
+          a low point can be read as a tissue event instead of a strength result,
+          and an unexplained symbol would do the opposite. Still no verdict: the
+          caption names the fact and stops (D23). */}
+      {(flagged || config.lowerIsBetter) && (
+        <figcaption className="mt-1 space-y-0.5 text-center text-[10px] text-slate-500">
+          {flagged && <span className="block">Ringed point — set ended on pain or form</span>}
+          {config.lowerIsBetter && <span className="block">Axis inverted — a smaller edge sits higher</span>}
         </figcaption>
       )}
     </figure>
@@ -126,7 +138,11 @@ function Segment({
   y: (value: number) => number;
   showEdgeLabel: boolean;
 }) {
-  const points = segment.points.map((p) => ({ cx: x(p.at), cy: y(p.value) }));
+  const points = segment.points.map((p) => ({
+    cx: x(p.at),
+    cy: y(p.value),
+    flagged: isSafetySignal(p.endReason),
+  }));
   // A single-session segment gets its point and no line (AC12) — one point is a
   // reading, not a trend, and joining it to the neighbouring edge would assert
   // exactly the comparison D22 exists to refuse.
@@ -138,8 +154,23 @@ function Segment({
       {points.length > 1 && (
         <polyline points={path} fill="none" strokeWidth={2} className={color.stroke} />
       )}
+      {/* A flagged point keeps its dot and gains a ring, so the value still reads
+          at the same place on the line — the point is not moved, downweighted, or
+          excluded (see progress.sessionValue), only annotated. */}
       {points.map((p, i) => (
-        <circle key={i} cx={p.cx} cy={p.cy} r={3} className={color.fill} />
+        <g key={i}>
+          {p.flagged && (
+            <circle
+              cx={p.cx}
+              cy={p.cy}
+              r={6}
+              fill="none"
+              strokeWidth={1.5}
+              className="stroke-red-400"
+            />
+          )}
+          <circle cx={p.cx} cy={p.cy} r={3} className={color.fill} />
+        </g>
       ))}
       {showEdgeLabel && (
         <text x={midX} y={H - 16} textAnchor="middle" className={`text-[9px] ${color.text} fill-current`}>

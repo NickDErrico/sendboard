@@ -1,7 +1,7 @@
 # SPEC: Personal Climbing Training App ("Sendboard")
 
-Version 1.7 — 2026-07-24
-Status: PRD approved with amendments — Gate 1 passed. T1–T13 built. See the Amendments log at the end of this file for what changed from v1.0 and why.
+Version 1.8 — 2026-07-24
+Status: PRD approved with amendments — Gate 1 passed. T1–T14 built. T15–T28 remain as a prioritized backlog (v1.8), built one at a time in wave order. See the Amendments log at the end of this file for what changed from v1.0 and why.
 
 > **Executor note:** This file is the source of truth. Read it in full before writing code. Mark task status markers in place as you go. If a decision you need was not made here, STOP, mark the task `[f]` with one line why, and escalate — do not improvise.
 
@@ -40,7 +40,7 @@ Explicitly out of scope. Do not build these; do not add scaffolding "in case."
 - Apple Watch app, HealthKit integration
 - **In-app reminder scheduling, storage, or notification delivery of any kind** (D2a — owned by an external alarm/Todoist)
 - ~~Rest timers with audio (nice-to-have, deferred to v2)~~ **BUILT in T10 (2026-07-24).** This was deferred, not rejected; the deferral expired when the owner asked for it. See D17–D19.
-- ~~Charts/analytics beyond a plain reverse-chronological history list~~ **NARROWED by T12 (2026-07-24).** A per-exercise progress line exists for the three exercises the training plan actually progresses (D20). Everything else still holds: no dashboards, no PRs, no streaks, no trend arrows, no cross-exercise or whole-block analytics, and no chart for an exercise the plan does not progress.
+- ~~Charts/analytics beyond a plain reverse-chronological history list~~ **NARROWED by T12 (2026-07-24), narrowed again by v1.8.** A per-exercise progress line exists for the three exercises the training plan actually progresses (D20). v1.8 additionally permits *arithmetic aggregates that report* — time under tension, an edge × week grid (T26), a session sigil (T27), a block poster (T28) — under the single rule in **D23**. What remains out, permanently: PRs, streaks, badges, adherence percentages, trend arrows, projections, session rankings, scores, and any chart for an exercise the plan does not progress.
 - Editing the exercise catalog from inside the app (catalog is code-seeded in v1)
 
 ### Prior decisions & constraints
@@ -71,6 +71,11 @@ Recorded once here so no downstream task re-derives or contradicts them.
 | D18 | **Timer state is ephemeral and session-local: never persisted, never in a backup, never a data type** | The timer answers "how long have I been pulling *right now*." Nothing downstream reads it, so persisting it would add a store, a schema version, and a stale-timer-on-resume problem in exchange for nothing. It is held as React state with an **absolute target timestamp** rather than a tick counter, so backgrounding, re-render, and iOS throttling cannot drift it — that, not persistence, is what makes it correct. A force-quit loses a running timer, which is acceptable: the owner has lost track of the interval by then anyway. `DB_VERSION` and `BACKUP_SCHEMA_VERSION` do not change. |
 | D19 | **Prefilled set values are a draft, never a claim.** Carry-forward seeds the input; it never marks an exercise completed and never writes a set the owner did not ask for | Preserves D16's separation of "logged numbers" from "I did this." A prefilled row appears only on an explicit `+ Add set` or `Log Ns` tap, and every field stays editable — so a seeded value that is wrong costs one edit, never a corrupted record. The rule that makes this safe: prefill copies *what you last did*, and the app never infers what you *should* do next (that would be adaptive load calculation, a standing non-goal). |
 | D16 | **A logged exercise carries an explicit `completed` flag, separate from its sets** | T4 AC6 omits zero-set exercises from `entries`, which makes "did it, didn't log numbers" indistinguishable from "skipped it." Several plan items have nothing numeric worth typing (warm-up progression, Turkish get-ups, the wall press), so the owner is forced to either fabricate a set row or lose the record. A boolean answers "was this session actually completed" without weakening AC6 for genuinely untouched exercises. |
+| D23 | **The app reports and cites. It never ranks, scores, projects, or congratulates** | Owner decision 2026-07-24, adopted as the governing rule for the whole v1.8 backlog. T5b already fenced streaks and guilt copy, and D20 already refused trendlines and PR badges, but v1.8 adds five surfaces that are exactly where a fitness app grows a score: a stop-signal card (T17), a symptom stream (T17), time under tension (T26), a session sigil (T27), a block poster (T28). One rule, stated once, instead of re-litigating each. **Permitted:** reporting what was recorded; aggregating it arithmetically; quoting `docs/training-plan.md` with a `§` reference. **Forbidden:** ranking sessions, computing an adherence or completion percentage, asserting a trend direction, projecting a future value, and any praise or reproach. The reason is in the plan, not in taste: §8 lists the conditions for *stopping* GtG and §4F prescribes a lighter week "regardless of the schedule," so a UI that rewarded consistency would argue against the owner's own safety rules — and §7 reads a *falling* number as the signal to deload, which a cheerful arrow inverts. Corollary: every aggregate the app renders must be a fact ("41 hangs · 6m22s under tension"), never a verdict. |
+| D27 | **Why a set ended is a closed four-value enum on the set, recorded only where the plan prescribes a hold** | Owner accepted 2026-07-24 (idea #8). `hit target / dropped / form broke / pain` is the highest-information-per-tap field available: it makes an existing charted number *interpretable* — a 6s hang that stopped for pain and one that stopped for strength are the same `holdSec` and completely different training facts — and §7's whole instruction is to spot a downward trend before it becomes an injury, which a bare number cannot support. Closed enum rather than free text because the value has to be countable and comparable across a block; free text already exists beside it in `notes` for anything the four values don't cover. Scoped to exercises declaring `holdSeconds` (D17) because "why did it end" is meaningful for a hold and vacuous for 3 × 10 goblet squats — no new catalog field is needed, the existing timing declaration already draws that line. Never carried forward, for RPE's reason (D19): it is a fresh judgment about a set that has not happened. The one automatic write is the timer's own auto-stop → `target`, which is a measurement of what the app itself did, not a guess. And under D23 it stays *data*: recording `pain` never triggers advice, a modal, or a changed prescription. |
+| D24 | **Bodyweight is a dated single number, entered opportunistically, and never estimated** | Resolves the revisit gate v1.6 left open. §4E records bodyweight alongside added load because neither means anything alone: `+35lb` at 175lb and at 182lb are different performances, and the block's headline number is currently missing half its denominator. At most one entry per day, no schedule, no prompt, no reminder (D2a). Charts gain a **% of bodyweight** view for `addedLb`, which is the climbing-relevant unit. The matching rule is deliberately strict: a session takes the most recent bodyweight recorded on or before it, within 14 days; with none in range the point is **omitted** from the %BW view rather than interpolated or carried indefinitely — the same refusal-to-draw-an-invalid-comparison as D22. |
+| D25 | **Block position is derived from the first completed session, not scheduled** | Un-defers the periodization question v1.4 parked, using D15's method: derive, don't store. "Session 11 · ~week 6" comes from the log; the only stored state is an optional block-start marker for when the owner deliberately begins a new block. Past week 8 reads **"week 8+"** — never "overdue," never "behind," which is the same state D15 refuses and §4F explicitly invites by prescribing a lighter week whenever fingers feel beat up. What this buys is the thing D17 works around: §4B carries a weeks-1–4 rep-structured PIMA variant and a weeks-5–8 max-effort variant in one `prescription` string, and derived block position lets the app show the live one first. The other variant stays readable on the detail screen — the app narrows emphasis, never hides the plan. |
+| D26 | **Available gear is Settings data, not catalog content** | Board edges, added-load increments, dip belt yes/no. Every numeric input in the app currently opens an iOS keyboard, and the hands typing on it are chalked and mid-protocol — which is the PRD's problem #2 in its most literal form. Knowing the four edges that actually exist on the board turns edge entry into a segmented pick, and knowing the load increments turns `addedLb` into ± chips at the 1–3% steps §4F asks for. This is not D6 reversed: it configures *input affordances*, not exercises. The catalog stays a typed constant in source, and gear never changes a prescription. |
 
 **Documented alternative, not chosen:** Expo + EAS Build → real native app with `expo-notifications` scheduling reminders in-app. Gate to revisit: owner is willing to pay $99/yr for the Apple Developer Program **and** external reminders have proven insufficient in real use (e.g. he wants the notification itself to name the day's routine). Revisit no earlier than the end of the 8-week block. Do not build toward this in v1.
 
@@ -107,6 +112,34 @@ Risk-first ordering. T0 is a spike: the entire architecture rests on assumptions
 | T12 | Structured measurements + per-exercise progress chart | T10, T11 | — |
 
 **Gate 2 (decomposition review) happens here** — before T1 starts, after T0 reports.
+
+### Backlog decomposition (v1.8)
+
+Nineteen accepted ideas from the 2026-07-24 ideation pass, grouped into fifteen tasks. Two ideas were rejected outright and three deferred — recorded in the v1.8 amendment so they are not re-proposed.
+
+**Ordering principle: unbackfillable first.** The owner has **not started the block** (confirmed 2026-07-24). That fact, not estimated value, sets the order. A set-end reason, a bodyweight, and a §4E week-1 baseline cannot be reconstructed after the fact: every session logged without them is a session whose record is permanently thinner, and the baseline is a single unrepeatable event that §4E requires *before* week 1 under rested, warmed-up, identical conditions. Ergonomics, by contrast, lose nothing by landing in week 2 — they pay off on every session that remains. So capture precedes comfort, and the biggest-value item on the list (T16) is also the most time-critical.
+
+| ID | Task | Ideas | Wave | Depends on |
+|---|---|---|---|---|
+| T14 | Set-end reason: why a hold ended, in one tap | #8 | 0 — before session 1 | T12 |
+| T15 | Bodyweight capture + % of bodyweight chart view | #11 | 0 — before session 1 | T12 |
+| T16 | §4E baseline / retest battery with condition capture | #7 | 0 — before session 1 | T15 |
+| T17 | Symptom check + plan-cited stop-signal card | #10, #9 | 1 — every session | T14, T16 |
+| T18 | Gear settings + stepper / picker set entry | #4, #1 | 1 — every session | — |
+| T19 | Chained sets: set *n* of *N* against the prescription | #3 | 1 — every session | T18 |
+| T20 | Spoken cues: "3–2–1–pull", set announcements, band-pitch tone | #2, #20 | 1 — every session | T19 |
+| T21 | Eyes-shut hold mode | #16 | 1 — every session | T20 |
+| T22 | Rest screen as the teaching surface | #15 | 2 — dead time | T19 |
+| T23 | Warm-up runner | #5 | 2 — dead time | T19 |
+| T24 | Block position derived from the first session | #13 | 2 — dead time | — |
+| T25 | In-app training-plan search | #6 | 2 — dead time | — |
+| T26 | Edge × week grid + time under tension | #12, #14 | 3 — insight | T15 |
+| T27 | Session sigil + history as a story | #17 | 3 — insight | T26 |
+| T28 | Week-8 block poster | #18 | 3 — insight | T24, T26, T27 |
+
+**Wave semantics.** Wave 0 must land before the first logged session. Wave 1 is used on every session from whenever it ships, so it is ordered by ergonomic payoff per unit of work. Wave 2 fills the ~15 minutes of prescribed rest a Day 1 session contains (5 sets × 3 min, §4C) — the app's largest unused surface. Wave 3 pays off at week 8 and needs a block's worth of data to show anything, so it cannot usefully come earlier.
+
+**Level 3 specs are written just-in-time**, one task ahead of building it, not fifteen upfront — the same reason T9–T13 were specced as they were requested. A spec written now for T28 would be written against a data model that T15, T24 and T26 are going to change. Each task's full spec is appended to Level 3 below when it starts.
 
 ---
 
@@ -941,6 +974,60 @@ Design calls:
 
 ---
 
+### [T14] Outcome: The owner can record why a hold ended in one tap, and the chart no longer reads a pain-stopped set as a strength result.
+Spec: this file | Status: [x] | Depends on: T12 | Wave 0
+
+#### Context manifest
+Create: `src/lib/setReason.ts` (+ `setReason.test.ts`) | Modify: `src/types.ts`, `src/lib/timer.ts` (+ `timer.test.ts`), `src/lib/lastTime.ts` (+ `lastTime.test.ts`), `src/lib/progress.ts` (+ `progress.test.ts`), `src/components/SetLogger.tsx`, `src/components/ProgressChart.tsx`, `src/screens/ActiveSession.tsx` | Conform to: D19, D21, D23, D27 | Delete: nothing
+
+**Why this is first.** It is one optional field, and it is the only change in the backlog that makes *already-charted* data mean something. T12 charts `holdSec` for the two max hangs and the weighted lock-off. A 6s hang that ended because the fingers opened and a 6s hang that ended because something hurt plot at the identical height, and §7 asks the owner to read that chart for an injury trend. Recording the difference costs one tap; recovering it later costs the whole block, because nobody remembers in week 8 why a set in week 2 was short.
+
+**The auto-stop write is free information, not a guess.** T13 made the timer end a hold at its prescribed maximum. When it does, the reason the set ended is known with certainty by the app itself — it hit the target — so that set is logged with `endReason: 'target'` and no tap. A *manual* stop is the ambiguous case (dropped? pain? form?), and there the app records nothing and puts the four chips on the row it just created. This mirrors T13 AC6's split exactly: the auto path records the prescription, the manual path defers to the owner.
+
+#### Acceptance criteria
+1. WHEN a set exists on an exercise that declares `holdSeconds` THE app SHALL offer four one-tap end reasons — hit target, dropped, form broke, pain — and record the choice on that set. [x]
+2. WHEN a hold ends by reaching its prescribed maximum THE logged set SHALL carry `target` without a tap. [x]
+3. WHEN a hold is stopped manually THE logged set SHALL carry no reason, and its chips SHALL be presented open so recording one is a single tap. [x]
+4. WHEN an exercise declares no `holdSeconds` THE set logger SHALL be visually unchanged from T12 — no chips, no extra row, no shifted columns. [x]
+5. WHEN a new set is seeded from a previous one THE end reason SHALL NOT be carried forward (D19). [x]
+6. WHEN a progress chart is drawn THE points whose best set ended for pain or a form breakdown SHALL be marked distinctly from the rest, with a caption naming what the mark means. [x]
+7. WHEN a set is summarized (the last-time line, history detail) THE reason SHALL appear only if it is `pain` or `form-broke`; `target` and `dropped` SHALL be omitted, because `holdSec` against the prescribed range already says which of those happened. [x]
+8. WHEN a pre-T14 set or an imported backup is read THE absent reason SHALL read as not-recorded, with no migration, no `DB_VERSION` bump, and no `BACKUP_SCHEMA_VERSION` bump. [x]
+
+#### Edge cases
+- An exercise with a hold but nothing numeric to log (the PIMA pulls, the wall press) → chips still offered; the reason is the *only* thing worth recording there, which is much of the point. [x]
+- Correcting a reason: tapping a recorded reason reopens the chips; tapping the already-active chip clears it back to not-recorded. A wrong tap must cost one tap, never a deleted set. [x]
+- Five sets × four chips is twenty controls on one card — at most one set's chips are open at a time. [x]
+- Chips open by rule, not by stored UI state: the last set, when its reason is unrecorded. So the row created by "Log 7.4s" is already open, and older rows stay collapsed. [x]
+- A `pain` reason must not change the best-set selection in `progress.sessionValue`. It was still a real measurement, and silently dropping it would hide precisely the trend §7 asks the owner to watch. [x]
+- The reason must round-trip through export → import unchanged (it is inside `SetEntry`, which `backup.ts` passes through whole). [x] — by construction: `backup.ts` passes `logs` through as whole objects and validates only the file envelope, so a new optional field on `SetEntry` needs no export or import change.
+
+#### Non-goals & do-not-touch
+- MUST NOT show chips on rep-based exercises (AC4).
+- MUST NOT react to `pain` with an alert, a modal, a hidden exercise, a blocked timer, or a changed prescription (D23, D27). The surface that cites §7/§8 when a plan-named condition fires is **T17's**, and it is deliberately not in this task.
+- MUST NOT bump `DB_VERSION` or `BACKUP_SCHEMA_VERSION` — the field is optional (AC8).
+- MUST NOT carry the reason forward, and MUST NOT infer one from `holdSec` versus the target range. A hold that fell 1s short of the range was not necessarily "dropped," and guessing would fabricate the safety signal §7 depends on.
+- MUST NOT persist which chip row is open (D18's reasoning: ephemeral UI state is not data).
+
+#### Verify
+`npm run test && npm run build && npm run lint`, plus an in-browser pass: a manual stop leaves the chips open on the new row; an auto-stop lands on `target` with no tap; a rep-based exercise's logger is pixel-unchanged; a pain-marked session renders a distinct point on the chart.
+
+#### Amendments
+
+**2026-07-24 — T14 built. Build + lint clean, 194 tests green (25 new: 10 in `setReason`, 4 timer, 7 lastTime, 4 progress). All eight ACs verified in-browser against a real session.** Files: `src/lib/setReason.ts` (+ `setReason.test.ts`); modified `src/types.ts`, `src/lib/timer.ts`, `src/lib/lastTime.ts`, `src/lib/progress.ts` (+ their tests), `src/components/SetLogger.tsx`, `src/components/ProgressChart.tsx`, `src/screens/ActiveSession.tsx`. No new dependencies, no schema change, no migration.
+
+Verified on the running app, not just in tests: the warm-up progression (no `holdSeconds`) shows no reason UI and keeps its `load / reps / RPE` inputs (AC4); a PIMA hold auto-stopped at exactly 5.0s and logged `reps: "5.0s"` with `endReason: "target"` and no tap (AC2); a max hang auto-stopped at 10.0s logged `holdSec: 10` the same way; a hand-stopped 1.4s hold logged with no reason and its four chips already open (AC3); re-tapping a recorded reason reopened it and re-tapping the active chip cleared it back to "Why did it end?"; and IndexedDB showed `endReason` present only on the sets that have one. With two sessions on the chart, the pain-marked point rendered as an `r=6` red ring around its dot, captioned "Ringed point — set ended on pain or form", with the same fact appended to the SVG's `aria-label` (AC6).
+
+Design calls:
+- **`TimerState` gained `heldAuto`, which is what makes AC2 free rather than a guess.** T13 already split auto-stop from manual stop for *duration* (the auto path records `hold.max`, the manual path records real elapsed time). The reason splits on the same line, so the timer carries one extra ephemeral boolean and the logging path reads it. Nothing is persisted (D18 unchanged).
+- **Which exercises are asked is derived from `holdSeconds`, not from a new catalog field.** The existing timing declaration already separates holds from rep work, which is exactly the line the question needs. Ten catalog entries gain the chips with no catalog edit at all.
+- **The open row is computed, not stored.** "The last set, while its reason is unrecorded" makes the row that `Log 7.4s` and `+ Add set` just created the open one, with no extra state to keep in sync and no stale-open row after a delete. A hand-opened row overrides it, so at most one row is ever open.
+- **Only `pain` and `form-broke` appear in summaries.** `target` and `dropped` are already legible from `holdSec` against the prescribed range, and printing them would push the numbers off a card built for a mid-session glance. `summaryReason` owns that rule so the last-time line and history detail can't disagree.
+- **A flagged point is annotated, never moved or excluded.** `sessionValue` still picks the best set even when that set ended on pain — dropping the low points would erase the only thing that makes a declining line visible, which is the one job §7 gives this chart. The chart marks it and says what the mark means; the interpretation stays the owner's (D23).
+- **`isSafetySignal` accepts `null` and `undefined`.** The codebase spells "not recorded" two ways on purpose — optional fields on stored data so pre-T14 sets need no migration, explicit `null` on derived values like the `edgeMm` beside it. Reading both is the classifier's job rather than every caller's.
+
+---
+
 ## Execution notes
 
 - **Gates:** Gate 1 = PRD approved (now, by the owner). Gate 2 = decomposition approved after T0's spike report. Gate 3 = implementation reviewed against acceptance criteria after T8.
@@ -1081,3 +1168,33 @@ The first of those reframed the whole persistence question. The threat to an 8-w
 | Playback audio session, louder and longer tones, resume on foreground, "Test sound" in Settings | On iOS the ringer switch silences Web Audio unless the page declares a playback session — the most likely cause of the reported silence, and untestable off-device, which is why Settings now has a button that plays the cue on demand. |
 
 **Net effect on scope:** one task, one new module, one reversed T10 design call, no new decisions, no dependencies, and no schema change. **Device pass still owes:** beep audibility with the ringer off, wake-lock acquisition, a real background/resume cycle, and confirmation that persistent storage is granted once installed.
+
+**2026-07-24 — v1.7 → v1.8 — ideation pass accepted: nineteen ideas specced as a prioritized backlog (T14–T28).**
+
+Owner request: "find some ways to make this app really easy, insightful and enjoyable to use… think outside the box." A review of the built app against `docs/training-plan.md` produced twenty-three ideas; the owner accepted nineteen, rejected one, and deferred three. This amendment records the decisions the accepted set needs, the priority order, and — for the record — what was turned down.
+
+**The design problem worth naming.** Every stock mechanism for making a training app enjoyable is already fenced off, correctly: no streaks or badges (T5b), no PRs or trend arrows or projections (D20), no reminders (D2a), no adaptive prescription (standing non-goal). §8 lists conditions for *stopping* GtG and §4F prescribes a lighter week regardless of schedule, so any UI that rewards adherence argues against the owner's own safety rules. The accepted set therefore had to be enjoyable and insightful using report-only mechanics, which is what **D23** now states as one rule rather than five arguments.
+
+| Change | Why |
+|---|---|
+| D23 added: the app reports and cites; never ranks, scores, projects, or congratulates | v1.8 adds five surfaces that are exactly where a fitness app grows a score. One governing rule is cheaper than re-litigating each, and it is derived from the plan (§7, §8, §4F) rather than from taste. |
+| D27 added: set-end reason as a closed four-value enum, scoped to exercises declaring `holdSeconds` | Highest information per tap in the app. It makes an already-charted number interpretable: a pain-stopped 6s hang and a strength-limited 6s hang are the same `holdSec` and different training facts. Scoped by the existing timing declaration, so no catalog field is added. |
+| D24 added: bodyweight as a dated single number, never estimated | Resolves the revisit gate v1.6 left open. §4E records bodyweight *with* added load because neither means anything alone. The strict ±14-day matching rule, and omitting rather than interpolating a point, is D22's refusal-to-draw-an-invalid-comparison applied to a second axis. |
+| D25 added: block position derived from the first completed session | Un-defers v1.4's periodization parking, using D15's derive-don't-store method. Buys the thing D17 works around — showing the live PIMA variant (§4B weeks 1–4 vs 5–8) instead of both in one string — with no schedule state and no "behind" state. |
+| D26 added: available gear (edges, load increments, dip belt) is Settings data | Every numeric input currently opens an iOS keyboard for chalked hands mid-protocol, which is PRD problem #2 in its most literal form. Not a reversal of D6: it configures input affordances, never exercises. |
+| Charts non-goal narrowed a second time | Arithmetic aggregates that *report* are now permitted under D23 (time under tension, edge × week grid, session sigil, block poster). PRs, streaks, adherence percentages, trend arrows, projections, and rankings remain permanently out. |
+| Backlog decomposition added at Level 2: T14–T28 in four waves | Fifteen tasks, ordered unbackfillable-first because the owner has not started the block. Level 3 specs are written just-in-time, one task ahead. |
+
+**Ordering rationale, stated once.** The owner confirmed on 2026-07-24 that the 8-week block has **not started**. That inverts the intuitive order. Ergonomic wins (steppers, voice, chained sets, eyes-shut mode) are the most *felt* improvements and lose nothing by landing in week 2 — they pay off on every remaining session. Capture changes are the opposite: a set-end reason, a bodyweight, and a §4E baseline are unrepeatable, and §4E's baseline in particular is a single event requiring rested, warmed-up, identical conditions *before* week 1. Every session logged without them is a permanently thinner record. So Wave 0 is capture, Wave 1 is comfort, and the highest-value item in the whole backlog (T16, the retest battery) is also the most time-critical.
+
+**Rejected, with reasons — do not re-propose.**
+
+| Idea | Verdict |
+|---|---|
+| Printable wall card (protocol + current numbers as a PDF) | **Rejected by the owner:** "I'm just not going to print it." No further argument needed; the phone-on-the-floor problem it addressed is handled by T21's eyes-shut mode instead. |
+| Backend-free sharing (session summary encoded in a URL fragment or QR) | **Deferred.** Solves a problem the owner has not reported having — there is no coach and no second device in the picture. Revisit only if one appears. |
+| Motion-detected hang start/stop (`DeviceMotion` to time the hold from actual loading of the board) | **Deferred, needs a T0-shaped device spike.** It would fix a real defect — `holdSec` currently includes the tap-then-get-on-the-board offset — but iOS requires a permission gesture and standalone-PWA support for motion events has been historically unreliable. Do not build toward this without a spike that runs on the owner's actual iPhone. |
+| Tremor / steadiness as a proxy quality signal (accelerometer variance during a yielding hold) | **Deferred.** Genuinely novel and honestly framed (it measures when a hold degraded, not how hard it was — §4E's "nothing to measure without a force gauge" stands for *force*), but it depends on the same unproven motion-event path, and no decision covers what a tremor number would mean. Gate: the motion spike passes first. |
+
+**Net effect on scope:** fifteen tasks, five decisions, one non-goal narrowed. Expected schema impact across the whole backlog: optional fields on `SetEntry` (T14), one new dated record type for bodyweight (T15) and one for symptoms (T17), a retest record (T16), and gear on `Settings` (T18/D26) — the first `BACKUP_SCHEMA_VERSION` bump since T7 becomes likely at T15 or T16, and that task owns the migration decision. No reversal of D2a, D9, D15, D16, D18, D19, D20, D21, or D22. Spoken cues (T20) are Web Speech in the foreground, not notifications — D2a is untouched.
+

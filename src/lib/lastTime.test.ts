@@ -232,3 +232,54 @@ describe('seedForNextSet (AC3, AC4, AC7)', () => {
     expect(seedForNextSet([], blank)).toEqual({ load: '', reps: '', rpe: null });
   });
 });
+
+// ─── Set-end reason in summaries (T14 AC5, AC7) ──────────────────────────────
+
+describe('formatSet with an end reason', () => {
+  it('appends a safety signal after the numbers and the rating', () => {
+    expect(formatSet({ ...HANG, endReason: 'pain' })).toBe('20mm +10kg × 7s @8 · pain');
+    expect(formatSet({ ...HANG, endReason: 'form-broke' })).toBe('20mm +10kg × 7s @8 · form');
+  });
+
+  it('omits target and dropped — holdSec against the range already says which', () => {
+    expect(formatSet({ ...HANG, endReason: 'target' })).toBe('20mm +10kg × 7s @8');
+    expect(formatSet({ ...HANG, endReason: 'dropped' })).toBe('20mm +10kg × 7s @8');
+  });
+
+  it('reports a reason on a set with no numbers at all', () => {
+    // A PIMA pull logs nothing numeric (D20), so the reason is the whole record.
+    expect(formatSet({ load: '', reps: '', rpe: null, endReason: 'pain' })).toBe('pain');
+    expect(formatSet({ load: '', reps: '', rpe: null, endReason: 'target' })).toBe('—');
+  });
+
+  it('reads a measured set with a reason', () => {
+    expect(formatSet({ load: '', reps: '', rpe: null, edgeMm: 18, holdSec: 6, endReason: 'pain' }))
+      .toBe('18mm · 6.0s · pain');
+  });
+
+  it('keeps two otherwise identical sets distinct in a summary', () => {
+    // One hang stopped on pain and one did not are different training facts, so
+    // summarizeSets must not collapse them into "×2".
+    const clean = { load: '20mm', reps: '7s', rpe: null };
+    const hurt = { ...clean, endReason: 'pain' as const };
+    expect(summarizeSets([clean, hurt])).toBe('20mm × 7s · 20mm × 7s · pain');
+  });
+});
+
+describe('seedForNextSet never carries a reason (AC5, D19/D27)', () => {
+  it('drops it from the previous set in this session', () => {
+    const previous: SetEntry = { load: '20mm', reps: '7s', rpe: 9, endReason: 'pain' };
+    expect(seedForNextSet([previous], null).endReason).toBeUndefined();
+  });
+
+  it('drops it from the last session too', () => {
+    const logs = [log('a', '2026-07-21T18:00', [entry('max-hang-half-crimp', [
+      { load: '20mm', reps: '7s', rpe: 8, endReason: 'target' },
+    ])])];
+    const last = lastPerformance(logs, 'max-hang-half-crimp', TODAY);
+    const seed = seedForNextSet([], last);
+    expect(seed.endReason).toBeUndefined();
+    // The setup it *does* carry is unaffected.
+    expect(seed.load).toBe('20mm');
+  });
+});

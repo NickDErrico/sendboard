@@ -28,6 +28,14 @@ export interface TimerState {
   restMs: number;
   /** Measured duration of the hold that just finished, in ms; null once logged or cleared. */
   heldMs: number | null;
+  /**
+   * True when `heldMs` came from the timer reaching the prescribed maximum rather
+   * than from a manual Stop. Read once, by the set-logging path: an auto-stop
+   * knows *why* the hold ended (it hit the target) and records that reason with
+   * no tap, where a manual stop is ambiguous and records nothing (D27, AC2/AC3).
+   * Ephemeral like every other field here (D18).
+   */
+  heldAuto: boolean;
 }
 
 export const IDLE_TIMER: TimerState = {
@@ -36,6 +44,7 @@ export const IDLE_TIMER: TimerState = {
   startedAt: 0,
   restMs: 0,
   heldMs: null,
+  heldAuto: false,
 };
 
 /** Reads an exercise's optional timing fields (D17) into the shapes this module uses. */
@@ -59,11 +68,11 @@ export function isTimerVisible(state: TimerState): boolean {
 // running rest and any unlogged result: there is one timer because there is one
 // owner with two hands, and the thing they just tapped is the thing they mean.
 export function startHold(exerciseId: string, now: number): TimerState {
-  return { phase: 'holding', exerciseId, startedAt: now, restMs: 0, heldMs: null };
+  return { phase: 'holding', exerciseId, startedAt: now, restMs: 0, heldMs: null, heldAuto: false };
 }
 
 export function startRest(exerciseId: string, restMs: number, now: number): TimerState {
-  return { phase: 'resting', exerciseId, startedAt: now, restMs, heldMs: null };
+  return { phase: 'resting', exerciseId, startedAt: now, restMs, heldMs: null, heldAuto: false };
 }
 
 /**
@@ -78,9 +87,16 @@ export function stopHold(state: TimerState, now: number, restMs: number | null):
   if (state.phase !== 'holding') return state;
   const heldMs = Math.max(0, now - state.startedAt);
   if (restMs === null) {
-    return { ...IDLE_TIMER, exerciseId: state.exerciseId, heldMs };
+    return { ...IDLE_TIMER, exerciseId: state.exerciseId, heldMs, heldAuto: false };
   }
-  return { phase: 'resting', exerciseId: state.exerciseId, startedAt: now, restMs, heldMs };
+  return {
+    phase: 'resting',
+    exerciseId: state.exerciseId,
+    startedAt: now,
+    restMs,
+    heldMs,
+    heldAuto: false,
+  };
 }
 
 /**
@@ -105,7 +121,7 @@ export function autoStopHold(
   if (state.phase !== 'holding') return state;
   const heldMs = hold.max * 1000;
   if (restMs === null) {
-    return { ...IDLE_TIMER, exerciseId: state.exerciseId, heldMs };
+    return { ...IDLE_TIMER, exerciseId: state.exerciseId, heldMs, heldAuto: true };
   }
   // Rest starts from the instant the hold *should* have ended, for the same
   // reason: a late tick must not silently shorten the prescribed rest.
@@ -115,6 +131,7 @@ export function autoStopHold(
     startedAt: state.startedAt + heldMs,
     restMs,
     heldMs,
+    heldAuto: true,
   };
 }
 
@@ -126,7 +143,7 @@ export function extendRest(state: TimerState, seconds: number): TimerState {
 
 /** Drops the result after it has been written to a set, leaving any running phase alone. */
 export function clearHeld(state: TimerState): TimerState {
-  return state.heldMs === null ? state : { ...state, heldMs: null };
+  return state.heldMs === null ? state : { ...state, heldMs: null, heldAuto: false };
 }
 
 /** Dismisses the timer entirely (Skip, or done with a finished rest). */

@@ -10,11 +10,14 @@ The full build specification and its decision log live in
 
 ## Status
 
-Feature-complete (T1–T12): data layer, exercise browsing, session logging, history,
+Feature-complete (T1–T14): data layer, exercise browsing, session logging, history,
 climbing/GtG check-offs, settings with JSON backup export/import, hash routing, a
 home + tab-bar navigation shell, install onboarding, routine rotation with preview and
-per-exercise completion, an in-session hold + rest timer, last-time carry-forward, and
-per-exercise progress charts.
+per-exercise completion, an in-session hold + rest timer, last-time carry-forward,
+per-exercise progress charts, and one-tap capture of why a hold ended.
+
+T15–T28 are a prioritized backlog in the spec — capture before comfort, because the
+8-week block has not started and a missing measurement cannot be backfilled.
 
 Remaining is the on-device acceptance pass: export/import on iOS Safari (T7), the T8
 criterion-5 walkthrough, and four things that can only be confirmed on the phone —
@@ -74,8 +77,30 @@ The chart reports and never judges: no trendline, no projection, no personal-bes
 badge, no improving-or-declining verdict. §4E's interpretation rubric is yours to
 apply, and §7 treats a falling line as a reason to deload.
 
-Note that bodyweight isn't tracked, so an added-load line only compares cleanly against
-a stable bodyweight — §4E records both together for that reason.
+A point drawn with a **red ring** is a set that ended on pain or a form breakdown —
+see below. It is marked, never excluded: dropping the low points would erase the only
+thing that makes a declining line visible.
+
+Note that bodyweight isn't tracked yet, so an added-load line only compares cleanly
+against a stable bodyweight — §4E records both together for that reason. That's the
+next task in the backlog.
+
+## Why a hold ended
+
+Every exercise the plan gives a duration for asks one more thing after a set:
+**hit target · dropped · form broke · pain**. One tap, and it is the highest-value tap
+in the app — a 6s hang that ended because the fingers opened and a 6s hang that ended
+because something hurt are the same number and completely different facts, and §7 asks
+you to read the chart for exactly that difference.
+
+You usually don't tap at all. When the timer ends a hold itself at the prescribed
+maximum, it already knows why the set ended and records **hit target**. Only a hold you
+stop by hand is ambiguous, and there the four chips are already open on the row that was
+just created.
+
+Nothing happens when you record **pain** — no alert, no changed prescription, no hidden
+exercise. It is data, and it shows up as a ringed point on the chart and beside the set
+in history. The plan's own stop conditions (§7, §8) are still yours to apply.
 
 ## Stack
 
