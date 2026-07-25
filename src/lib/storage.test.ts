@@ -24,9 +24,11 @@ function makeCheck(id: string, kind: CheckKind, date: string): Check {
 }
 
 describe('catalog (AC1, AC4, AC5)', () => {
-  it('exposes all 20 exercises and 2 routines from an empty database', async () => {
-    expect(await storage.getAllExercises()).toHaveLength(20);
-    expect(await storage.getAllRoutines()).toHaveLength(2);
+  // 20 training entries + T16's five §4E test-only entries; 2 training routines
+  // + T16's non-rotating battery.
+  it('exposes all 25 exercises and 3 routines from an empty database', async () => {
+    expect(await storage.getAllExercises()).toHaveLength(25);
+    expect(await storage.getAllRoutines()).toHaveLength(3);
   });
 
   it('is stable across a re-init and never overwritten', async () => {

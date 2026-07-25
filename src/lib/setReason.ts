@@ -47,6 +47,22 @@ export function reasonApplies(exercise: Exercise | undefined): boolean {
 }
 
 /**
+ * The reasons offered for one exercise's sets.
+ *
+ * All four, except on an **open hold** (T16), where `target` is dropped: §4E's
+ * lock-off test prescribes no duration, so there is no target to have hit and the
+ * value would be uninterpretable — which is the same standard D27 sets for the
+ * enum as a whole. It is also the one value the app can write by itself, and it
+ * never does so here, because an open hold is only ever ended by hand.
+ */
+export function reasonsFor(exercise: Exercise | undefined): SetEndReason[] {
+  if (exercise?.holdSeconds === 'open') {
+    return SET_END_REASONS.filter((r) => r !== 'target');
+  }
+  return SET_END_REASONS;
+}
+
+/**
  * Both classifiers below accept `null` as well as `undefined`, because the
  * codebase has two deliberate spellings of "not recorded": optional fields on
  * stored data (`SetEntry.endReason`, so a pre-T14 set needs no migration) and

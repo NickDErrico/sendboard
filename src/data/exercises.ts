@@ -444,4 +444,140 @@ export const EXERCISES: Exercise[] = [
     ],
     gtgEligible: false,
   },
+
+  // ─── §4E baseline / retest battery (T16) ───────────────────────────────────
+  //
+  // Five test-only entries, run twice a block and never in a training session
+  // (D29a). They are separate from the trained movements on purpose: §4E is a
+  // maximum under one fixed protocol while §4C training is 85–90% for five sets,
+  // so logging both against `max-hang-half-crimp` would put a week-1 and a week-8
+  // spike on the very series §7 asks the owner to read for a *downward* trend.
+  // That is D22's refusal to draw an invalid comparison, applied to intensity
+  // rather than edge size — these get their own two-point series instead.
+  //
+  // None is gtgEligible: §8 forbids greasing the groove on max protocols, and a
+  // test to failure is the most maximal thing in the app.
+  {
+    id: 'test-max-hang-half-crimp',
+    name: '§4E Test — Max Hang Load, Half-Crimp',
+    category: 'fingers',
+    isoType: 'yielding',
+    equipment: ['hangboard', 'dip-belt'],
+    summary: 'Baseline/retest: the most added weight you can hold 7s on your standard edge, half-crimp.',
+    howTo: [
+      'Fully rested, after a thorough warm-up — the same warm-up both times.',
+      'Use your one standard edge (14–20mm) and a half-crimp grip.',
+      'Work up in 3–5 sets with 3 minutes of rest, adding weight each set.',
+      'Each attempt is a 7-second hang. Stop at the first failed attempt.',
+      'Record the edge, the heaviest added weight held for 7s, and your bodyweight.',
+    ],
+    prescription: 'Work up in 3–5 sets x 7s, 3 min rest, to the max added weight held for 7s. Stop at the first failed attempt (§4E)',
+    holdSeconds: [7, 7],
+    restSeconds: 180,
+    // No holdSec: the hold is fixed at 7s by the protocol, so the only things that
+    // move between week 1 and week 8 are the load and the edge it was held on.
+    metrics: ['addedLb', 'edgeMm'],
+    cues: [
+      'Identical conditions both times — same edge, same grip, same time of day, same warm-up — or the comparison is meaningless (§4E).',
+      'Record bodyweight the same day: added weight alone is half a measurement (§4E).',
+    ],
+    safetyNotes: [
+      'A true max attempt on cold or fatigued fingers is how pulleys tear — test rested, never as a make-up session (plan §7).',
+      'Stop at the first failed attempt rather than grinding out one more (plan §4E).',
+    ],
+    gtgEligible: false,
+  },
+  {
+    id: 'test-max-hang-open-hand',
+    name: '§4E Test — Max Hang Load, Open-Hand',
+    category: 'fingers',
+    isoType: 'yielding',
+    equipment: ['hangboard', 'dip-belt'],
+    summary: 'Baseline/retest: the most added weight you can hold 7s on your standard edge, open-hand.',
+    howTo: [
+      'Same protocol as the half-crimp test, with an open-hand grip.',
+      'Use the same standard edge you tested the half-crimp on.',
+      'Work up in 3–5 sets with 3 minutes of rest; each attempt is a 7-second hang.',
+      'Stop at the first failed attempt.',
+      'Record the edge, the heaviest added weight held for 7s, and your bodyweight.',
+    ],
+    prescription: 'Same protocol as the half-crimp test, open-hand grip (§4E)',
+    holdSeconds: [7, 7],
+    restSeconds: 180,
+    metrics: ['addedLb', 'edgeMm'],
+    cues: [
+      'Same edge as the half-crimp test, and the same edge again at week 8 (§4E).',
+    ],
+    safetyNotes: [
+      'A true max attempt on cold or fatigued fingers is how pulleys tear — test rested (plan §7).',
+    ],
+    gtgEligible: false,
+  },
+  {
+    id: 'test-max-pullup-load',
+    name: '§4E Test — Max Pull-up Load',
+    category: 'pulling',
+    isoType: 'dynamic',
+    equipment: ['pullup-bar', 'dip-belt', 'kettlebell'],
+    summary: 'Baseline/retest: the heaviest single strict pull-up, kettlebell via dip belt.',
+    howTo: [
+      'Warm up, then load a kettlebell on the dip belt.',
+      'Perform one strict pull-up — no kipping, full extension to chin over bar.',
+      'Add weight and repeat until an attempt fails.',
+      'Record the heaviest added weight completed.',
+    ],
+    prescription: 'Heaviest single strict pull-up (kettlebell via dip belt) — record added weight (§4E)',
+    // No holdSeconds: a pull-up is a rep, not a hold, so there is no timer and no
+    // end-reason question (D27's line falls exactly here).
+    metrics: ['addedLb'],
+    cues: ['Strict means strict — a kipped rep is not the same test at week 8.'],
+    safetyNotes: [
+      'Stop at any elbow or shoulder pain; §5D lists antagonist work as the reason this stays healthy, and a max single is not worth an injury (plan §7).',
+    ],
+    gtgEligible: false,
+  },
+  {
+    id: 'test-lockoff-90-left',
+    name: '§4E Test — Lock-off Hold 90°, Left',
+    category: 'pulling',
+    isoType: 'yielding',
+    equipment: ['pullup-bar'],
+    summary: 'Baseline/retest: longest static 90° lock-off at bodyweight, left side, one attempt.',
+    howTo: [
+      'Pull up to a 90° lock-off on the left side at bodyweight.',
+      'Hold as long as you can — this is a maximum, not a prescribed duration.',
+      'One attempt per side; the timer runs until you stop it.',
+      'Record the seconds held.',
+    ],
+    prescription: 'Longest static hold at bodyweight, one attempt per side — record seconds each side (§4E)',
+    // 'open' (T16): the duration is the measurement, so there is no maximum to
+    // auto-stop at. Left and right are separate entries because a session's chart
+    // point is its *best* set, and a best-of-both-arms number is not a per-side
+    // record — the same reason D22 refuses to join two edges.
+    holdSeconds: 'open',
+    metrics: ['holdSec'],
+    cues: ['One attempt per side — a second try after a rest is a different test.'],
+    safetyNotes: ['Come off before the elbow takes over from the back; §7 names pulling volume as the first thing to cut at any elbow symptom.'],
+    gtgEligible: false,
+  },
+  {
+    id: 'test-lockoff-90-right',
+    name: '§4E Test — Lock-off Hold 90°, Right',
+    category: 'pulling',
+    isoType: 'yielding',
+    equipment: ['pullup-bar'],
+    summary: 'Baseline/retest: longest static 90° lock-off at bodyweight, right side, one attempt.',
+    howTo: [
+      'Pull up to a 90° lock-off on the right side at bodyweight.',
+      'Hold as long as you can — this is a maximum, not a prescribed duration.',
+      'One attempt per side; the timer runs until you stop it.',
+      'Record the seconds held.',
+    ],
+    prescription: 'Longest static hold at bodyweight, one attempt per side — record seconds each side (§4E)',
+    holdSeconds: 'open',
+    metrics: ['holdSec'],
+    cues: ['One attempt per side — a second try after a rest is a different test.'],
+    safetyNotes: ['Come off before the elbow takes over from the back; §7 names pulling volume as the first thing to cut at any elbow symptom.'],
+    gtgEligible: false,
+  },
 ];

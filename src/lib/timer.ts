@@ -13,7 +13,18 @@ import type { Exercise } from '../types';
 
 export interface HoldSpec {
   min: number; // seconds
-  max: number; // seconds; equal to min for a fixed target
+  /**
+   * Seconds; equal to `min` for a fixed target, and **null for an open hold**
+   * (T16) — §4E's lock-off test is "longest static hold", so the duration is the
+   * measurement and there is no prescription to end it at. An open hold never
+   * auto-stops, draws no target band, and can only be ended by hand.
+   */
+  max: number | null;
+}
+
+/** True for §4E's max-duration tests: a running clock with nothing to reach. */
+export function isOpenHold(hold: HoldSpec): boolean {
+  return hold.max === null;
 }
 
 export type TimerPhase = 'idle' | 'holding' | 'resting';
@@ -50,6 +61,7 @@ export const IDLE_TIMER: TimerState = {
 /** Reads an exercise's optional timing fields (D17) into the shapes this module uses. */
 export function holdSpecOf(exercise: Exercise | undefined): HoldSpec | null {
   if (!exercise?.holdSeconds) return null;
+  if (exercise.holdSeconds === 'open') return { min: 0, max: null };
   const [min, max] = exercise.holdSeconds;
   return { min, max };
 }
@@ -118,7 +130,9 @@ export function autoStopHold(
   hold: HoldSpec,
   restMs: number | null,
 ): TimerState {
-  if (state.phase !== 'holding') return state;
+  // An open hold has no prescribed maximum to record, so there is nothing this
+  // function can honestly write; `shouldAutoStop` never fires for one either.
+  if (state.phase !== 'holding' || hold.max === null) return state;
   const heldMs = hold.max * 1000;
   if (restMs === null) {
     return { ...IDLE_TIMER, exerciseId: state.exerciseId, heldMs, heldAuto: true };
@@ -184,7 +198,9 @@ export type HoldStatus = 'under' | 'in' | 'over';
  * between the threshold and the stop landing, and for holds with no spec.
  */
 export function shouldAutoStop(state: TimerState, now: number, hold: HoldSpec | null): boolean {
-  if (state.phase !== 'holding' || hold === null) return false;
+  // An open hold (T16) is never ended by the app: cutting §4E's max-duration
+  // test short at an invented ceiling would truncate the measurement itself.
+  if (state.phase !== 'holding' || hold === null || hold.max === null) return false;
   return elapsedMs(state, now) >= hold.max * 1000;
 }
 
@@ -195,6 +211,9 @@ export function shouldAutoStop(state: TimerState, now: number, hold: HoldSpec | 
  * and still at exactly 10.0s.
  */
 export function holdStatus(elapsed: number, hold: HoldSpec): HoldStatus {
+  // An open hold has no range to be under or over: every second of it counts,
+  // which is the whole point of the test.
+  if (hold.max === null) return 'in';
   if (elapsed < hold.min * 1000) return 'under';
   if (elapsed <= hold.max * 1000) return 'in';
   return 'over';
@@ -202,13 +221,13 @@ export function holdStatus(elapsed: number, hold: HoldSpec): HoldStatus {
 
 /** Fraction of the way to the top of the range, clamped to [0, 1], for the progress bar. */
 export function holdFraction(elapsed: number, hold: HoldSpec): number {
-  if (hold.max <= 0) return 0;
+  if (hold.max === null || hold.max <= 0) return 0;
   return Math.min(1, Math.max(0, elapsed / (hold.max * 1000)));
 }
 
 /** Where the target band starts, as a fraction of the bar. 0 for a fixed target. */
 export function holdBandStart(hold: HoldSpec): number {
-  if (hold.max <= 0) return 0;
+  if (hold.max === null || hold.max <= 0) return 0;
   return Math.min(1, Math.max(0, hold.min / hold.max));
 }
 
@@ -230,7 +249,8 @@ export function formatClock(ms: number): string {
   return `${mins}:${String(secs).padStart(2, '0')}`;
 }
 
-/** "7–10s" / "5s" — the target as shown next to the running count. */
+/** "7–10s" / "5s" / "max" — the target as shown next to the running count. */
 export function formatHoldTarget(hold: HoldSpec): string {
+  if (hold.max === null) return 'max';
   return hold.min === hold.max ? `${hold.max}s` : `${hold.min}–${hold.max}s`;
 }

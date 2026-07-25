@@ -33,7 +33,13 @@ export interface Exercise {
   // out of that prose — several entries carry two variants in one string, and a
   // regex over them is a silent-wrong-number machine on a max-effort protocol.
   // Both optional: absent means this exercise simply has no timer (T10).
-  holdSeconds?: [min: number, max: number]; // min === max for a fixed target
+  //
+  // T16 adds `'open'` for §4E's lock-off test, where the duration IS the
+  // measurement: there is no prescribed maximum, so nothing to auto-stop at
+  // (T13) and no `target` end reason to write. A union member on this field
+  // rather than a new one keeps every existing gate — `holdSpecOf`,
+  // `setReason.reasonApplies` — reading one declaration.
+  holdSeconds?: [min: number, max: number] | 'open'; // min === max for a fixed target
   restSeconds?: number; // prescribed rest between sets
   // D20: charted only where the training plan actually progresses something —
   // three exercises. Absent means no numeric fields and no chart. Order matters:
@@ -49,6 +55,10 @@ export interface Routine {
   name: string; // e.g. "Day 1 — Fingerboard"
   dayOfWeek: number | null; // 0-6, null = unscheduled
   exerciseIds: string[]; // ordered
+  // D29: absent means true. The §4E battery is a routine so its results are
+  // ordinary logs, but it is a test, not a training day — completing it must not
+  // change which of the two strength routines is up next (D15).
+  inRotation?: boolean;
 }
 
 // D20: what an exercise progresses by. Declaration order on `Exercise.metrics`
@@ -133,4 +143,15 @@ export const CHECK_SCOPE: Record<CheckKind, CheckScope> = {
 
 export interface Settings {
   installGuideDismissed: boolean;
+  /**
+   * The one standard edge the block is tested on (D30), in millimetres.
+   *
+   * §4E: "Pick **one** standard edge (14–20mm) and never change it mid-block —
+   * changing edge size invalidates the comparison more than any training
+   * variable." Eight weeks is long enough to forget which edge week 1 was on, and
+   * a retest on the wrong edge produces no comparison at all rather than a worse
+   * one. Optional, so a pre-T16 database and every already-exported backup read
+   * as "not chosen yet" with no migration and no BACKUP_SCHEMA_VERSION bump.
+   */
+  standardEdgeMm?: number;
 }

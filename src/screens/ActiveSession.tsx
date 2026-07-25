@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Exercise, Routine, SetEntry, WorkoutLog } from '../types';
-import { getAllExercises, getAllLogs, getLog, getRoutine, saveLog } from '../lib/storage';
+import {
+  getAllExercises,
+  getAllLogs,
+  getLog,
+  getRoutine,
+  getSettings,
+  saveLog,
+} from '../lib/storage';
 import {
   addSet,
   deleteSet,
@@ -36,7 +43,7 @@ import {
   stopHold,
   type TimerState,
 } from '../lib/timer';
-import { reasonApplies } from '../lib/setReason';
+import { reasonApplies, reasonsFor } from '../lib/setReason';
 import { primeAudio } from '../lib/beep';
 import { useWakeLock } from '../lib/wakeLock';
 import { SetLogger } from '../components/SetLogger';
@@ -55,6 +62,10 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   const [timer, setTimer] = useState<TimerState>(IDLE_TIMER);
   // T11: every exercise's previous performance, resolved once on load.
   const [lastByExercise, setLastByExercise] = useState<Map<string, LastPerformance>>(new Map());
+  // T16/D30: the one edge the block is tested on, used to seed a first-ever set
+  // where carry-forward has nothing to offer — the §4E battery is exactly that
+  // case. Read once; changing it mid-session is not a thing that happens.
+  const [standardEdgeMm, setStandardEdgeMm] = useState<number | undefined>(undefined);
   // Ref mirrors the latest log so rapid taps build from current state, never a
   // stale closure — otherwise concurrent "Add set" taps would drop entries.
   const logRef = useRef<WorkoutLog | null>(null);
@@ -74,13 +85,15 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
       }
       logRef.current = loaded;
       setLog(loaded);
-      const [r, all, logs] = await Promise.all([
+      const [r, all, logs, settings] = await Promise.all([
         getRoutine(loaded.routineId),
         getAllExercises(),
         getAllLogs(),
+        getSettings(),
       ]);
       if (cancelled) return;
       setRoutine(r ?? null);
+      setStandardEdgeMm(settings.standardEdgeMm);
       setExercisesById(new Map(all.map((e) => [e.id, e])));
       // This log is excluded, so an exercise can never cite itself (T11).
       setLastByExercise(lastPerformanceMap(logs, r?.exerciseIds ?? [], new Date(), logId));
@@ -160,13 +173,23 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
     // been replaced there (D21). Everywhere else it keeps writing the text form.
     const tracksHold = exercisesById.get(exerciseId)?.metrics?.includes('holdSec') ?? false;
     mutate((l) => {
-      const seed = seedForNextSet(getSets(l, exerciseId), lastByExercise.get(exerciseId) ?? null);
+      const seed = seedForNextSet(
+        getSets(l, exerciseId),
+        lastByExercise.get(exerciseId) ?? null,
+        edgeSeedFor(exerciseId),
+      );
       const measured = tracksHold
         ? { holdSec: Math.round((heldMs / 1000) * 10) / 10 }
         : { reps: formatHold(heldMs) };
       return addSet(l, exerciseId, { ...seed, ...measured, endReason });
     });
     setTimer(clearHeld);
+  }
+
+  // Only exercises that actually record an edge get the standard-edge seed —
+  // writing one onto a goblet squat would invent a measurement (D21).
+  function edgeSeedFor(exerciseId: string): number | undefined {
+    return exercisesById.get(exerciseId)?.metrics?.includes('edgeMm') ? standardEdgeMm : undefined;
   }
 
   function toggleExpanded(id: string) {
@@ -326,8 +349,11 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
                 sets={sets}
                 metrics={exercise?.metrics}
                 askEndReason={reasonApplies(exercise)}
+                endReasons={reasonsFor(exercise)}
                 onAdd={() =>
-                  mutate((l) => addSet(l, exId, seedForNextSet(getSets(l, exId), last)))
+                  mutate((l) =>
+                    addSet(l, exId, seedForNextSet(getSets(l, exId), last, edgeSeedFor(exId))),
+                  )
                 }
                 onUpdate={(index, patch: Partial<SetEntry>) =>
                   mutate((l) => updateSet(l, exId, index, patch))

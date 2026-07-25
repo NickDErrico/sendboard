@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Routine, WorkoutLog } from '../types';
-import { daysBetween, describeLastCompleted, routineRotation } from './rotation';
+import { daysBetween, describeLastCompleted, rotates, routineRotation } from './rotation';
 
 const ROUTINES: Routine[] = [
   { id: 'day-1-fingerboard', name: 'Day 1', dayOfWeek: null, exerciseIds: ['a'] },
@@ -148,5 +148,56 @@ describe('describeLastCompleted', () => {
     expect(describeLastCompleted(status(0))).toBe('Done today');
     expect(describeLastCompleted(status(1))).toBe('Done yesterday');
     expect(describeLastCompleted(status(5))).toBe('Done 5 days ago');
+  });
+});
+
+// ── Non-rotating routines (T16 AC10, D29) ────────────────────────────────────
+// The §4E battery is a measurement, not a training day. If it entered the
+// rotation, running a test would flip "up next" to the other routine and count
+// toward the week's balance — the app would treat measuring as training.
+describe('rotates / battery exclusion', () => {
+  const BATTERY: Routine = {
+    id: 'baseline-retest',
+    name: '§4E — Baseline / Retest',
+    dayOfWeek: null,
+    inRotation: false,
+    exerciseIds: ['t'],
+  };
+  const WITH_BATTERY = [...ROUTINES, BATTERY];
+
+  it('treats an absent inRotation as true, so the training seeds are untouched', () => {
+    expect(rotates(ROUTINES[0])).toBe(true);
+    expect(rotates(BATTERY)).toBe(false);
+  });
+
+  it('leaves the battery out of the returned statuses entirely', () => {
+    const statuses = routineRotation(WITH_BATTERY, [], '2026-07-26');
+    expect(statuses.map((s) => s.routineId)).toEqual([
+      'day-1-fingerboard',
+      'day-3-pull-antagonist',
+    ]);
+  });
+
+  it('does not let completing a battery change which routine is up next', () => {
+    const logs = [log('day-1-fingerboard', at('2026-07-20T09:00'), at('2026-07-20T10:00'))];
+    const before = nextUpOf(routineRotation(WITH_BATTERY, logs, '2026-07-26'));
+    const after = nextUpOf(
+      routineRotation(
+        WITH_BATTERY,
+        [...logs, log('baseline-retest', at('2026-07-26T08:00'), at('2026-07-26T09:00'))],
+        '2026-07-26',
+      ),
+    );
+    expect(before).toBe('day-3-pull-antagonist');
+    expect(after).toBe('day-3-pull-antagonist');
+  });
+
+  it('does not let a battery count as a routine done this week', () => {
+    const statuses = routineRotation(
+      WITH_BATTERY,
+      [log('baseline-retest', at('2026-07-26T08:00'), at('2026-07-26T09:00'))],
+      '2026-07-26',
+    );
+    expect(statuses.every((s) => !s.doneThisWeek)).toBe(true);
   });
 });

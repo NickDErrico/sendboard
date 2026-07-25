@@ -173,13 +173,31 @@ export function summarizeSets(sets: SetEntry[], maxRuns = 3): string {
 export function seedForNextSet(
   currentSets: SetEntry[],
   last: LastPerformance | null,
+  /**
+   * The standard edge from Settings (D30), used only when nothing to carry
+   * forward supplies one. §4E's battery is the case that needs it: the baseline
+   * is the first time those entries are ever logged, so carry-forward has
+   * nothing, and the one thing that must not be re-guessed eight weeks later is
+   * the edge the whole comparison rests on.
+   */
+  standardEdgeMm?: number,
 ): SetEntry {
   const source = currentSets[currentSets.length - 1] ?? last?.sets[currentSets.length] ?? last?.sets[0];
-  if (!source) return { load: '', reps: '', rpe: null };
+  if (!source) {
+    const blank: SetEntry = { load: '', reps: '', rpe: null };
+    if (typeof standardEdgeMm === 'number') blank.edgeMm = standardEdgeMm;
+    return blank;
+  }
 
   const seed: SetEntry = { load: source.load, reps: source.reps, rpe: null };
   for (const metric of CARRIED_METRICS) {
     if (typeof source[metric] === 'number') seed[metric] = source[metric];
+  }
+  // A seeded value always wins: what you actually hung on last set is a better
+  // answer than the setting, and the setting is only a starting point (D19 — it
+  // is a draft either way, and every field stays editable).
+  if (seed.edgeMm === undefined && typeof standardEdgeMm === 'number') {
+    seed.edgeMm = standardEdgeMm;
   }
   return seed;
 }

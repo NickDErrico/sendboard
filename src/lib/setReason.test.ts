@@ -5,6 +5,7 @@ import {
   SET_END_REASONS,
   isSafetySignal,
   reasonApplies,
+  reasonsFor,
   summaryReason,
 } from './setReason';
 
@@ -89,5 +90,23 @@ describe('both spellings of "not recorded"', () => {
     expect(isSafetySignal(undefined)).toBe(false);
     expect(summaryReason(null)).toBeNull();
     expect(summaryReason(undefined)).toBeNull();
+  });
+});
+
+// ── Open holds (T16) ─────────────────────────────────────────────────────────
+describe('reasonsFor', () => {
+  const ex = (holdSeconds: Exercise['holdSeconds']) => ({ id: 'x', holdSeconds }) as Exercise;
+
+  it('offers all four on a prescribed hold', () => {
+    expect(reasonsFor(ex([7, 10]))).toEqual(['target', 'dropped', 'form-broke', 'pain']);
+  });
+
+  it('drops "hit target" on an open hold, which has no target to hit', () => {
+    expect(reasonsFor(ex('open'))).toEqual(['dropped', 'form-broke', 'pain']);
+  });
+
+  it('still lists the safety signals on an open hold — that is the point of asking', () => {
+    expect(reasonsFor(ex('open'))).toContain('pain');
+    expect(reasonsFor(ex('open'))).toContain('form-broke');
   });
 });

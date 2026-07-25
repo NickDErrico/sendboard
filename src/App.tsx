@@ -10,6 +10,7 @@ import { RoutineList } from './screens/RoutineList';
 import { RoutineDetail } from './screens/RoutineDetail';
 import { ActiveSession } from './screens/ActiveSession';
 import { History } from './screens/History';
+import { Retest } from './screens/Retest';
 import { Settings } from './screens/Settings';
 import { InstallGuide } from './screens/InstallGuide';
 import { CheckLog } from './screens/CheckLog';
@@ -71,6 +72,8 @@ function renderRoute(route: Route): ReactNode {
       return <SessionRoute />;
     case 'history':
       return <History onResume={() => go({ name: 'session' })} onExit={() => go({ name: 'home' })} />;
+    case 'retest':
+      return <Retest onExit={() => go({ name: 'home' })} />;
     case 'checks':
       return <ChecksRoute />;
     case 'checklog':

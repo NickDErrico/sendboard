@@ -135,7 +135,7 @@ function readMetric(set: SetEntry, metric: ProgressMetric): number | undefined {
  * that make a declining line visible — which is the one thing §7 asks this chart
  * to show. It is marked instead, and the interpretation stays the owner's.
  */
-function sessionValue(
+export function sessionValue(
   log: WorkoutLog,
   exerciseId: string,
   metric: ProgressMetric,

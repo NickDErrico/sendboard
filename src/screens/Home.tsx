@@ -2,7 +2,13 @@ import { useEffect, useState } from 'react';
 import type { Routine, WorkoutLog } from '../types';
 import { createLog } from '../lib/session';
 import { getAllLogs, getAllRoutines, saveLog } from '../lib/storage';
-import { describeLastCompleted, routineRotation, type RoutineStatus } from '../lib/rotation';
+import {
+  describeLastCompleted,
+  rotates,
+  routineRotation,
+  type RoutineStatus,
+} from '../lib/rotation';
+import { batteryOccasions, type Occasion } from '../lib/retest';
 import { go } from '../lib/routes';
 import { WeekStatus } from '../components/WeekStatus';
 import { DailyGtgStatus } from '../components/DailyGtgStatus';
@@ -22,6 +28,7 @@ export function Home() {
   const [inProgress, setInProgress] = useState<WorkoutLog | null>(null);
   const [lastCompleted, setLastCompleted] = useState<WorkoutLog | null>(null);
   const [rotation, setRotation] = useState<RoutineStatus[]>([]);
+  const [occasions, setOccasions] = useState<Occasion[]>([]);
 
   // Reloads on mount and refocus, so a session finished elsewhere (or a resume
   // after force-close) is reflected — and so "days ago" rolls over at midnight
@@ -34,6 +41,7 @@ export function Home() {
       setInProgress(logs.find((l) => l.completedAt === null) ?? null);
       setLastCompleted(logs.find((l) => l.completedAt !== null) ?? null);
       setRotation(routineRotation(rs, logs, new Date()));
+      setOccasions(batteryOccasions(logs));
     };
     void load();
     const onFocus = () => void load();
@@ -48,8 +56,21 @@ export function Home() {
   const routineName = (id: string) => routines?.find((r) => r.id === id)?.name ?? id;
   const statusFor = (id: string) => rotation.find((s) => s.routineId === id);
 
-  // Up next first; otherwise seed order is preserved.
-  const sortedRoutines = [...(routines ?? [])].sort(
+  // T16: what the §4E card says, in facts only. "Not recorded yet" is a statement
+  // of what the log holds, not a reproach for not having done it (D23).
+  const batteryLine =
+    occasions.length === 0
+      ? 'Not recorded yet'
+      : occasions.length === 1
+        ? `Baseline ${new Date(occasions[0].at).toLocaleDateString()}`
+        : `${occasions.length} recorded · latest ${new Date(
+            occasions[occasions.length - 1].at,
+          ).toLocaleDateString()}`;
+
+  // Up next first; otherwise seed order is preserved. The battery is excluded:
+  // `routineRotation` already drops it (D29), and a test is not a training day
+  // the week owes.
+  const sortedRoutines = [...(routines ?? [])].filter(rotates).sort(
     (a, b) => Number(statusFor(b.id)?.isNextUp ?? false) - Number(statusFor(a.id)?.isNextUp ?? false),
   );
 
@@ -151,6 +172,25 @@ export function Home() {
           ? `Last session: ${new Date(lastCompleted.completedAt ?? lastCompleted.startedAt).toLocaleDateString()}`
           : 'No sessions yet — start one above.'}
       </p>
+
+      {/* T16: §4E's battery, one tap away and never a prompt. It states what is
+          recorded and nothing else — no "due", no countdown to week 8, no nudge
+          (D2a, D23). The reason it sits above the check-offs is that a baseline
+          not taken before week 1 cannot be taken later. */}
+      <button
+        onClick={() => go({ name: 'retest' })}
+        className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-700 bg-brand-surface p-3 text-left"
+      >
+        <span className="min-w-0">
+          <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            §4E baseline / retest
+          </span>
+          <span className="mt-0.5 block text-sm text-slate-300">{batteryLine}</span>
+        </span>
+        <span aria-hidden className="shrink-0 text-slate-500">
+          ›
+        </span>
+      </button>
 
       <WeekStatus />
       <DailyGtgStatus />

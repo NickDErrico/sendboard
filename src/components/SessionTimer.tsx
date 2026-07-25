@@ -8,6 +8,7 @@ import {
   holdBandStart,
   holdFraction,
   holdStatus,
+  isOpenHold,
   isRestComplete,
   restRemainingMs,
   shouldAutoStop,
@@ -144,6 +145,9 @@ function HoldView({
 }) {
   const status = holdStatus(elapsed, hold);
   const style = STATUS_STYLE[status];
+  // "in range" is meaningless without a range: an open hold is simply running,
+  // and every second of it counts (T16).
+  const label = isOpenHold(hold) ? 'holding' : style.label;
 
   return (
     <div>
@@ -159,26 +163,33 @@ function HoldView({
           {formatHold(elapsed)}
         </span>
         <span className={`text-sm font-semibold ${style.text}`} aria-live="polite">
-          {style.label}
+          {label}
         </span>
       </div>
 
-      <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-slate-700">
-        {/* The target band: everything from min to the top of the range. */}
-        <div
-          className="absolute inset-y-0 right-0 bg-slate-600"
-          style={{ left: `${holdBandStart(hold) * 100}%` }}
-        />
-        <div
-          className={`absolute inset-y-0 left-0 ${style.fill}`}
-          style={{ width: `${holdFraction(elapsed, hold) * 100}%` }}
-        />
-      </div>
-      <div className="mt-0.5 flex justify-between text-[10px] tabular-nums text-slate-600">
-        <span>0</span>
-        {hold.min !== hold.max && <span>{hold.min}s</span>}
-        <span>{hold.max}s</span>
-      </div>
+      {/* An open hold (T16) has no target to fill toward, so it gets no bar: a
+          progress bar with an invented ceiling would imply a duration §4E
+          deliberately does not prescribe. The count itself is the measurement. */}
+      {hold.max !== null && (
+        <>
+          <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-slate-700">
+            {/* The target band: everything from min to the top of the range. */}
+            <div
+              className="absolute inset-y-0 right-0 bg-slate-600"
+              style={{ left: `${holdBandStart(hold) * 100}%` }}
+            />
+            <div
+              className={`absolute inset-y-0 left-0 ${style.fill}`}
+              style={{ width: `${holdFraction(elapsed, hold) * 100}%` }}
+            />
+          </div>
+          <div className="mt-0.5 flex justify-between text-[10px] tabular-nums text-slate-600">
+            <span>0</span>
+            {hold.min !== hold.max && <span>{hold.min}s</span>}
+            <span>{hold.max}s</span>
+          </div>
+        </>
+      )}
 
       <button
         onClick={() => onStop(false)}

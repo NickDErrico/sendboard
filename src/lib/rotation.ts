@@ -64,7 +64,22 @@ export function daysBetween(from: string | Date, to: string | Date): number {
 }
 
 /**
- * Status for every routine, in seed order, with exactly one flagged `isNextUp`.
+ * True for the routines the rotation alternates between (D29).
+ *
+ * Absent `inRotation` means true, so the two training seeds are untouched. The
+ * §4E battery declares false: it is a measurement, not a training day, and
+ * letting it into the rotation would make running a test look like doing Day 1 —
+ * "up next" would flip to the other routine and the week's balance would count a
+ * session that trained nothing.
+ */
+export function rotates(routine: Routine): boolean {
+  return routine.inRotation !== false;
+}
+
+/**
+ * Status for every rotating routine, in seed order, with exactly one flagged
+ * `isNextUp`. Non-rotating routines are filtered out entirely rather than
+ * returned with a flag, so no caller has to remember to skip them.
  *
  * Ranking: never-completed routines first (in seed order), then the rest oldest
  * `completedAt` first. Both-done-today still yields exactly one next-up — there
@@ -77,7 +92,7 @@ export function routineRotation(
 ): RoutineStatus[] {
   const weekStart = dateKey(mondayOf(localDayKey(today)));
 
-  const statuses: RoutineStatus[] = routines.map((routine) => {
+  const statuses: RoutineStatus[] = routines.filter(rotates).map((routine) => {
     const completedAt = lastCompletedAt(logs, routine.id);
     return {
       routineId: routine.id,

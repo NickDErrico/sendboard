@@ -283,3 +283,29 @@ describe('seedForNextSet never carries a reason (AC5, D19/D27)', () => {
     expect(seed.load).toBe('20mm');
   });
 });
+
+// ── Standard-edge seed (T16 AC4, D30) ────────────────────────────────────────
+// The §4E baseline is the first time those entries are ever logged, so carry
+// forward has nothing — and the edge is the one condition the week-8 comparison
+// cannot survive being re-guessed.
+describe('seedForNextSet with a standard edge', () => {
+  it('seeds the edge when there is no history at all', () => {
+    expect(seedForNextSet([], null, 20)).toEqual({ load: '', reps: '', rpe: null, edgeMm: 20 });
+  });
+
+  it('leaves a blank row blank when no standard edge is set', () => {
+    expect(seedForNextSet([], null)).toEqual({ load: '', reps: '', rpe: null });
+  });
+
+  it('lets what was actually hung on win over the setting', () => {
+    const current = [{ load: '', reps: '', rpe: null, edgeMm: 18 }];
+    expect(seedForNextSet(current, null, 20).edgeMm).toBe(18);
+  });
+
+  it('fills the edge in when the carried source has none', () => {
+    const current = [{ load: '', reps: '', rpe: null, addedLb: 35 }];
+    const seeded = seedForNextSet(current, null, 20);
+    expect(seeded.edgeMm).toBe(20);
+    expect(seeded.addedLb).toBe(35);
+  });
+});

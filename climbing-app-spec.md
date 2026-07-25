@@ -1,7 +1,7 @@
 # SPEC: Personal Climbing Training App ("Sendboard")
 
-Version 1.8 — 2026-07-24
-Status: PRD approved with amendments — Gate 1 passed. T1–T15 built. T16–T28 remain as a prioritized backlog (v1.8), built one at a time in wave order. See the Amendments log at the end of this file for what changed from v1.0 and why.
+Version 1.8 — 2026-07-25
+Status: PRD approved with amendments — Gate 1 passed. **T1–T16 built — Wave 0 is complete, so the block can start.** T17–T28 remain as a prioritized backlog (v1.8), specced and built one at a time in wave order. See the Amendments log at the end of this file for what changed from v1.0 and why.
 
 > **Executor note:** This file is the source of truth. Read it in full before writing code. Mark task status markers in place as you go. If a decision you need was not made here, STOP, mark the task `[f]` with one line why, and escalate — do not improvise.
 
@@ -77,6 +77,8 @@ Recorded once here so no downstream task re-derives or contradicts them.
 | D25 | **Block position is derived from the first completed session, not scheduled** | Un-defers the periodization question v1.4 parked, using D15's method: derive, don't store. "Session 11 · ~week 6" comes from the log; the only stored state is an optional block-start marker for when the owner deliberately begins a new block. Past week 8 reads **"week 8+"** — never "overdue," never "behind," which is the same state D15 refuses and §4F explicitly invites by prescribing a lighter week whenever fingers feel beat up. What this buys is the thing D17 works around: §4B carries a weeks-1–4 rep-structured PIMA variant and a weeks-5–8 max-effort variant in one `prescription` string, and derived block position lets the app show the live one first. The other variant stays readable on the detail screen — the app narrows emphasis, never hides the plan. |
 | D28 | **A backup file older than the current schema is read and upgraded, never refused. Newer or unrecognised files are still refused** | Forced by T15, which adds the first new collection since T7. T7's gate accepts only `schemaVersion === BACKUP_SCHEMA_VERSION`, so bumping the version would turn every file the owner has already exported into "unsupported version — nothing was changed." That inverts D5: manual export exists *because* on-device data is one cache-clear from gone, and a backup that stops being importable the moment the app gains a feature is not a backup. The rule is therefore asymmetric, and the asymmetry is the point: reading an **older** file is well-defined (a collection the file predates reads as empty, exactly as an absent optional field does), while reading a **newer** one is not (the app cannot know what it is dropping, and a silent partial import of an 8-week log is worse than a refusal). Every version between `1` and current stays readable indefinitely; imports name the version they upgraded from so the owner is told rather than surprised. |
 | D26 | **Available gear is Settings data, not catalog content** | Board edges, added-load increments, dip belt yes/no. Every numeric input in the app currently opens an iOS keyboard, and the hands typing on it are chalked and mid-protocol — which is the PRD's problem #2 in its most literal form. Knowing the four edges that actually exist on the board turns edge entry into a segmented pick, and knowing the load increments turns `addedLb` into ± chips at the 1–3% steps §4F asks for. This is not D6 reversed: it configures *input affordances*, not exercises. The catalog stays a typed constant in source, and gear never changes a prescription. |
+| D29 | **The §4E battery is a logged session against a non-rotating test routine, recorded on test-only catalog entries. Its conditions are derived from what is already stored, never re-entered** | Forced by T16. Everything §4E's table asks to record already has a typed home — edge is `edgeMm`, added weight is `addedLb`, seconds are `holdSec`, bodyweight is T15's `BodyweightEntry` — so a parallel `Retest` record would duplicate four fields, need its own backup array and version bump, and split a max-hang number across two stores. Modelling the battery as a `WorkoutLog` instead buys the set logger, the timer, the set-end reason (D27), history, and export/import for free. Two consequences make it a decision rather than an implementation detail. **(a) Test-only entries.** §4E is a maximum under one fixed protocol; §4C training is 85–90% for 5 sets. Logging both against `max-hang-half-crimp` would put two spikes on the trained series at weeks 1 and 8 that read as progress and are actually a different test — D22's refusal-to-draw-an-invalid-comparison applied to intensity instead of edge. The tests therefore get their own entries and their own two-point series, which is the only comparison §4E actually asks for. **(b) Nothing new is stored about conditions.** §4E's "identical conditions" are time of day (`startedAt`), grip (which entry it is), warm-up (D16's `completed` on the warm-up), rest before it (days since the previous completed log), and edge (D30) — every one derivable. The app *shows* the conditions at both occasions rather than asking the owner to certify them, which is D15's derive-don't-store applied a third time. |
+| D30 | **The standard edge is one stored number, chosen at the baseline and prefilled at every test thereafter** | §4E: "Pick **one** standard edge (14–20mm) and never change it mid-block — changing edge size invalidates the comparison more than any training variable." An 8-week gap is exactly long enough to forget which edge week 1 was on, and a retest on the wrong edge does not produce a worse comparison, it produces no comparison at all (D22). So the choice is made once and carried, in `Settings` rather than in the catalog — the same line D26 draws: it configures an input, it does not change a prescription. If it is ever changed mid-block the app keeps both values and declines the delta rather than silently comparing across edges. |
 
 **Documented alternative, not chosen:** Expo + EAS Build → real native app with `expo-notifications` scheduling reminders in-app. Gate to revisit: owner is willing to pay $99/yr for the Apple Developer Program **and** external reminders have proven insufficient in real use (e.g. he wants the notification itself to name the day's routine). Revisit no earlier than the end of the 8-week block. Do not build toward this in v1.
 
@@ -380,7 +382,7 @@ Spec: this file | Status: [x] | Depends on: T2 | Parallel-safe with T4
 Create: `src/screens/ExerciseList.tsx`, `src/screens/ExerciseDetail.tsx`, `src/components/EquipmentBadge.tsx` | Read: `src/types.ts`, `src/lib/storage.ts` | Conform to: `Exercise` type | Imitate: n/a (first UI task — establishes the pattern others follow)
 
 #### Acceptance criteria
-1. WHEN the exercise list renders THE screen SHALL show all 20 seeded exercises grouped by `category`, each row showing name, `summary`, and equipment badges. [x]
+1. WHEN the exercise list renders THE screen SHALL show all 25 seeded exercises (20 + T16's five §4E test entries) grouped by `category`, each row showing name, `summary`, and equipment badges. [x]
 1a. WHEN an exercise has `gtgEligible: true` THE row and detail screen SHALL show a distinct "GtG" badge, and a filter SHALL exist to show only GtG-eligible exercises. [x]
 2. WHEN a filter control is set to an `Equipment` value THE list SHALL show only exercises whose `equipment` array contains it. [x]
 3. WHEN an exercise row is tapped THE detail screen SHALL render `name`, `prescription`, all `howTo` steps as an ordered list, all `cues`, and all `safetyNotes`. [x]
@@ -1089,6 +1091,88 @@ Design calls:
 
 ---
 
+### [T16] Outcome: The owner can run §4E's baseline battery before week 1 and the identical battery again at the end, and read the two side by side with the conditions they were produced under.
+Spec: this file | Status: [x] | Depends on: T15 | Wave 0
+
+#### Context manifest
+Create: `src/lib/retest.ts` (+ `retest.test.ts`), `src/screens/Retest.tsx`, `src/components/RetestComparison.tsx` | Modify: `src/types.ts`, `src/data/exercises.ts`, `src/data/routines.ts`, `src/lib/rotation.ts` (+ `rotation.test.ts`), `src/lib/timer.ts` (+ `timer.test.ts`), `src/lib/routes.ts`, `src/screens/ActiveSession.tsx`, `src/screens/Home.tsx`, `src/screens/RoutineList.tsx`, `src/screens/Settings.tsx`, `src/App.tsx` | Conform to: D20, D21, D22, D23, D24, D27, D29, D30 | Delete: nothing
+
+**Why this is the last Wave 0 task, and why it is the most time-critical thing in the backlog.** §4E's baseline is a single unrepeatable event: "once in week 1 (fully rested, after a thorough warm-up)… **identical conditions both times** — same edge, same grip, same time of day, same warm-up — or the comparison is meaningless." Every other item in v1.8 improves sessions that have not happened yet and can land in week 2 at no cost. This one cannot: a block started without a baseline has no week-8 comparison at all, and §4E's interpretation rubric — 10–20% is a good block, flat with better climbing means technical gains, declining means deload — is the plan's only instrument for answering whether eight weeks of max-effort finger loading worked. T15 shipped the denominator; this is the numerator, and the owner has not started the block.
+
+**The task is mostly assembly, and that is the point.** Four of the five things §4E says to record are already typed fields the set logger already writes (D29). What T16 adds is a battery that puts them in one place, five test-only catalog entries so the test never contaminates the trained series, one setting (D30), one timer shape the app does not have yet (an open hold, below), and a comparison view that reports two numbers and quotes the plan instead of grading them (D23).
+
+**The one genuinely new mechanism: an open hold.** §4E's lock-off test is "longest static hold at bodyweight, one attempt per side" — the duration *is* the measurement, so there is no prescribed maximum to auto-stop at (T13) and no `target` end reason to write. `holdSeconds` therefore gains an `'open'` form alongside `[min, max]`. A union member on the existing field rather than a new one is deliberate: `reasonApplies` already gates the D27 chips on `holdSeconds !== undefined` and keeps working unchanged, which matters because "why did it end" is *more* informative on a max-duration hold than anywhere else in the app — a lock-off that ended on pain and one that ended at failure are the same number and opposite training facts.
+
+#### Catalog additions — five test-only entries, all content from §4E
+
+| id | category | isoType | equipment | holdSeconds | metrics |
+|---|---|---|---|---|---|
+| `test-max-hang-half-crimp` | fingers | yielding | hangboard, dip-belt | `[7, 7]` | `addedLb`, `edgeMm` |
+| `test-max-hang-open-hand` | fingers | yielding | hangboard, dip-belt | `[7, 7]` | `addedLb`, `edgeMm` |
+| `test-max-pullup-load` | pulling | dynamic | pullup-bar, dip-belt, kettlebell | — | `addedLb` |
+| `test-lockoff-90-left` | pulling | yielding | pullup-bar | `'open'` | `holdSec` |
+| `test-lockoff-90-right` | pulling | yielding | pullup-bar | `'open'` | `holdSec` |
+
+All five `gtgEligible: false` — §8 forbids GtG on max protocols, and these are the maximum of the maximums. Left and right are two entries rather than one entry with two sets because a session's series takes its *best* set (`progress.sessionValue`), and a best-of-both-arms number is not a per-side record; two entries make the arms as unmixable as two exercises are, at the cost of two catalog rows and no new type surface. Catalog count 20 → 25; T3 AC1's count moves with it when this ships.
+
+**Seed routine** `baseline-retest` — "§4E — Baseline / Retest", `dayOfWeek: null`, `inRotation: false`, exercises in §4E's table order with the warm-up first: `finger-warmup-progression`, `test-max-hang-half-crimp`, `test-max-hang-open-hand`, `test-max-pullup-load`, `test-lockoff-90-left`, `test-lockoff-90-right`.
+
+#### Acceptance criteria
+1. WHEN the owner starts the battery THE app SHALL create an ordinary `WorkoutLog` against the `baseline-retest` routine, obeying the existing at-most-one-in-progress invariant, and the session SHALL log through the same set logger, timer, and end-reason chips every other session uses. [x]
+2. WHEN the battery is run THE app SHALL show §4E's method text for each test — the working-up protocol, the 7s hold, "stop at the first failed attempt", one attempt per side — cited to §4E, not paraphrased into a new prescription. [x]
+3. WHEN a completed battery exists THE app SHALL label the earliest one **Baseline** and each later one **Retest**, derived from completion order, and SHALL NOT name a week number (block position is T24's) or describe any retest as due, overdue, missed, or behind (D2a, D23). [x]
+4. WHEN a standard edge is set THE two max-hang tests SHALL prefill `edgeMm` from it, and the setting SHALL be editable in Settings and offered at the baseline if it is unset (D30). [x]
+5. WHEN both a baseline and a later battery are completed THE comparison view SHALL show, per test, the baseline value, the latest value, and their arithmetic difference — in pounds, seconds, and (where a bodyweight is in range) as a share of bodyweight (T15). [x]
+6. WHEN the comparison is shown THE app SHALL quote §4E's interpretation lines verbatim with the `§` reference and SHALL NOT select which line applies, label the block, or render any verdict, badge, or arrow (D23). [x]
+7. WHEN the two batteries were recorded on different standard edges THE app SHALL show both edges and SHALL NOT compute a difference for the edge-dependent tests (D22). [x]
+8. WHEN a battery is displayed THE conditions it was produced under SHALL be shown for both occasions — time of day, whether the warm-up was marked completed, days since the previous completed session, and the edge — all derived from stored data, with nothing extra asked of the owner (D29). [x]
+9. WHEN a lock-off test is timed THE hold SHALL run open — no target, no auto-stop, `holdSec` from the real elapsed time on manual stop — and the D27 chips SHALL still be offered, with `target` never written. [x]
+10. WHEN the rotation is computed THE battery routine SHALL be excluded, and completing it SHALL NOT change which training routine is next up (D15). [x]
+11. WHEN a test measurement is charted THE series SHALL contain only battery sessions, and the trained `max-hang-*` and `weighted-lockoff-hold` series SHALL be unchanged by any battery (D29a). [x]
+12. WHEN a pre-T16 database or backup is read THE app SHALL show the battery as not recorded, with no migration, no `DB_VERSION` bump, and no `BACKUP_SCHEMA_VERSION` bump. [x]
+
+#### Edge cases
+- A battery abandoned part-way is not a baseline — it has `completedAt: null`, so rotation, comparison, and labelling all ignore it, and Home's existing resume banner is what surfaces it. [x]
+- A partly-completed battery (three of five tests) compares per test: a test with no measurement on one side reads "not recorded" on that row, and no aggregate, average, or completion percentage is computed across rows (D23). [x]
+- Two batteries completed on the same day → order by `completedAt`; the earliest completed one is the baseline, permanently, even if a later one is more thorough. [x]
+- Deleting the baseline log promotes the next-earliest battery to Baseline. It is a report over the logs, not a stored flag. [x]
+- No bodyweight within 14 days of a battery → the %BW column is omitted for that occasion and the pounds column still renders, with the reason named (T15 AC5's rule, not a new one). [x]
+- The standard edge is unset when the baseline runs → the edge is typed per test as it is today, and whatever was recorded becomes what the retest is prefilled with and compared against. [x]
+- An open hold backgrounded mid-attempt behaves like any other hold (D18's absolute timestamp); it simply never auto-stops. [x]
+- `formatHoldTarget` and the hold progress band have no maximum to draw against on an open hold → render an elapsed count with no band rather than a bar that fills to an invented target. [x]
+- A third, fourth, or fifth battery is legitimate (§4F's lighter weeks make a mid-block check plausible) → the comparison always reads baseline against the **latest**, and every occasion stays listed. [x]
+- The five test entries appear in the T3 catalog browser like any other exercise, and must not be added to the Day 1 or Day 3 routines. [x]
+
+#### Non-goals & do-not-touch
+- MUST NOT add a `Retest` record type, a new object store, or a new backup array — the battery is a `WorkoutLog` (D29).
+- MUST NOT bump `DB_VERSION` or `BACKUP_SCHEMA_VERSION`. The only new stored field is optional (`Settings.standardEdgeMm`), and `settings` already passes through the backup whole.
+- MUST NOT schedule, remind, prompt, or nag about a retest, and MUST NOT compute how many weeks remain until one is due (D2a, D23, and T24 owns block position).
+- MUST NOT grade the result. §4E's rubric is quoted and the owner applies it; the app never says "good block", never colours a delta green or red, and never draws an arrow (D23).
+- MUST NOT log a test measurement against a trained exercise id, or a trained set against a test id.
+- MUST NOT auto-stop, cap, or warn on an open hold.
+- MUST NOT add the test entries to any training routine, mark them `gtgEligible`, or put the battery into rotation.
+- MUST NOT ask the owner to certify conditions the app can derive (D29b).
+
+#### Verify
+`npm run test && npm run build && npm run lint`, plus an in-browser pass: set a standard edge and confirm both max-hang tests prefill it; run a full battery and confirm it logs like any other session and does not change which training routine is next up; time a lock-off with the open hold and confirm it runs past any prescribed duration, stops only by hand, and still offers the end-reason chips with no `target`; run a second battery and confirm the comparison shows baseline, latest, and the difference with §4E quoted and no verdict; change the standard edge between the two and confirm the edge-dependent deltas are withheld with both edges named.
+
+#### Amendments
+
+**2026-07-25 — T16 built. Build + lint clean, 276 tests green (41 new: 24 in `retest`, 6 timer, 4 rotation, 4 lastTime, 3 setReason). All twelve ACs verified in a running browser against a seeded v2 database.** Files: `src/lib/retest.ts` (+ `retest.test.ts`), `src/screens/Retest.tsx`, `src/components/RetestComparison.tsx`; modified `src/types.ts`, `src/data/exercises.ts` (20 → 25), `src/data/routines.ts` (2 → 3), `src/lib/timer.ts`, `src/lib/rotation.ts`, `src/lib/lastTime.ts`, `src/lib/setReason.ts`, `src/lib/progress.ts`, `src/lib/routes.ts` (+ their tests), `src/components/SessionTimer.tsx`, `src/components/SetLogger.tsx`, `src/screens/ActiveSession.tsx`, `src/screens/Home.tsx`, `src/screens/RoutineList.tsx`, `src/screens/Settings.tsx`, `src/App.tsx`. **No new dependencies, no new object store, no migration, and `DB_VERSION`/`BACKUP_SCHEMA_VERSION` both still 2** — as the spec predicted, correcting v1.8's expectation of a retest record and a version bump.
+
+Verified on the running app, not only in tests: a standard edge of 20mm typed in Settings persisted into `Settings.standardEdgeMm` with the database still at version 2, and the first-ever set on the half-crimp test opened with `edgeMm: 20` already filled and no edge typed (AC4); the battery session listed the warm-up plus five tests, the hang tests offering `▶ Start hold · 7s` and the lock-offs `▶ Start hold · max` (AC1, AC2); a left-side lock-off ran to 20.3s without auto-stopping — past every other prescribed duration in the catalog — showed "target max" with no progress bar and the word "holding" rather than "in range", ended only on the Stop tap, and logged `holdSec: 20.4` with **no** `endReason` at all (AC9); with a second battery in place the comparison rendered `+30lb → +35lb · +5lb / +2.5%BW` for the half-crimp, `20.4s → 24.1s · +3.7s` for the lock-off, and §4E's three interpretation lines quoted underneath with nothing selecting between them (AC5, AC6); re-recording the retest on an 18mm edge replaced both hang deltas with "edge changed", kept both recorded values visible, left the pull-up and lock-off deltas alone, and named both edges in the §4E citation (AC7); each occasion card showed its derived conditions — `✓ warm-up completed · 5d since last session · 20mm edge · 180 lb` — with nothing typed twice (AC8); after two completed batteries Home still read "Up next: Day 3", the week line still listed only the two training routines, and the routine list still offered two (AC10); and the trained Max Hang — Half-Crimp chart still read "No time logged yet" while the test entry's own chart showed its two points (AC11).
+
+Design calls:
+- **`holdSeconds` gained `'open'` rather than a new catalog field.** Every gate that asks "does this exercise have a hold" already reads that one declaration, so `reasonApplies` needed no change at all and `holdSpecOf` needed one line. `HoldSpec.max` becomes `number | null`, and `null` propagates as a refusal everywhere it matters: `shouldAutoStop` returns false, `autoStopHold` returns the state untouched, `holdFraction`/`holdBandStart` return 0 so no bar is drawn, and `formatHoldTarget` says "max".
+- **`target` is not offered on an open hold** (`reasonsFor`). Found in verification: the chips rendered all four, and "Hit target" on a test that prescribes no target is a value nobody could interpret later — the same standard D27 sets for the enum itself. The two safety signals are exactly why the chips are still asked there.
+- **The comparison is computed from `progress.sessionValue`, which is now exported.** Reusing the best-set rule means the battery cannot disagree with the chart about what a session's number was; writing a second "find the best set" here is how those two drift apart.
+- **Conditions are derived and displayed, never asked.** Time of day from `startedAt`, warm-up from D16's `completed`, rest from the previous completed log of *any* routine (a Day 3 two days before compromises a lock-off test exactly as much as another battery would), edge from the sets, bodyweight from T15's ±14-day rule. The battery therefore asks for zero extra taps beyond the measurements themselves.
+- **`daysSincePrevious` is null rather than 0 when nothing precedes the baseline.** A first-ever session has no rest interval, and printing "0d since last session" would read as "trained yesterday".
+- **`rotates()` filters inside `routineRotation`, not at each call site.** Three screens consume the rotation; a filter each would be three chances to forget. `RoutineList` still resolves names against every routine, so an unfinished battery is named in the resume banner instead of showing its id.
+- **A bug caught in the browser, not by a test:** the first pass let `RoutineList` set its whole routine list to the filtered array, which made the resume banner render `baseline-retest` as a raw id whenever a battery was left open. Splitting "all routines, for names" from "startable routines" fixed it.
+
+---
+
 ## Execution notes
 
 - **Gates:** Gate 1 = PRD approved (now, by the owner). Gate 2 = decomposition approved after T0's spike report. Gate 3 = implementation reviewed against acceptance criteria after T8.
@@ -1258,4 +1342,22 @@ Owner request: "find some ways to make this app really easy, insightful and enjo
 | Tremor / steadiness as a proxy quality signal (accelerometer variance during a yielding hold) | **Deferred.** Genuinely novel and honestly framed (it measures when a hold degraded, not how hard it was — §4E's "nothing to measure without a force gauge" stands for *force*), but it depends on the same unproven motion-event path, and no decision covers what a tremor number would mean. Gate: the motion spike passes first. |
 
 **Net effect on scope:** fifteen tasks, five decisions, one non-goal narrowed. Expected schema impact across the whole backlog: optional fields on `SetEntry` (T14), one new dated record type for bodyweight (T15) and one for symptoms (T17), a retest record (T16), and gear on `Settings` (T18/D26) — the first `BACKUP_SCHEMA_VERSION` bump since T7 becomes likely at T15 or T16, and that task owns the migration decision. No reversal of D2a, D9, D15, D16, D18, D19, D20, D21, or D22. Spoken cues (T20) are Web Speech in the foreground, not notifications — D2a is untouched.
+
+---
+
+**2026-07-25 — T16 spec written (amend before you code), D29 and D30 added.**
+
+The next task in wave order, specced one ahead as Level 2 prescribes. Three things were decided here rather than left to the build, because each one could reasonably have gone the other way and the wrong choice is expensive after the block starts:
+
+| Decision | Why it was made now |
+|---|---|
+| D29: the battery is a `WorkoutLog`, not a new record type | The v1.8 amendment predicted "a retest record (T16)" and a likely `BACKUP_SCHEMA_VERSION` bump. Reading the code says otherwise: §4E's four recorded columns are already `edgeMm`, `addedLb`, `holdSec`, and T15's bodyweight, so a parallel record would duplicate all four, split the max-hang numbers across two stores, and buy a version bump for nothing. **Revised expectation: T16 needs no schema bump at all.** |
+| D29a: the tests get their own catalog entries | The alternative — logging §4E's maximum against the trained `max-hang-half-crimp` — puts a week-1 and a week-8 spike on the series §7 asks the owner to read for a *downward* trend. Same argument as D22, applied to intensity instead of edge size. Costs five catalog rows (20 → 25) and zero new type surface. |
+| D30: the standard edge is a stored setting | §4E's "never change it mid-block" is the strictest condition in the plan, and eight weeks is long enough to forget. Landing it in `Settings` now also means T18's gear work (D26) extends an existing field group rather than inventing one. |
+
+**The one new mechanism, flagged rather than buried:** `holdSeconds` gains an `'open'` form for the lock-off test, where the duration is the measurement and there is nothing to auto-stop at (T13). A union member on the existing field keeps `reasonApplies`'s D27 gate working untouched — which matters, because a max-duration hold is the single place in the app where "why did it end" carries the most information.
+
+**Net effect on scope:** one task, two decisions, five catalog entries, one seed routine, one optional `Routine` field (`inRotation`), one optional `Settings` field (`standardEdgeMm`), and one union member on `Exercise.holdSeconds`. No new dependencies, no new object store, no `DB_VERSION` or `BACKUP_SCHEMA_VERSION` bump, and no reversal of D2a, D9, D15, D16, D18–D22, or D27.
+
+**Built the same day; every prediction above held.** See T16's amendment for the verification pass. One thing the spec did not anticipate: an open hold must not offer `target` as an end reason, since a test with no prescribed duration cannot have hit one. **Wave 0 is now complete** — set-end reason (T14), bodyweight (T15) and the §4E battery (T16) are all in place, so nothing further is unbackfillable and the 8-week block can start. T17 (symptom check + plan-cited stop-signal card) leads Wave 1.
 

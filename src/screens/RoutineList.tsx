@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import type { Routine, WorkoutLog } from '../types';
 import { deleteLog, getAllLogs, getAllRoutines, saveLog } from '../lib/storage';
 import { createLog } from '../lib/session';
+import { rotates } from '../lib/rotation';
+import { go } from '../lib/routes';
 
 export function RoutineList({
   onOpenSession,
@@ -22,7 +24,13 @@ export function RoutineList({
     })();
   }, []);
 
+  // Names resolve against every routine, including the battery — an unfinished
+  // battery must still be named in the resume banner rather than showing its id.
   const routineName = (id: string) => routines?.find((r) => r.id === id)?.name ?? id;
+  // Started from here: training routines only. The §4E battery is a measurement,
+  // not a training session, and it has its own screen where its protocol and its
+  // conditions live (D29).
+  const startable = routines?.filter(rotates) ?? null;
 
   async function startNew(routineId: string) {
     const log = createLog(routineId, crypto.randomUUID(), new Date().toISOString());
@@ -72,11 +80,11 @@ export function RoutineList({
         </div>
       )}
 
-      {routines === null ? (
+      {startable === null ? (
         <p className="text-sm text-slate-400">Loading…</p>
       ) : (
         <ul className="space-y-3">
-          {routines.map((routine) => (
+          {startable.map((routine) => (
             <li
               key={routine.id}
               className="flex items-center justify-between gap-3 rounded-xl border border-slate-700 bg-brand-surface p-3"
@@ -95,6 +103,16 @@ export function RoutineList({
           ))}
         </ul>
       )}
+
+      <button
+        onClick={() => go({ name: 'retest' })}
+        className="mt-3 flex w-full items-center justify-between rounded-xl border border-slate-700 bg-brand-surface p-3 text-left"
+      >
+        <span className="text-sm text-slate-300">§4E baseline / retest battery</span>
+        <span aria-hidden className="text-slate-500">
+          &rsaquo;
+        </span>
+      </button>
 
       {confirmRoutineId && (
         <div className="fixed inset-0 z-10 flex items-end justify-center bg-black/60 p-4 sm:items-center">

@@ -14,6 +14,7 @@ import {
   holdFraction,
   holdSpecOf,
   holdStatus,
+  isOpenHold,
   isRestComplete,
   isTimerVisible,
   restMsOf,
@@ -362,5 +363,53 @@ describe('heldAuto', () => {
     expect(cleared.heldAuto).toBe(false);
     // The running rest is untouched — only the result is dropped.
     expect(cleared.phase).toBe('resting');
+  });
+});
+
+// ── Open holds (T16) ─────────────────────────────────────────────────────────
+// §4E's lock-off test is "longest static hold": the duration is the measurement,
+// so the app must never end it. Every reading below is the refusal, not a
+// different number — a truncated max is a wrong measurement that looks right.
+describe('open hold', () => {
+  const OPEN: HoldSpec = { min: 0, max: null };
+  const openExercise = {
+    id: 'test-lockoff-90-left',
+    holdSeconds: 'open',
+  } as unknown as Exercise;
+
+  it('is what an exercise declaring holdSeconds: open reads as', () => {
+    expect(holdSpecOf(openExercise)).toEqual({ min: 0, max: null });
+    expect(isOpenHold(OPEN)).toBe(true);
+    expect(isOpenHold({ min: 7, max: 10 })).toBe(false);
+  });
+
+  it('never auto-stops, however long it runs', () => {
+    const holding = startHold('test-lockoff-90-left', T0);
+    expect(shouldAutoStop(holding, T0 + 10_000, OPEN)).toBe(false);
+    expect(shouldAutoStop(holding, T0 + 600_000, OPEN)).toBe(false);
+  });
+
+  it('leaves the state untouched if autoStopHold is somehow reached', () => {
+    const holding = startHold('test-lockoff-90-left', T0);
+    expect(autoStopHold(holding, OPEN, null)).toBe(holding);
+  });
+
+  it('records real elapsed time on a manual stop, with heldAuto false', () => {
+    const stopped = stopHold(startHold('test-lockoff-90-left', T0), T0 + 12_400, null);
+    expect(stopped.heldMs).toBe(12_400);
+    expect(stopped.heldAuto).toBe(false);
+  });
+
+  it('has no range to be under or over, and draws no bar', () => {
+    expect(holdStatus(0, OPEN)).toBe('in');
+    expect(holdStatus(60_000, OPEN)).toBe('in');
+    expect(holdFraction(30_000, OPEN)).toBe(0);
+    expect(holdBandStart(OPEN)).toBe(0);
+  });
+
+  it('shows "max" rather than a target it does not have', () => {
+    expect(formatHoldTarget(OPEN)).toBe('max');
+    expect(formatHoldTarget({ min: 7, max: 10 })).toBe('7–10s');
+    expect(formatHoldTarget({ min: 5, max: 5 })).toBe('5s');
   });
 });

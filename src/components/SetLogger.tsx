@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ProgressMetric, SetEndReason, SetEntry } from '../types';
 import { METRIC_CONFIG } from '../lib/progress';
 import { METRIC_INPUT_ORDER } from '../lib/lastTime';
-import { REASON_CONFIG, SET_END_REASONS } from '../lib/setReason';
+import { REASON_CONFIG } from '../lib/setReason';
 
 const inputClass =
   'min-w-0 rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-brand-accent focus:outline-none';
@@ -38,6 +38,7 @@ export function SetLogger({
   sets,
   metrics,
   askEndReason = false,
+  endReasons = [],
   onAdd,
   onUpdate,
   onDelete,
@@ -47,6 +48,8 @@ export function SetLogger({
   metrics?: ProgressMetric[];
   /** D27: true where the plan prescribes a hold, so "why did it end" has an answer. */
   askEndReason?: boolean;
+  /** Which reasons to offer — an open hold has no `target` to have hit (T16). */
+  endReasons?: SetEndReason[];
   onAdd: () => void;
   onUpdate: (index: number, patch: Partial<SetEntry>) => void;
   onDelete: (index: number) => void;
@@ -155,7 +158,7 @@ export function SetLogger({
         {askEndReason &&
           (isOpen(i) ? (
             <div className="mt-1 flex flex-wrap gap-1 pl-5">
-              {SET_END_REASONS.map((reason) => {
+              {endReasons.map((reason) => {
                 const active = set.endReason === reason;
                 return (
                   <button

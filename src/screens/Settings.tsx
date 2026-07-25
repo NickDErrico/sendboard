@@ -13,9 +13,12 @@ import {
   getAllBodyweights,
   getAllChecks,
   getAllLogs,
+  getSettings,
   saveBodyweight,
+  saveSettings,
 } from '../lib/storage';
 import { parseBodyweight } from '../lib/bodyweight';
+import { parseEdgeMm } from '../lib/retest';
 import type { BodyweightEntry } from '../types';
 import { PERSISTENCE_COPY, checkPersistence, type PersistenceState } from '../lib/persistence';
 import { beepTest } from '../lib/beep';
@@ -169,6 +172,8 @@ export function Settings({
           <span className="text-slate-500">→</span>
         </button>
 
+        <StandardEdge reloadKey={bwReloadKey} />
+
         <BodyweightLog reloadKey={bwReloadKey} />
 
         <section className="space-y-3 rounded-xl border border-slate-700 bg-brand-surface p-4">
@@ -260,6 +265,67 @@ export function Settings({
 // T13 AC1/AC3: replaces T0's temporary write-a-timestamp probe, which could not
 // survive the owner's update workflow anyway (deleting the app deleted the
 // probe). This reports the browser's actual answer instead of inferring it.
+/**
+ * The one standard edge the block is tested on (T16 AC4, D30).
+ *
+ * §4E: pick one edge (14–20mm) and never change it mid-block, because changing it
+ * invalidates the comparison more than any training variable. It lives here
+ * rather than in the catalog for D26's reason — it configures an input, it does
+ * not change a prescription — and it is prefilled onto every set that records an
+ * edge, so week 8 does not depend on remembering week 1.
+ *
+ * Editable, because it is the owner's board: a nonsense edit leaves the stored
+ * value alone rather than clearing the condition every hang comparison rests on.
+ */
+function StandardEdge({ reloadKey }: { reloadKey: number }) {
+  const [edgeMm, setEdgeMm] = useState<number | null | undefined>(undefined);
+
+  const refresh = useCallback(async () => {
+    const settings = await getSettings();
+    setEdgeMm(settings.standardEdgeMm ?? null);
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh, reloadKey]);
+
+  async function save(raw: string) {
+    const mm = parseEdgeMm(raw);
+    if (mm === null) {
+      await refresh();
+      return;
+    }
+    const settings = await getSettings();
+    await saveSettings({ ...settings, standardEdgeMm: mm });
+    await refresh();
+  }
+
+  return (
+    <section className="space-y-2 rounded-xl border border-slate-700 bg-brand-surface p-4">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Standard edge
+      </h2>
+      <div className="flex items-center gap-2">
+        <input
+          key={String(edgeMm)}
+          defaultValue={edgeMm === null || edgeMm === undefined ? '' : String(edgeMm)}
+          onBlur={(e) => void save(e.target.value)}
+          inputMode="decimal"
+          placeholder="20"
+          aria-label="Standard edge, millimetres"
+          className="w-20 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-right text-sm text-slate-100 focus:border-brand-accent focus:outline-none"
+        />
+        <span className="text-xs text-slate-500">mm</span>
+      </div>
+      <p className="text-xs text-slate-500">
+        Prefilled on every set that records an edge. §4E: “Pick one standard edge (14–20mm) and
+        never change it mid-block — changing edge size invalidates the comparison more than any
+        training variable.”
+      </p>
+    </section>
+  );
+}
+
 /**
  * The recorded bodyweights, correctable in place (T15 AC9).
  *
