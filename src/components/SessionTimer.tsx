@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { beep } from '../lib/beep';
+import { beepHoldEnd, beepRestEnd, resumeAudio } from '../lib/beep';
 import {
   elapsedMs,
   formatClock,
@@ -10,6 +10,7 @@ import {
   holdStatus,
   isRestComplete,
   restRemainingMs,
+  shouldAutoStop,
   type HoldSpec,
   type TimerState,
 } from '../lib/timer';
@@ -28,8 +29,12 @@ function useNow(active: boolean): number {
     setNow(Date.now());
     const id = window.setInterval(() => setNow(Date.now()), 100);
     // A backgrounded tab throttles intervals, so re-read on the way back in
-    // rather than waiting up to a full tick for the next one.
-    const onVisible = () => setNow(Date.now());
+    // rather than waiting up to a full tick for the next one. iOS also suspends
+    // the audio context while backgrounded, so re-arm it here too (T13 AC9).
+    const onVisible = () => {
+      setNow(Date.now());
+      resumeAudio();
+    };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
     return () => {
@@ -59,7 +64,9 @@ export function SessionTimer({
   state: TimerState;
   exerciseName: string;
   hold: HoldSpec | null;
-  onStop: () => void;
+  /** `auto` distinguishes the timer ending the hold from the owner ending it — the
+      first records the prescription, the second records real elapsed time. */
+  onStop: (auto?: boolean) => void;
   onSkip: () => void;
   onExtend: (seconds: number) => void;
   onLogHeld: (heldMs: number) => void;
@@ -67,14 +74,28 @@ export function SessionTimer({
   const now = useNow(state.phase !== 'idle');
   const restDone = isRestComplete(state, now);
 
-  // One beep per rest, keyed on the phase's start instant so an extend (+30s)
+  // T13 AC4: the hold ends itself at the prescribed maximum. Keyed on the hold's
+  // start instant so it fires once per hold rather than on every tick past the
+  // threshold, and it sounds *before* the state change so the cue is not waiting
+  // on a render — the owner is mid-hang and listening, not watching.
+  const autoStoppedAt = useRef<number | null>(null);
+  const autoStop = shouldAutoStop(state, now, hold);
+  useEffect(() => {
+    if (!autoStop) return;
+    if (autoStoppedAt.current === state.startedAt) return;
+    autoStoppedAt.current = state.startedAt;
+    beepHoldEnd();
+    onStop(true);
+  }, [autoStop, state.startedAt, onStop]);
+
+  // One cue per rest, keyed on the phase's start instant so an extend (+30s)
   // re-arms it and a re-render never re-fires it.
   const beepedFor = useRef<number | null>(null);
   useEffect(() => {
     if (!restDone) return;
     if (beepedFor.current === state.startedAt) return;
     beepedFor.current = state.startedAt;
-    beep();
+    beepRestEnd();
   }, [restDone, state.startedAt]);
   useEffect(() => {
     if (!restDone) beepedFor.current = null;
@@ -119,7 +140,7 @@ function HoldView({
   elapsed: number;
   hold: HoldSpec;
   name: string;
-  onStop: () => void;
+  onStop: (auto?: boolean) => void;
 }) {
   const status = holdStatus(elapsed, hold);
   const style = STATUS_STYLE[status];
@@ -160,7 +181,7 @@ function HoldView({
       </div>
 
       <button
-        onClick={onStop}
+        onClick={() => onStop(false)}
         className="mt-2 w-full rounded-lg bg-slate-100 px-4 py-3 text-base font-bold text-slate-900"
       >
         Stop

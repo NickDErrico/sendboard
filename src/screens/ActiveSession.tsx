@@ -21,6 +21,7 @@ import {
 } from '../lib/lastTime';
 import {
   IDLE_TIMER,
+  autoStopHold,
   clearHeld,
   clearTimer,
   extendRest,
@@ -129,8 +130,16 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
     setTimer(startRest(exerciseId, restMs, Date.now()));
   }
 
-  function handleStop() {
-    setTimer((t) => stopHold(t, Date.now(), restMsOf(exercisesById.get(t.exerciseId ?? ''))));
+  // `auto` means the timer reached the prescribed maximum rather than the owner
+  // tapping Stop. Only then is the recorded duration the prescription: a manual
+  // stop always measures what actually elapsed (T13 AC6).
+  function handleStop(auto = false) {
+    setTimer((t) => {
+      const exercise = exercisesById.get(t.exerciseId ?? '');
+      const restMs = restMsOf(exercise);
+      const hold = holdSpecOf(exercise);
+      return auto && hold ? autoStopHold(t, hold, restMs) : stopHold(t, Date.now(), restMs);
+    });
   }
 
   // Writes the measured hold as a set, carrying last time's load forward (T11

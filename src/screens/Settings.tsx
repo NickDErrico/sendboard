@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { openDB } from 'idb';
 import {
   backupFilename,
   collectBackup,
@@ -10,6 +9,8 @@ import {
   type BackupFile,
 } from '../lib/backup';
 import { getAllChecks, getAllLogs } from '../lib/storage';
+import { PERSISTENCE_COPY, checkPersistence, type PersistenceState } from '../lib/persistence';
+import { beepTest } from '../lib/beep';
 
 // T6 settings shell + T7 backup section. Deliberately NO reminder UI of any kind
 // (D2a): no time picker, no notification permission, no deep-link URLs. Reminders
@@ -98,10 +99,28 @@ export function Settings({
       </header>
 
       <div className="space-y-3">
-        <section className="flex items-center justify-between rounded-xl border border-slate-700 bg-brand-surface p-4">
-          <span className="text-sm font-medium text-slate-300">Version</span>
-          <span className="font-mono text-sm text-slate-400">v{__APP_VERSION__}</span>
+        {/* T13 AC2: the build stamp, not the (never-bumped) package version, is
+            what tells the owner an update landed. Compare it after relaunching
+            twice — the service worker updates itself (registerType: autoUpdate),
+            so the app never needs deleting, and deleting it is what destroys the
+            log. */}
+        <section className="rounded-xl border border-slate-700 bg-brand-surface p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-300">Build</span>
+            <span className="font-mono text-sm text-slate-400">
+              {new Date(__BUILD_TIME__).toLocaleString()}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            v{__APP_VERSION__} · {__COMMIT__}
+          </p>
+          <p className="mt-2 text-xs text-slate-500">
+            Updates install themselves — close Sendboard and open it twice, then check this
+            timestamp. Never delete the app to update it; that erases your log.
+          </p>
         </section>
+
+        <PersistenceStatus />
 
         <button
           onClick={onOpenInstallGuide}
@@ -168,6 +187,22 @@ export function Settings({
           )}
         </section>
 
+        {/* T13 AC8: audio is the one thing that cannot be checked by looking, and
+            checking it mid-session means abandoning a hang to find out. */}
+        <section className="rounded-xl border border-slate-700 bg-brand-surface p-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sound</h2>
+          <p className="mt-2 text-sm text-slate-400">
+            The timer plays a tone when a hold ends and when a rest is up. It only sounds while
+            Sendboard is on screen — iOS suspends a backgrounded web app.
+          </p>
+          <button
+            onClick={beepTest}
+            className="mt-3 w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 font-semibold text-slate-200"
+          >
+            Test sound
+          </button>
+        </section>
+
         <section className="rounded-xl border border-slate-700 bg-brand-surface p-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Reminders</h2>
           <p className="mt-2 text-sm text-slate-400">
@@ -176,77 +211,44 @@ export function Settings({
             step-by-step setup.
           </p>
         </section>
-
-        <PersistenceHeartbeat />
       </div>
     </div>
   );
 }
 
-// ─── TEMPORARY: T0 persistence heartbeat ─────────────────────────────────────
-// Kept ONLY until the 48h storage-persistence gate (T0 AC2 / D4) is confirmed on
-// device, then delete this component and its usage above. Relocated here from the
-// home screen in T8 so the real Home matches its spec (AC1) while the probe stays
-// reachable on device. Separate 'sendboard-spike' DB — NOT the app's real storage.
-const SPIKE_DB = 'sendboard-spike';
-const SPIKE_STORE = 'probe';
-interface ProbeValue {
-  writtenAt: string;
-  count: number;
-}
-async function openSpike() {
-  return openDB(SPIKE_DB, 1, { upgrade: (db) => void db.createObjectStore(SPIKE_STORE) });
-}
-async function readProbe(): Promise<ProbeValue | undefined> {
-  return (await openSpike()).get(SPIKE_STORE, 'value');
-}
-async function writeProbe(prevCount: number): Promise<ProbeValue> {
-  const value: ProbeValue = { writtenAt: new Date().toISOString(), count: prevCount + 1 };
-  await (await openSpike()).put(SPIKE_STORE, value, 'value');
-  return value;
-}
-function timeAgo(iso: string): string {
-  const mins = (Date.now() - new Date(iso).getTime()) / 60_000;
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${Math.round(mins)} min ago`;
-  const hrs = mins / 60;
-  if (hrs < 48) return `${Math.round(hrs)} h ago`;
-  return `${Math.floor(hrs / 24)} days ago`;
-}
+// T13 AC1/AC3: replaces T0's temporary write-a-timestamp probe, which could not
+// survive the owner's update workflow anyway (deleting the app deleted the
+// probe). This reports the browser's actual answer instead of inferring it.
+function PersistenceStatus() {
+  const [state, setState] = useState<PersistenceState | null>(null);
 
-function PersistenceHeartbeat() {
-  const [probe, setProbe] = useState<ProbeValue | undefined>();
-  const [loaded, setLoaded] = useState(false);
   useEffect(() => {
-    readProbe()
-      .then(setProbe)
-      .finally(() => setLoaded(true));
+    void (async () => setState(await checkPersistence()))();
   }, []);
+
+  const tone =
+    state === 'persisted'
+      ? 'text-emerald-300'
+      : state === 'denied'
+        ? 'text-amber-300'
+        : 'text-slate-400';
+
   return (
-    <section className="w-full rounded-xl border border-slate-800 bg-brand-surface/60 p-4 text-left text-sm">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-        Diagnostics · storage persistence (temporary)
+    <section className="rounded-xl border border-slate-700 bg-brand-surface p-4">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Storage durability
       </h2>
-      {!loaded ? (
-        <p className="text-slate-400">Checking…</p>
-      ) : probe ? (
-        <p className="text-slate-300">
-          Value survived — written{' '}
-          <span className="font-semibold text-emerald-400">{timeAgo(probe.writtenAt)}</span>
-          <br />
-          <span className="text-xs text-slate-500">
-            {new Date(probe.writtenAt).toLocaleString()} · write #{probe.count}
-          </span>
-        </p>
+      {state === null ? (
+        <p className="mt-2 text-sm text-slate-400">Checking…</p>
       ) : (
-        <p className="text-slate-400">No stored value found — tap to start the 48h check.</p>
+        <>
+          <p className={`mt-2 text-sm font-semibold ${tone}`}>
+            {state === 'persisted' ? 'Persistent storage granted' : `Persistent storage: ${state}`}
+          </p>
+          <p className="mt-1 text-sm text-slate-400">{PERSISTENCE_COPY[state]}</p>
+        </>
       )}
-      <button
-        onClick={() => writeProbe(probe?.count ?? 0).then(setProbe)}
-        className="mt-3 w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 font-semibold text-slate-200"
-      >
-        {probe ? 'Reset check (write now)' : 'Write timestamp'}
-      </button>
     </section>
   );
 }
+

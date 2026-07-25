@@ -83,6 +83,41 @@ export function stopHold(state: TimerState, now: number, restMs: number | null):
   return { phase: 'resting', exerciseId: state.exerciseId, startedAt: now, restMs, heldMs };
 }
 
+/**
+ * Ends a hold that reached its prescribed maximum, recording *exactly* that
+ * maximum rather than the elapsed time at the moment detection happened.
+ *
+ * Detection rides on a render tick, and a throttled tick (a backgrounded tab, a
+ * busy main thread) can notice a second or more late — which would log "5.9s"
+ * for a 5s hold that the app itself ended. The hold did reach the target; the
+ * timer was simply slow to look. Recording the target keeps the logged number
+ * deterministic and honest, and it is now a charted measurement (T12), so tick
+ * jitter would otherwise show up as noise in the trend.
+ *
+ * A *manual* stop still records real elapsed time (T13 AC6) — there the number
+ * is the owner's, not the prescription's.
+ */
+export function autoStopHold(
+  state: TimerState,
+  hold: HoldSpec,
+  restMs: number | null,
+): TimerState {
+  if (state.phase !== 'holding') return state;
+  const heldMs = hold.max * 1000;
+  if (restMs === null) {
+    return { ...IDLE_TIMER, exerciseId: state.exerciseId, heldMs };
+  }
+  // Rest starts from the instant the hold *should* have ended, for the same
+  // reason: a late tick must not silently shorten the prescribed rest.
+  return {
+    phase: 'resting',
+    exerciseId: state.exerciseId,
+    startedAt: state.startedAt + heldMs,
+    restMs,
+    heldMs,
+  };
+}
+
 /** Pushes the rest target out without restarting it — the remaining time grows by `seconds`. */
 export function extendRest(state: TimerState, seconds: number): TimerState {
   if (state.phase !== 'resting') return state;
@@ -120,12 +155,27 @@ export function isRestComplete(state: TimerState, now: number): boolean {
 export type HoldStatus = 'under' | 'in' | 'over';
 
 /**
+ * True once a running hold has reached the top of its prescribed range (T13 AC4).
+ *
+ * T10 deliberately let the hold run past its target, on the reasoning that the
+ * owner decides when to drop off. The owner reversed that on 2026-07-24: the
+ * timer now ends the hold at the prescribed maximum. A manual Stop before then
+ * still measures the real elapsed time (AC6), so cutting a hold short is
+ * unaffected — only overrunning is.
+ *
+ * `over` therefore remains reachable in `holdStatus` for the brief window
+ * between the threshold and the stop landing, and for holds with no spec.
+ */
+export function shouldAutoStop(state: TimerState, now: number, hold: HoldSpec | null): boolean {
+  if (state.phase !== 'holding' || hold === null) return false;
+  return elapsedMs(state, now) >= hold.max * 1000;
+}
+
+/**
  * Where an elapsed hold sits against its target range.
  *
  * Both bounds are inclusive, so a 7–10s hang reads "in range" at exactly 7.0s
- * and still at exactly 10.0s. The range is the prescription; going past its top
- * is information, not failure, which is why this reports `over` rather than
- * stopping the hold (the owner decides when to drop off, not the timer).
+ * and still at exactly 10.0s.
  */
 export function holdStatus(elapsed: number, hold: HoldSpec): HoldStatus {
   if (elapsed < hold.min * 1000) return 'under';

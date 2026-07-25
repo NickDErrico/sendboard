@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Routine } from './types';
 import { getAllLogs, getRoutine, getSettings, saveSettings } from './lib/storage';
+import { requestPersistence } from './lib/persistence';
 import { go, useRoute, type Route } from './lib/routes';
 import { Home } from './screens/Home';
 import { ExerciseList } from './screens/ExerciseList';
@@ -26,6 +27,14 @@ const NO_TAB_BAR = new Set(['session', 'routine', 'install', 'notFound']);
 export default function App() {
   const route = useRoute();
   const onboarding = useInstallOnboarding();
+
+  // T13 AC1: ask to be moved out of the browser's best-effort storage bucket, on
+  // every launch — a denial is not permanent, and the browser is more willing
+  // once the app is installed and used. The result is reported in Settings;
+  // nothing here depends on the answer, and D5's export is still the real backup.
+  useEffect(() => {
+    void requestPersistence();
+  }, []);
 
   // First open in a browser (not the installed PWA), not yet dismissed → show the
   // install guide once (AC3). Overlays the app so it can't be routed past.

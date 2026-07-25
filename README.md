@@ -16,25 +16,45 @@ home + tab-bar navigation shell, install onboarding, routine rotation with previ
 per-exercise completion, an in-session hold + rest timer, last-time carry-forward, and
 per-exercise progress charts.
 
-Remaining is the on-device acceptance pass (T0 48h storage gate, T7 export/import on
-iOS Safari, T8 criterion-5 walkthrough) — plus three items T10 could not verify off
-the device: rest-complete beep audibility, screen wake-lock acquisition, and a real
-background/resume cycle mid-interval.
+Remaining is the on-device acceptance pass: export/import on iOS Safari (T7), the T8
+criterion-5 walkthrough, and four things that can only be confirmed on the phone —
+beep audibility with the ringer off, screen wake-lock acquisition, a real
+background/resume cycle mid-interval, and whether persistent storage is granted once
+installed.
+
+## Updating — do not delete the app
+
+**Never delete Sendboard to pick up a new build.** That erases the log with it, and it
+isn't necessary: the service worker updates itself (`registerType: 'autoUpdate'`).
+
+Close Sendboard and reopen it twice, then check the **Build** timestamp at the top of
+Settings — that's how you confirm an update landed. It changes with every deploy, which
+`v0.1.0` never did.
+
+Settings also reports whether the browser granted **persistent storage**, which asks it
+not to evict your log under storage pressure. That's a request, not a guarantee, and it
+doesn't survive deleting the app or clearing website data — so export a backup at the
+end of each block regardless.
 
 ## Timing a session
 
 Exercises the training plan gives a duration for carry a **Start hold** control during
 a session. The hold counts *up* with its target range banded — 7–10s reads amber below
-7s, green inside the range, and keeps counting past 10s rather than stopping itself,
-because the plan prescribes ranges and you decide when to drop off. Stopping measures
-the hold, starts its prescribed rest in the same tap, and offers to log the measured
-duration as a set with last session's load carried forward.
+7s and green inside the range — and **ends itself at the top of the range**, sounding a
+long low tone so you can hang with your eyes shut. It then starts the prescribed rest
+in the same transition and offers to log the duration as a set, with last session's
+load carried forward. Stopping early is always available and records what actually
+elapsed; only the auto-stop records the prescribed figure.
 
-Two platform limits worth knowing: iOS suspends a backgrounded PWA, so the
-rest-complete beep only fires while Sendboard is on screen (the app holds a screen wake
-lock during a session for that reason), and a force-quit discards a running timer. The
-countdown itself is computed from wall-clock instants, so backgrounding and returning
-never makes it drift.
+Rest ending plays three short high tones — deliberately unlike the hold cue, so "stop
+pulling" and "start pulling" can't be confused.
+
+If you hear nothing, check **Settings → Test sound** first. On iOS the ringer switch
+silences web audio unless the app claims a playback session, which Sendboard does.
+Two limits remain: iOS suspends a backgrounded PWA, so cues only fire while Sendboard
+is on screen (hence the screen wake lock during a session), and a force-quit discards a
+running timer. The countdown is computed from wall-clock instants, so backgrounding and
+returning never makes it drift.
 
 ## Progress charts
 

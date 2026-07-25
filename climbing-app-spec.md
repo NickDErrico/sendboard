@@ -1,7 +1,7 @@
 # SPEC: Personal Climbing Training App ("Sendboard")
 
-Version 1.6 — 2026-07-24
-Status: PRD approved with amendments — Gate 1 passed. T1–T12 built. See the Amendments log at the end of this file for what changed from v1.0 and why.
+Version 1.7 — 2026-07-24
+Status: PRD approved with amendments — Gate 1 passed. T1–T13 built. See the Amendments log at the end of this file for what changed from v1.0 and why.
 
 > **Executor note:** This file is the source of truth. Read it in full before writing code. Mark task status markers in place as you go. If a decision you need was not made here, STOP, mark the task `[f]` with one line why, and escalate — do not improvise.
 
@@ -885,6 +885,62 @@ Design calls:
 
 ---
 
+### [T13] Outcome: The owner's data survives an update without being reinstalled away, storage is requested as persistent, the hold timer ends itself at the prescribed time, and the rest beep is audible on device.
+Spec: this file | Status: [x] | Depends on: T10, T12
+
+#### Context manifest
+Create: `src/lib/persistence.ts` (+ `persistence.test.ts`) | Modify: `src/lib/beep.ts`, `src/lib/timer.ts` (+ `timer.test.ts`), `src/components/SessionTimer.tsx`, `src/screens/Settings.tsx`, `vite.config.ts`, `src/vite-env.d.ts`, `src/App.tsx` | Conform to: D4, D5, D18 | Delete: the temporary T0 `PersistenceHeartbeat` component in `Settings.tsx`
+
+**The data-loss cause is the update workflow, not eviction.** Owner reported 2026-07-24: "I need to remove the app from my phone to get our updates so it is gone." That is the whole 8-week log destroyed on every deploy, and it is unnecessary — `registerType: 'autoUpdate'` already makes the service worker skip waiting and claim clients, so a relaunch picks up a new build. What is missing is any way to *confirm* it: `Settings` renders `v{__APP_VERSION__}` from a `package.json` version that has never changed from `0.1.0`, so an update and a non-update look identical, and uninstalling is the only workflow that feels reliable. A build stamp is therefore a data-durability feature, not a nicety.
+
+**AC4 reverses a T10 design call at the owner's request.** T10 had the hold count past its target and never stop itself, reasoning that the owner decides when to drop off and an auto-stop would invent the logged number. The owner has decided otherwise (2026-07-24). The reversal is recorded rather than argued: stopping at the prescribed maximum is the behaviour, and a manual Stop before then still measures the real duration. It also *requires* an audible cue — the reason to auto-stop is not having to watch the screen mid-hang.
+
+#### Acceptance criteria
+1. WHEN the app starts THE app SHALL request persistent storage, and Settings SHALL show whether it was granted, denied, or is unsupported. [x]
+2. WHEN Settings is opened THE app SHALL show a build identifier that changes with every deploy, so the owner can confirm an update landed without reinstalling. [x]
+3. WHEN Settings is opened THE temporary T0 persistence-probe component SHALL be gone, replaced by the AC1 status. [x]
+4. WHEN a hold reaches the top of its prescribed range THE timer SHALL stop itself, record that duration, and start the prescribed rest — the same transition a manual Stop performs. [x]
+5. WHEN a hold auto-stops THE app SHALL emit an audible cue distinct from the rest-complete cue, since the owner is mid-hang and not watching the screen. [x]
+6. WHEN a hold is stopped manually before its maximum THE measured duration SHALL be the real elapsed time, unchanged from T10. [x]
+7. WHEN audio is initialized THE app SHALL declare a playback audio session where the platform supports it, so the beep is not silenced by the ringer switch. [ ] — **device-pass only.** `navigator.audioSession` is a WebKit API and is absent from the preview browser, so the code path is guarded and unexercised here. This is the specific fix for the reported silence; it can only be confirmed on the iPhone.
+8. WHEN Settings is opened THE app SHALL offer a control that plays the beep on demand, so audio can be diagnosed without running a session. [x]
+9. WHEN the app returns to the foreground THE audio context SHALL be resumed, so a beep after a backgrounded stretch is not silent. [ ] — wired to `visibilitychange`, but a real background/resume cycle is a device-pass item.
+
+#### Edge cases
+- `navigator.storage.persist` absent (older iOS) → reported as unsupported; nothing else changes, and the app keeps working exactly as it does today. [x]
+- Persistence denied → stated plainly in Settings alongside the export button, since manual backup (D5) is then the only durable copy. [x]
+- `navigator.audioSession` absent → skipped silently; the beep still plays when the ringer is on. [x]
+- A fixed-target hold (`[5, 5]`) auto-stops at 5s; a ranged one (`[7, 10]`) at 10s. [x]
+- An exercise with a hold but no prescribed rest (the wall press) auto-stops and offers its result with no countdown, exactly as a manual stop does. [x]
+- Auto-stop must fire once per hold, not on every render tick while the threshold is exceeded. [x]
+- The build stamp must not be a random value regenerated on every page load, or it would report an update that did not happen. [x]
+
+#### Non-goals & do-not-touch
+- MUST NOT add cloud sync, an account, or any backend (standing non-goal). Persistent storage is a request to the browser, not a durability guarantee — D5's manual export stays the real backup.
+- MUST NOT add an update-available prompt, a forced reload, or version-check polling. `autoUpdate` already handles the update; this task only makes it *visible*.
+- MUST NOT use the Notification API for the audio cue (D2a).
+- MUST NOT change how a manually stopped hold is measured (AC6).
+
+#### Verify
+`npm run test -- timer && npm run test -- persistence && npm run build && npm run lint`, plus an in-browser pass. **AC5, AC7 and AC9 are device-pass items** — audibility cannot be confirmed off the phone, and the ringer-switch behaviour is the specific thing being fixed.
+
+#### Amendments
+
+**2026-07-24 — T13 built. Build + lint clean, 169 tests green (9 new timer cases, 8 new persistence cases). AC1–AC6 and AC8 verified in-browser; AC7 and AC9 carried to the device pass, see above.** Files: `src/lib/persistence.ts` (+ `persistence.test.ts`); modified `src/lib/beep.ts`, `src/lib/timer.ts` (+ tests), `src/components/SessionTimer.tsx`, `src/screens/Settings.tsx`, `src/App.tsx`, `vite.config.ts`, `src/vite-env.d.ts`. The temporary T0 `PersistenceHeartbeat` is deleted along with its `sendboard-spike` database. No new dependencies, no schema change.
+
+**Bug found in verification, and it would have quietly corrupted the T12 charts.** The first auto-stop implementation ended the hold at whatever the clock read when the render tick noticed the threshold. In the preview browser — a hidden tab, so `setInterval` is throttled to roughly 1Hz — a 5s hold recorded **5.9s**. The same throttling applies to a backgrounded or busy phone. Since `holdSec` is now a charted measurement, that jitter would have shown up as noise in the trend, and worse, as *improvement*: a laggier tick reads as a longer hang. `autoStopHold()` therefore records exactly `hold.max`, and starts the rest from when the hold *should* have ended rather than from detection, so a late tick cannot silently shorten a prescribed 3 minutes either. A **manual** stop still records real elapsed time (AC6) — there the number belongs to the owner, not to the prescription.
+
+**Root cause of the reported data loss, which was not eviction.** The owner reported deleting and reinstalling the app to pick up each deploy, destroying the log every time. `registerType: 'autoUpdate'` already sets `skipWaiting` and `clientsClaim`, so a relaunch installs a new build unaided; what was missing was any way to *tell*. Settings rendered `v{__APP_VERSION__}` from a `package.json` version that has never moved off `0.1.0`, so an updated app and a stale one were indistinguishable and reinstalling was the only workflow that felt reliable. The build stamp is therefore a data-durability fix, and the copy beside it says so directly.
+
+Design calls:
+- **The ringer switch is the prime suspect for the silent beep.** On iOS, Web Audio is muted by the hardware silent switch unless the page declares `navigator.audioSession.type = 'playback'` (Safari 16.4+). A phone on a climbing-wall floor is a phone on silent. Gain was also raised and the tones lengthened, but the audio session is the actual fix.
+- **Two distinct cues.** Hold-end is one long low tone (520Hz, 0.45s); rest-end is three short high ones (880/880/1170). The owner is hanging with their eyes shut, and "stop pulling" must not sound like "start pulling."
+- **Persistence is requested on every launch, not once.** A denial is not permanent — browsers weigh installed-ness and engagement — so asking again next launch costs nothing and may succeed later. The result is reported in Settings, and every status string tells the owner to keep exporting, because `persist()` is a request, not a guarantee (D5 is unchanged).
+- **`__BUILD_TIME__` is evaluated at build time, not page load.** A per-load timestamp would report an update on every launch, which is worse than reporting none.
+- **The T0 heartbeat probe is deleted rather than kept.** It could never answer its own question under the owner's workflow — deleting the app deleted the probe with it — and the browser's own `storage.persisted()` answers the real question directly.
+
+---
+
 ## Execution notes
 
 - **Gates:** Gate 1 = PRD approved (now, by the owner). Gate 2 = decomposition approved after T0's spike report. Gate 3 = implementation reviewed against acceptance criteria after T8.
@@ -1006,3 +1062,22 @@ That last detail is the substantive one. Under it, any single continuous line mi
 | Bodyweight recorded as a known limitation with a revisit gate | §4E records bodyweight alongside added load because the two are only meaningful together. Tracking it needs a capture surface and a granularity decision no decision covers, and the owner has not asked. Written down so the chart is not later mistaken for a complete strength measure. |
 
 **Net effect on scope:** one task, three decisions, one new type plus three optional `SetEntry` fields and one optional `Exercise` field, and metric declarations on three catalog entries. No new dependencies (the chart is inline SVG), no storage or backup schema change (`DB_VERSION` and `BACKUP_SCHEMA_VERSION` both unchanged), and no reversal of D2a, D9, D15, or D16.
+
+---
+
+**2026-07-24 — v1.6 → v1.7 — storage durability, update visibility, hold auto-stop, audible cues (T13 added).**
+
+Owner report, in one message: the T0 heartbeat is moot because "I need to remove the app from my phone to get our updates so it is gone"; realistically the data only needs to survive the 8-week cycle so the next block starts from the latest numbers; the hold timer should stop at the designated time rather than run over; and the sound does not appear to work.
+
+The first of those reframed the whole persistence question. The threat to an 8-week log was never WebKit eviction — it was the update workflow deleting the app once per deploy. See T13's amendment.
+
+| Change | Why |
+|---|---|
+| Build stamp in Settings; copy stating the app never needs deleting | `autoUpdate` already updates the service worker on relaunch, but `v0.1.0` never changed, so an update was unverifiable and reinstalling was the only workflow that felt safe. Making the update *visible* is what stops the data being deleted. |
+| `navigator.storage.persist()` requested at launch, status shown in Settings | Moves the origin out of the browser's best-effort bucket, which is what eviction targets first. Requested every launch because a denial is not permanent. Reported honestly, and every status string still points at the export button — D5 is unchanged and persistence is a request, not a guarantee. |
+| T0's `PersistenceHeartbeat` deleted | It could not survive the workflow it was meant to measure, and `storage.persisted()` answers the question directly. T0 AC2's 48h gate is superseded by this rather than left pending forever. |
+| **T10's "the timer never stops itself" reversed** — holds now end at the prescribed maximum | Owner decision. Recorded as a reversal rather than argued: a manual stop still measures real elapsed time, so cutting a hold short is unaffected. It also forced an audible hold-end cue, since the point of auto-stopping is not having to watch the screen mid-hang. |
+| Auto-stop records the prescription, not the clock at detection | Found in verification: a throttled render tick logged 5.9s for a 5s hold. `holdSec` is a charted measurement now (T12), so tick jitter would read as improvement. |
+| Playback audio session, louder and longer tones, resume on foreground, "Test sound" in Settings | On iOS the ringer switch silences Web Audio unless the page declares a playback session — the most likely cause of the reported silence, and untestable off-device, which is why Settings now has a button that plays the cue on demand. |
+
+**Net effect on scope:** one task, one new module, one reversed T10 design call, no new decisions, no dependencies, and no schema change. **Device pass still owes:** beep audibility with the ringer off, wake-lock acquisition, a real background/resume cycle, and confirmation that persistent storage is granted once installed.

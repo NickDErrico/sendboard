@@ -4,6 +4,10 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import pkg from './package.json' with { type: 'json' };
 
+// `process` exists in Vite's Node-side config context. Declared locally rather
+// than adding @types/node, which nothing else in this project needs.
+declare const process: { env: Record<string, string | undefined> };
+
 // D7: deployed to GitHub Pages at https://nickderrico.github.io/sendboard/
 // The base path is the single most common failure mode for this stack (T1 edge case):
 // it must match the Pages subpath or every asset URL and the service-worker scope 404s.
@@ -13,6 +17,14 @@ export default defineConfig({
   base,
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    // T13 AC2: a build identifier that changes every deploy. `package.json`'s
+    // version has never moved off 0.1.0, so an updated app and a stale one used
+    // to look identical in Settings — which made deleting and reinstalling the
+    // only way to be sure an update landed, taking the whole IndexedDB log with
+    // it. Evaluated once at build time (not per page load), so it identifies the
+    // build rather than the visit.
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    __COMMIT__: JSON.stringify((process.env.GITHUB_SHA ?? 'local').slice(0, 7)),
   },
   plugins: [
     react(),

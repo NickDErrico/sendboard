@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Exercise } from '../types';
 import {
   IDLE_TIMER,
+  autoStopHold,
   clearHeld,
   clearTimer,
   elapsedMs,
@@ -17,6 +18,7 @@ import {
   isTimerVisible,
   restMsOf,
   restRemainingMs,
+  shouldAutoStop,
   startHold,
   startRest,
   stopHold,
@@ -90,10 +92,63 @@ describe('hold timing (AC2)', () => {
     expect(elapsedMs(startHold('x', T0), T0 - 5_000)).toBe(0);
   });
 
-  it('keeps counting past the top of the range instead of auto-stopping', () => {
+});
+
+describe('auto-stop at the prescribed maximum (T13 AC4)', () => {
+  it('fires exactly at the top of the range, not before', () => {
     const s = startHold('max-hang', T0);
-    expect(elapsedMs(s, T0 + 45_000)).toBe(45_000);
-    expect(s.phase).toBe('holding');
+    expect(shouldAutoStop(s, T0 + 9_999, HANG)).toBe(false);
+    expect(shouldAutoStop(s, T0 + 10_000, HANG)).toBe(true);
+    expect(shouldAutoStop(s, T0 + 12_000, HANG)).toBe(true);
+  });
+
+  it('fires at the target for a fixed-target hold', () => {
+    const s = startHold('wall-press', T0);
+    expect(shouldAutoStop(s, T0 + 4_900, FIXED)).toBe(false);
+    expect(shouldAutoStop(s, T0 + 5_000, FIXED)).toBe(true);
+  });
+
+  it('never fires when no hold is running', () => {
+    expect(shouldAutoStop(IDLE_TIMER, T0 + 60_000, HANG)).toBe(false);
+    expect(shouldAutoStop(startRest('x', MIN_3, T0), T0 + 60_000, HANG)).toBe(false);
+  });
+
+  it('never fires for an exercise with no hold spec', () => {
+    expect(shouldAutoStop(startHold('x', T0), T0 + 600_000, null)).toBe(false);
+  });
+
+  it('leaves a manually shortened hold measuring its real duration (AC6)', () => {
+    const held = startHold('max-hang', T0);
+    expect(shouldAutoStop(held, T0 + 6_200, HANG)).toBe(false);
+    expect(stopHold(held, T0 + 6_200, MIN_3).heldMs).toBe(6_200);
+  });
+
+  // The regression this guards: detection rides on a render tick, and a
+  // throttled tick noticed a 5s hold at 5.9s in the preview browser. Recording
+  // the prescription rather than the detection instant makes the logged number
+  // deterministic — and it is a charted measurement now (T12).
+  it('records exactly the prescribed maximum, however late detection was', () => {
+    const held = startHold('max-hang', T0);
+    expect(autoStopHold(held, HANG, MIN_3).heldMs).toBe(10_000);
+    expect(autoStopHold(held, FIXED, MIN_3).heldMs).toBe(5_000);
+  });
+
+  it('starts the rest from when the hold should have ended, not from detection', () => {
+    const resting = autoStopHold(startHold('max-hang', T0), HANG, MIN_3);
+    expect(resting.phase).toBe('resting');
+    // A tick that arrived 900ms late must not hand back a 3:00.9 rest.
+    expect(restRemainingMs(resting, T0 + 10_900)).toBe(MIN_3 - 900);
+  });
+
+  it('lands idle with its result when the exercise prescribes no rest', () => {
+    const stopped = autoStopHold(startHold('wall-press', T0), FIXED, null);
+    expect(stopped.phase).toBe('idle');
+    expect(stopped.heldMs).toBe(5_000);
+    expect(isTimerVisible(stopped)).toBe(true);
+  });
+
+  it('is a no-op when no hold is running', () => {
+    expect(autoStopHold(IDLE_TIMER, HANG, MIN_3)).toBe(IDLE_TIMER);
   });
 });
 
