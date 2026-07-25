@@ -142,6 +142,29 @@ describe('set formatting (AC2)', () => {
   it('renders nothing for an empty list', () => {
     expect(summarizeSets([])).toBe('');
   });
+
+  it('renders a measured set from its numbers, not its free text (T12/D21)', () => {
+    const measured = { load: '', reps: '', rpe: 8, edgeMm: 20, addedLb: 35, holdSec: 7.4 };
+    expect(formatSet(measured)).toBe('20mm · +35lb · 7.4s @8');
+  });
+
+  it('omits measurements that were left blank', () => {
+    expect(formatSet({ load: '', reps: '', rpe: null, edgeMm: 18 })).toBe('18mm');
+    expect(formatSet({ load: '', reps: '', rpe: null, addedLb: 35, holdSec: 9 })).toBe('+35lb · 9.0s');
+  });
+
+  it('reads zero added load as bodyweight', () => {
+    expect(formatSet({ load: '', reps: '', rpe: null, addedLb: 0, holdSec: 8 })).toBe('BW · 8.0s');
+  });
+
+  it('still renders pre-T12 free-text sets unchanged', () => {
+    expect(formatSet(HANG)).toBe('20mm +10kg × 7s @8');
+  });
+
+  it('collapses identical measured sets the same way', () => {
+    const m = { load: '', reps: '', rpe: null, edgeMm: 20, addedLb: 35 };
+    expect(summarizeSets([m, m, m])).toBe('20mm · +35lb ×3');
+  });
 });
 
 describe('describeWhen', () => {
@@ -177,6 +200,26 @@ describe('seedForNextSet (AC3, AC4, AC7)', () => {
   it('never carries RPE forward — it is a fresh judgment about a set not yet done', () => {
     expect(seedForNextSet([set('a', 'b', 10)], last).rpe).toBeNull();
     expect(seedForNextSet([], last).rpe).toBeNull();
+  });
+
+  it('carries the setup measurements but never the measured hold (T12 AC4)', () => {
+    const measured = { load: '', reps: '', rpe: 8, edgeMm: 20, addedLb: 35, holdSec: 7.4 };
+    const seeded = seedForNextSet([measured], null);
+    expect(seeded.edgeMm).toBe(20);
+    expect(seeded.addedLb).toBe(35);
+    expect(seeded.holdSec).toBeUndefined();
+    expect(seeded.rpe).toBeNull();
+  });
+
+  it('carries measurements across sessions when this session is empty', () => {
+    const priorMeasured = { ...last, sets: [{ load: '', reps: '', rpe: null, edgeMm: 18, addedLb: 0 }] };
+    expect(seedForNextSet([], priorMeasured)).toMatchObject({ edgeMm: 18, addedLb: 0 });
+  });
+
+  it('omits a measurement absent from the source rather than writing undefined', () => {
+    const seeded = seedForNextSet([{ load: '', reps: '', rpe: null, edgeMm: 20 }], null);
+    expect(seeded.edgeMm).toBe(20);
+    expect('addedLb' in seeded).toBe(false);
   });
 
   it('falls back to the first prior set when last time had fewer sets', () => {

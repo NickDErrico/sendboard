@@ -1,5 +1,6 @@
 import type { Exercise, IsoType } from '../types';
 import { EquipmentBadge, GtgBadge } from '../components/EquipmentBadge';
+import { ExerciseProgress } from '../components/ExerciseProgress';
 
 // Only overcoming/yielding are required to be labelled (AC6); dynamic is shown
 // too as useful context, 'none' is omitted.
@@ -40,6 +41,10 @@ export function ExerciseDetail({
           <EquipmentBadge key={eq} equipment={eq} />
         ))}
       </div>
+
+      {/* T12: renders nothing unless the exercise declares metrics (D20) — only
+          the three the training plan actually progresses. */}
+      <ExerciseProgress exerciseId={exercise.id} metrics={exercise.metrics} />
 
       {/* Prescription — must wrap, never scroll horizontally at 390px (AC5). */}
       <section className="mt-5">

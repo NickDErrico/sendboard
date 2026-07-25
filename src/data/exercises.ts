@@ -144,6 +144,9 @@ export const EXERCISES: Exercise[] = [
     prescription: '5 sets x 7–10s hang @ ~85–90% of max for the edge, 3 min rest',
     holdSeconds: [7, 10],
     restSeconds: 180,
+    // D20/D22: §4F progresses this by load. Edge is declared because it is the
+    // condition the other two are measured under, not a peer metric.
+    metrics: ['holdSec', 'addedLb', 'edgeMm'],
     cues: [
       'Should be hard by rep 3, not failing before then.',
       'Keep one standard edge (14–20mm) for the whole block so retests compare.',
@@ -170,6 +173,7 @@ export const EXERCISES: Exercise[] = [
     prescription: '5 sets x 7–10s hang @ ~85–90% of max for the edge, 3 min rest',
     holdSeconds: [7, 10],
     restSeconds: 180,
+    metrics: ['holdSec', 'addedLb', 'edgeMm'],
     cues: [
       'Alternate with the half-crimp version session to session.',
       'Keep the same standard edge all block for valid retests.',
@@ -256,6 +260,9 @@ export const EXERCISES: Exercise[] = [
     prescription: '3 holds x 8–10s, 2 min rest; add kettlebell via dip belt as it gets easy (start bodyweight)',
     holdSeconds: [8, 10],
     restSeconds: 120,
+    // No edgeMm: this hangs from a bar via a dip belt, so there is no edge to
+    // record and its series is unsegmented (D22).
+    metrics: ['holdSec', 'addedLb'],
     cues: ['Complements the overcoming bar pulls — same angle, yielding instead of overcoming.'],
     safetyNotes: ['Never grease-the-groove weighted lock-offs (plan §8).'],
     gtgEligible: false,

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Exercise, WorkoutLog } from '../types';
 import { getAllExercises, getRoutine } from '../lib/storage';
+import { formatSet } from '../lib/lastTime';
 
 // Read-only view of a completed session (T5 non-goal: no editing in v1).
 export function LogDetail({ log, onBack }: { log: WorkoutLog; onBack: () => void }) {
@@ -59,13 +60,12 @@ export function LogDetail({ log, onBack }: { log: WorkoutLog; onBack: () => void
                 ) : (
                   <ul className="mt-2 space-y-1">
                     {entry.sets.map((set, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm text-slate-200">
+                      // T12: formatSet renders a measured set from its numbers
+                      // and a pre-T12 (or unmeasured) one from its free text,
+                      // so old and new logs read the same way here.
+                      <li key={i} className="flex items-start gap-2 text-sm text-slate-200">
                         <span className="w-4 shrink-0 text-xs text-slate-500">{i + 1}</span>
-                        <span className="flex-1 break-words">{set.load || '—'}</span>
-                        <span className="flex-1 break-words">{set.reps || '—'}</span>
-                        <span className="w-14 shrink-0 text-right text-xs text-slate-400">
-                          {set.rpe === null ? '' : `RPE ${set.rpe}`}
-                        </span>
+                        <span className="flex-1 break-words">{formatSet(set)}</span>
                       </li>
                     ))}
                   </ul>

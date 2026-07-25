@@ -10,10 +10,11 @@ The full build specification and its decision log live in
 
 ## Status
 
-Feature-complete (T1–T11): data layer, exercise browsing, session logging, history,
+Feature-complete (T1–T12): data layer, exercise browsing, session logging, history,
 climbing/GtG check-offs, settings with JSON backup export/import, hash routing, a
 home + tab-bar navigation shell, install onboarding, routine rotation with preview and
-per-exercise completion, an in-session hold + rest timer, and last-time carry-forward.
+per-exercise completion, an in-session hold + rest timer, last-time carry-forward, and
+per-exercise progress charts.
 
 Remaining is the on-device acceptance pass (T0 48h storage gate, T7 export/import on
 iOS Safari, T8 criterion-5 walkthrough) — plus three items T10 could not verify off
@@ -34,6 +35,27 @@ rest-complete beep only fires while Sendboard is on screen (the app holds a scre
 lock during a session for that reason), and a force-quit discards a running timer. The
 countdown itself is computed from wall-clock instants, so backgrounding and returning
 never makes it drift.
+
+## Progress charts
+
+Three exercises are charted: both max hangs and the weighted lock-off. Those are the
+ones the training plan actually progresses — §4B and §4E rule out measuring PIMA
+numerically, §8 says keep greasing-the-groove pull-ups trivial, and warm-ups and prehab
+aren't progressed at all. On those three, the set logger takes numbers (edge mm, added
+lb, hold s) instead of free text, and hold time fills itself in from the timer.
+
+Switch between **Time**, **Load**, and **Edge** on the exercise's detail screen. Time
+and load are **cut into a separate segment for each edge you were on** — rebuilding
+hold time after dropping to a smaller edge is progress, not a setback, and one
+continuous line would draw it as the latter. Edge gets its own view where a smaller
+edge sits higher.
+
+The chart reports and never judges: no trendline, no projection, no personal-best
+badge, no improving-or-declining verdict. §4E's interpretation rubric is yours to
+apply, and §7 treats a falling line as a reason to deload.
+
+Note that bodyweight isn't tracked, so an added-load line only compares cleanly against
+a stable bodyweight — §4E records both together for that reason.
 
 ## Stack
 

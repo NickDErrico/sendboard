@@ -1,5 +1,20 @@
-import type { SetEntry, WorkoutLog } from '../types';
+import type { ProgressMetric, SetEntry, WorkoutLog } from '../types';
+import { METRIC_CONFIG } from './progress';
 import { daysBetween } from './rotation';
+
+/**
+ * The measurements carry-forward repeats (T12 AC4).
+ *
+ * Edge and added load are *setup* — what you hung on and what you clipped to the
+ * belt — and repeating them across five near-identical hangs is the same saving
+ * carry-forward already gives load and reps. `holdSec` is deliberately excluded
+ * for the same reason `rpe` is: it is a *result*, measured after the fact by the
+ * T10 timer, and seeding it would pre-fill an achievement that has not happened.
+ */
+export const CARRIED_METRICS: ProgressMetric[] = ['edgeMm', 'addedLb'];
+
+/** Measurements in the order they are entered: setup first, then the result. */
+export const METRIC_INPUT_ORDER: ProgressMetric[] = ['edgeMm', 'addedLb', 'holdSec'];
 
 // "What did I do last time?" (T11), derived from the logs rather than stored —
 // the same property that makes rotation.ts correct after a backup import, for
@@ -75,11 +90,28 @@ export function describeWhen(daysAgo: number): string {
   return `${daysAgo} days ago`;
 }
 
-/** One set as `load × reps @rpe`, skipping whatever the owner left blank. */
+/**
+ * One set as a single line, with `@rpe` appended when it was rated.
+ *
+ * Two shapes, because the three measured exercises replaced their free-text
+ * fields with numbers (D21): a measured set reads `20mm · +35lb · 7.4s`, and
+ * everything else keeps the original `load × reps`. Measurements win when both
+ * are somehow present, since they are the structured record.
+ */
 export function formatSet(set: SetEntry): string {
-  const load = set.load.trim();
-  const reps = set.reps.trim();
-  const core = load && reps ? `${load} × ${reps}` : load || reps;
+  const measured = METRIC_INPUT_ORDER.filter((m) => typeof set[m] === 'number').map((m) =>
+    METRIC_CONFIG[m].format(set[m] as number),
+  );
+
+  let core: string;
+  if (measured.length > 0) {
+    core = measured.join(' · ');
+  } else {
+    const load = set.load.trim();
+    const reps = set.reps.trim();
+    core = load && reps ? `${load} × ${reps}` : load || reps;
+  }
+
   if (!core) return set.rpe === null ? '—' : `@${set.rpe}`;
   return set.rpe === null ? core : `${core} @${set.rpe}`;
 }
@@ -124,11 +156,12 @@ export function seedForNextSet(
   currentSets: SetEntry[],
   last: LastPerformance | null,
 ): SetEntry {
-  const previous = currentSets[currentSets.length - 1];
-  if (previous) return { load: previous.load, reps: previous.reps, rpe: null };
+  const source = currentSets[currentSets.length - 1] ?? last?.sets[currentSets.length] ?? last?.sets[0];
+  if (!source) return { load: '', reps: '', rpe: null };
 
-  const corresponding = last?.sets[currentSets.length] ?? last?.sets[0];
-  if (corresponding) return { load: corresponding.load, reps: corresponding.reps, rpe: null };
-
-  return { load: '', reps: '', rpe: null };
+  const seed: SetEntry = { load: source.load, reps: source.reps, rpe: null };
+  for (const metric of CARRIED_METRICS) {
+    if (typeof source[metric] === 'number') seed[metric] = source[metric];
+  }
+  return seed;
 }

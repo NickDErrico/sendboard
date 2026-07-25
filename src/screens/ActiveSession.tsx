@@ -139,9 +139,16 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   function handleLogHeld(heldMs: number) {
     const exerciseId = timer.exerciseId;
     if (!exerciseId) return;
+    // T12: where the exercise declares `holdSec`, the measurement lands in the
+    // numeric field — that is the charted value, and the free-text `reps` has
+    // been replaced there (D21). Everywhere else it keeps writing the text form.
+    const tracksHold = exercisesById.get(exerciseId)?.metrics?.includes('holdSec') ?? false;
     mutate((l) => {
       const seed = seedForNextSet(getSets(l, exerciseId), lastByExercise.get(exerciseId) ?? null);
-      return addSet(l, exerciseId, { ...seed, reps: formatHold(heldMs) });
+      const measured = tracksHold
+        ? { holdSec: Math.round((heldMs / 1000) * 10) / 10 }
+        : { reps: formatHold(heldMs) };
+      return addSet(l, exerciseId, { ...seed, ...measured });
     });
     setTimer(clearHeld);
   }
@@ -301,6 +308,7 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
 
               <SetLogger
                 sets={sets}
+                metrics={exercise?.metrics}
                 onAdd={() =>
                   mutate((l) => addSet(l, exId, seedForNextSet(getSets(l, exId), last)))
                 }

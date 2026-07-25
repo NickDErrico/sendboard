@@ -1,7 +1,7 @@
 # SPEC: Personal Climbing Training App ("Sendboard")
 
-Version 1.5 — 2026-07-24
-Status: PRD approved with amendments — Gate 1 passed. T1–T9 built. See the Amendments log at the end of this file for what changed from v1.0 and why.
+Version 1.6 — 2026-07-24
+Status: PRD approved with amendments — Gate 1 passed. T1–T12 built. See the Amendments log at the end of this file for what changed from v1.0 and why.
 
 > **Executor note:** This file is the source of truth. Read it in full before writing code. Mark task status markers in place as you go. If a decision you need was not made here, STOP, mark the task `[f]` with one line why, and escalate — do not improvise.
 
@@ -40,7 +40,7 @@ Explicitly out of scope. Do not build these; do not add scaffolding "in case."
 - Apple Watch app, HealthKit integration
 - **In-app reminder scheduling, storage, or notification delivery of any kind** (D2a — owned by an external alarm/Todoist)
 - ~~Rest timers with audio (nice-to-have, deferred to v2)~~ **BUILT in T10 (2026-07-24).** This was deferred, not rejected; the deferral expired when the owner asked for it. See D17–D19.
-- Charts/analytics beyond a plain reverse-chronological history list — **still out of scope.** T11 is deliberately the *precondition* for a chart, not a chart: see its "What a chart would still need" note before reversing this.
+- ~~Charts/analytics beyond a plain reverse-chronological history list~~ **NARROWED by T12 (2026-07-24).** A per-exercise progress line exists for the three exercises the training plan actually progresses (D20). Everything else still holds: no dashboards, no PRs, no streaks, no trend arrows, no cross-exercise or whole-block analytics, and no chart for an exercise the plan does not progress.
 - Editing the exercise catalog from inside the app (catalog is code-seeded in v1)
 
 ### Prior decisions & constraints
@@ -64,6 +64,9 @@ Recorded once here so no downstream task re-derives or contradicts them.
 | D7 | **Hosting: GitHub Pages from the repo, via GitHub Actions on push to `main`** | Free, no account beyond GitHub, HTTPS by default (required for PWA install), deploys from Windows with no extra tooling. |
 | D8 | **Routines are first-class; a workout log always references a routine** | The plan is structured as named days (Day 1 Fingerboard, Day 3 Pull/Antagonist, etc.), not a flat exercise pool. Logging "did some exercises" would not answer "did I complete week 3." |
 | D15 | **"Which routine am I supposed to do" is answered by rotation order, never by a calendar day** | Owner decision 2026-07-24. The two strength routines alternate (A → B → A), so "up next" is derivable from *which was completed least recently* with no schedule state at all. A day-of-week assignment would reverse D2a (which removed scheduling), require a rest-day/missed-day concept, and produce a "you're behind" state on any week that shifts — which training plan §3's "rest 2–3 days" and §4F's "take a lighter week regardless of the schedule" both explicitly invite. Rotation degrades correctly: a skipped or shifted week just changes what is oldest. `Routine.dayOfWeek` stays `null` on both seeds and remains unused. |
+| D20 | **An exercise is charted only if the training plan progresses it, and the catalog declares which metrics it progresses by** | Owner decision 2026-07-24, after a pass over `docs/training-plan.md` found that most of the catalog has nothing to plot. §4F progresses the max hangs by load ("add small load increments (1–3%)") and §5B progresses the weighted lock-off ("add kettlebell via dip belt as this gets easy") — those three, and only those three, are charted. §4B says PIMA progresses "by feel, not by adding weight" and §4E adds "don't test PIMA numerically; there's nothing to measure without a force gauge," which rules out both PIMA entries and, by the same argument, the three bar pulls and the wall press. §8 says to keep GtG pull-ups trivial and never near failure, so charting them would encourage exactly the behaviour the plan warns about. Warm-ups and prehab are not progressed at all. A per-exercise `metrics` list — rather than one global rule — is required because the metrics are not uniform: a max hang has an edge, the lock-off is a bar and has none. |
+| D22 | **Where an exercise declares an edge, edge size is the *condition* the other metrics are measured under — not a peer metric. A series never connects two points recorded on different edges** | Owner's stated progression, 2026-07-24: drop to a smaller edge, rebuild hold time on it, then add weight or drop again. Under that pattern a single continuous time line renders real progress as a sawtooth — 7s→10s on 20mm, then 6s on 18mm — which reads as repeated regression when nothing regressed. The same applies to load: `+35lb` on 20mm and `+35lb` on 18mm are different performances, and joining them asserts an equivalence that is false. So time and load series break at every edge change and each segment is labelled with its edge; progress is legible both *within* a segment (the line rising) and *across* them (a new edge starting higher than the previous one did). This is the charting form of §4E's "changing edge size invalidates the comparison more than any training variable" — the app declines to draw the invalid comparison rather than annotating it after the fact. The weighted lock-off declares no edge, so its series is unsegmented. |
+| D21 | **Measurements are stored as typed optional numbers next to the free-text fields, never parsed out of them. Canonical units are pounds, millimetres, and seconds** | The same reasoning as D17, applied to logging instead of the catalog: `load` is deliberately free text ("20mm +10kg", "BW", "35lb") and a parser over it silently mis-reads anything off-pattern — on a chart that means a wrong trend line, which is worse than no line, because §7's whole point is spotting a *downward* trend before it becomes an injury. Free text stays exactly as it is for grip, edge and context notes; the numbers live beside it and appear only on exercises that declare the metric. Pounds because that is the equipment the owner actually picks up (a 35lb kettlebell lands on a whole number); the plan's kg notation stays in the prose. Optional fields → no `DB_VERSION` or `BACKUP_SCHEMA_VERSION` bump, and pre-T12 sets simply do not plot. |
 | D17 | **Hold and rest durations are typed catalog fields (`holdSeconds`, `restSeconds`), never parsed out of `prescription` text** | `prescription` is prose written for a human mid-session ("5 sets x 7–10s hang @ ~85–90% of max for the edge, 3 min rest"), and several entries carry two variants in one string (§4B's weeks 1–4 vs 5–8 PIMA). A regex over that is a silent-wrong-number machine on a max-effort finger protocol, which is the exact failure the PRD's problem #2 names. Typed optional fields cost two lines per exercise in a file that is already the hand-authored source of truth (D6). Absent field = that exercise simply has no timer; nothing is invented for the rep-based movements. |
 | D18 | **Timer state is ephemeral and session-local: never persisted, never in a backup, never a data type** | The timer answers "how long have I been pulling *right now*." Nothing downstream reads it, so persisting it would add a store, a schema version, and a stale-timer-on-resume problem in exchange for nothing. It is held as React state with an **absolute target timestamp** rather than a tick counter, so backgrounding, re-render, and iOS throttling cannot drift it — that, not persistence, is what makes it correct. A force-quit loses a running timer, which is acceptable: the owner has lost track of the interval by then anyway. `DB_VERSION` and `BACKUP_SCHEMA_VERSION` do not change. |
 | D19 | **Prefilled set values are a draft, never a claim.** Carry-forward seeds the input; it never marks an exercise completed and never writes a set the owner did not ask for | Preserves D16's separation of "logged numbers" from "I did this." A prefilled row appears only on an explicit `+ Add set` or `Log Ns` tap, and every field stays editable — so a seeded value that is wrong costs one edit, never a corrupted record. The rule that makes this safe: prefill copies *what you last did*, and the app never infers what you *should* do next (that would be adaptive load calculation, a standing non-goal). |
@@ -101,6 +104,7 @@ Risk-first ordering. T0 is a spike: the entire architecture rests on assumptions
 | T9 | Routine rotation, routine preview, in-session detail + per-exercise completion | T8 | — |
 | T10 | In-session hold + rest timer (audio, wake lock, one-tap log) | T9 | T11 |
 | T11 | Last-time carry-forward on the exercise card | T9 | T10 |
+| T12 | Structured measurements + per-exercise progress chart | T10, T11 | — |
 
 **Gate 2 (decomposition review) happens here** — before T1 starts, after T0 reports.
 
@@ -804,6 +808,83 @@ Design calls:
 
 ---
 
+### [T12] Outcome: For the three exercises the plan actually progresses, the owner can log the measurement as a number and see it as a line over the block, switching between load, edge, and time.
+Spec: this file | Status: [x] | Depends on: T10, T11
+
+#### Context manifest
+Create: `src/lib/progress.ts` (+ `progress.test.ts`), `src/components/ProgressChart.tsx`, `src/components/ExerciseProgress.tsx` | Modify: `src/types.ts` (`SetEntry` measurements, `Exercise.metrics`), `src/data/exercises.ts` (three entries), `src/components/SetLogger.tsx`, `src/screens/ActiveSession.tsx`, `src/screens/ExerciseDetail.tsx`, `src/lib/lastTime.ts` (carry the numbers forward too) | Read: `src/lib/timer.ts`, `src/lib/storage.ts` | Conform to: D20, D21, D19, D6
+
+**Only three exercises are in scope**, per D20: `max-hang-half-crimp`, `max-hang-open-hand`, `weighted-lockoff-hold`. Every other catalog entry is untouched and shows no numeric fields and no chart. Adding a fourth is a catalog edit plus a line in the amendments log explaining which section of the training plan progresses it — not a code change.
+
+**Metrics are per-exercise, not universal.** Both max hangs declare `['holdSec', 'addedLb', 'edgeMm']`; the weighted lock-off declares `['holdSec', 'addedLb']`, because it hangs from a bar via a dip belt and has no edge. A chart is offered for a metric only if the exercise declares it. **Declaration order is display order and the default view** — hold time leads because, under the owner's progression (D22), it is the metric that moves session to session, while added load steps rarely and edge size steps rarest of all.
+
+**Edge is a condition, not a peer (D22).** For an exercise declaring `edgeMm`, the time and load series are cut into one segment per contiguous run of the same edge, each labelled. Edge itself still gets its own view — the step-down over the block — where it is the subject rather than the condition.
+
+**`holdSec` is free.** T10's timer already measures the hold and writes it into `reps` as text (`"8.0s"`); the one-tap log path fills the numeric field at the same time, so the time series costs the owner no additional typing on exactly these three exercises.
+
+`progress.ts` is pure — series building and aggregation as functions of (logs, exerciseId, metric) — for the same reason `timer.ts`, `lastTime.ts`, and `rotation.ts` are.
+
+#### Acceptance criteria
+1. WHEN a set is logged for an exercise that declares metrics THE logger SHALL offer a numeric input per declared metric (added lb, edge mm, hold s), alongside the existing free-text `load`/`reps` fields, which are unchanged. [x]
+2. WHEN an exercise declares no metrics THE logger SHALL render exactly as it does today — no numeric inputs, no chart, no empty section. [x]
+3. WHEN a set is logged from a finished hold THE app SHALL populate `holdSec` from the measured duration without the owner typing it. [x]
+4. WHEN a new set row is seeded by carry-forward (T11) THE declared measurements SHALL carry forward on the same precedence rule as load and reps — a max hang's edge and added weight rarely change between sets. [x]
+5. WHEN an exercise detail is opened AND at least two sessions have logged the selected metric THE app SHALL draw a line chart of that metric over time. [x]
+6. WHEN an exercise declares more than one metric THE app SHALL let the owner switch between them, showing one chart at a time. [x]
+7. WHEN the charted metric is `edgeMm` THE y-axis SHALL be inverted, so a smaller edge reads as upward progress, and SHALL be labelled so the inversion is not ambiguous. [x]
+8. WHEN a session logged several sets THE chart SHALL plot one point per session, using the best set for that metric (highest `addedLb`, highest `holdSec`, smallest `edgeMm`). [x]
+9. WHEN fewer than two sessions carry the metric THE app SHALL say so plainly instead of drawing a line through one point or an empty box. [x]
+10. WHEN the chart renders THE x-axis SHALL be proportional to elapsed time, so a skipped or deload week reads as a gap rather than being evenly spaced away. [x]
+11. WHEN the charted metric is `holdSec` or `addedLb` AND the exercise declares `edgeMm` THE series SHALL be broken into one segment per contiguous run of the same edge, with no line drawn across an edge change, and each segment SHALL be labelled with its edge (D22). [x]
+12. WHEN a segment contains a single session THE app SHALL render its point without a connecting line, rather than dropping it or joining it to the neighbouring edge's segment. [x]
+
+#### Edge cases
+- A pre-T12 set with free-text load only → contributes no point; the chart starts from the first structured entry rather than guessing. Never parse the string (D21). [x]
+- Only in-progress (uncompleted) sessions carry the metric → treated as no data, matching how rotation and carry-forward already treat unfinished logs. [x]
+- Two sessions on the same local calendar day → one point per session, not per day; the x-axis is time, so they sit close together rather than collapsing. [x]
+- A metric declared but never logged (e.g. edge left blank all block) → that metric's toggle is offered but its chart shows the AC9 empty state; the other metrics still chart. [x]
+- Sessions logged with no `edgeMm` on an edge-declaring exercise → grouped as one "edge not recorded" segment rather than silently merged into an adjacent edge's run. [x]
+- The owner returns to a previously used edge (18mm → 16mm → 18mm) → three segments, not two. Runs are contiguous in time, never merged by value, or a return to an easier edge would read as continued progress on the harder one. [x]
+- Every session on the same edge (no edge change all block) → exactly one segment, rendering identically to an unsegmented line. Segmentation must not add visual noise when there is nothing to separate. [x]
+- All values identical (five weeks at +35lb) → a flat line, drawn honestly, not auto-scaled into a fake slope. A zero-range y-axis must not divide by zero. [x]
+- A single outlier (mistyped 350lb) → plotted as logged. The chart is a record, not a validator; the fix is editing the set, and history editing remains out of scope. [x]
+- Numeric input left blank → no measurement stored; the set still logs its free text normally. Blank is not zero. [x]
+- A backup written before T12, restored → imports cleanly, contributes no points, and `BACKUP_SCHEMA_VERSION` is unchanged (added optional fields are compatible both directions, per the T9 precedent). [x]
+
+#### Non-goals & do-not-touch
+- MUST NOT chart any exercise outside the three named in D20, and MUST NOT add a "chart everything that has a number" fallback.
+- MUST NOT parse, normalize, or migrate the free-text `load`/`reps` strings (D21).
+- MUST NOT add a charting dependency. Inline SVG only — the whole feature is a polyline and some labels, and every prior task shipped with no new dependencies.
+- MUST NOT compute or display a projection, target, trendline fit, PR badge, streak, or "you're improving/declining" verdict. The line is the record; §4E's interpretation rubric is the owner's to apply, and a cheerful arrow on a declining line would invert the plan's safety guidance.
+- MUST NOT add cross-exercise dashboards, a whole-block summary screen, or a new tab.
+- MUST NOT bump `DB_VERSION` or `BACKUP_SCHEMA_VERSION`.
+- MUST NOT make history editable (still out of scope, and named in the outlier edge case above).
+
+#### Known limitation, deliberately accepted
+**Bodyweight is not tracked, so an added-load line is only comparable against a stable bodyweight.** Training plan §4E records bodyweight alongside added weight for exactly this reason: +35lb at 165lb bodyweight is not the same performance as +35lb at 172lb. Tracking it means a capture surface and a decision about per-session vs. per-block granularity that no decision covers yet, and the owner has not asked for it. Recorded here so the chart is not later mistaken for a complete strength measure. **Revisit gate:** the owner's bodyweight moves enough over the block to matter, or the §4E retest battery gets built — whichever comes first.
+
+#### Verify
+`npm run test -- progress && npm run test -- lastTime && npm run build && npm run lint`, plus an in-browser pass of criteria 1–12 at 390px with a seeded multi-session history, including the flat-line, single-point, and inverted-edge cases.
+
+#### Amendments
+
+**2026-07-24 — T12 built. Build + lint clean, 153 tests green (23 new progress cases, 7 new lastTime cases); all 12 criteria verified in-browser against a seeded eight-session progression across three edges.** Files: `src/lib/progress.ts` (+ `progress.test.ts`), `src/components/ProgressChart.tsx`, `src/components/ExerciseProgress.tsx`; modified `src/types.ts`, `src/data/exercises.ts`, `src/components/SetLogger.tsx`, `src/lib/lastTime.ts`, `src/screens/ActiveSession.tsx`, `src/screens/ExerciseDetail.tsx`, `src/screens/LogDetail.tsx`. No new dependencies, no storage or backup schema change.
+
+Observed in-browser against a seeded block (20mm ×4 → 18mm ×3 → 16mm ×1): the time view drew **two** polylines and eight points, the single-session 16mm run correctly rendering as a bare point with no line (AC12); segment labels read 20mm / 18mm / 16mm (AC11); the load view segmented identically and its axis read `+35lb` to `BW`, with zero added load shown as bodyweight; the edge view was the one **unsegmented** line, axis inverted (16mm top, 20mm bottom) with the explanatory caption (AC7); x positions were unevenly spaced in proportion to the real day gaps (AC10). PIMA and the Turkish get-up showed no progress section at all (AC2, D20); the weighted lock-off offered Time and Load but no Edge; an exercise with one session showed "One session so far — 8.2s" and drew nothing (AC9). In a live session the max-hang card rendered `edge mm / added lb / hold s` numeric columns with a single header row, `+ Add set` carried edge and load forward but left time blank (AC4), the hold timer wrote `holdSec: 2.9` numerically (AC3), and the stored set was `{edgeMm, addedLb, holdSec, load: "", reps: ""}` — no string parsing anywhere. History and the last-time line both render measured sets from their numbers (`16mm · BW · 6.5s @8`).
+
+Design calls:
+- **The segmentation rule earns its complexity.** Drawn as one line, the owner's real progression is a sawtooth that reads as three regressions; the same data cut at edge changes reads as three builds, each rising. This is the whole reason D22 exists, and it is visible in the verification data above.
+- **Runs are contiguous in time, never grouped by value.** 18mm → 16mm → 18mm yields three segments. Merging the two 18mm runs would draw the later work as a continuation of the harder block and assert progress that did not happen.
+- **`holdSec` is not carried forward, for the same reason `rpe` is not.** Edge and added load are *setup* — what you hung on and what you clipped on — and repeating them across five near-identical hangs is the real saving. Hold time is a *result*, measured after the fact by the T10 timer; seeding it would pre-fill an achievement that has not happened yet. This is recorded as `CARRIED_METRICS` rather than left implicit.
+- **Two orderings, deliberately.** `Exercise.metrics` order is chart order and the default view (time first — it moves session to session). Input order is fixed separately as edge → load → time, which follows the physical act: set up, then hang.
+- **`ExerciseProgress` self-loads so `ExerciseDetail` stays presentational.** The detail screen is rendered from three places (catalog list, routine preview, mid-session) and none of them should have to fetch logs to show it. A consequence worth having: the chart is reachable *during* a session, which is when "am I back to where I was before I dropped the edge" is actually asked.
+- **The chart asserts nothing.** No trendline fit, no projection, no PR marker, no improving/declining verdict. §4E's interpretation rubric is the owner's, and §7 treats a downward trend as a signal to deload — an encouraging arrow drawn on one would invert the plan's own safety guidance.
+- **A flat series is drawn flat.** Zero range centres the line rather than auto-scaling it into a fake slope, and the axis shows one value instead of "8 / 8".
+
+**Deliberately still absent:** bodyweight (see the known-limitation section above — the revisit gate is unchanged), any cross-exercise or whole-block view, and any chart for the other seventeen exercises.
+
+---
+
 ## Execution notes
 
 - **Gates:** Gate 1 = PRD approved (now, by the owner). Gate 2 = decomposition approved after T0's spike report. Gate 3 = implementation reviewed against acceptance criteria after T8.
@@ -906,3 +987,22 @@ The review's finding was that the two largest remaining gaps are both *in-sessio
 **Net effect on scope:** two tasks, three decisions, two optional type fields, and timing data on ten catalog entries. No new dependencies, no storage or backup schema change (`DB_VERSION` and `BACKUP_SCHEMA_VERSION` both unchanged), no new routines, and no reversal of D2a, D9, or D15 — the beep is foreground Web Audio, not a notification.
 
 **Carried to the on-device pass:** beep audibility on iOS, wake-lock acquisition (unobservable in a hidden preview pane), and a real background/resume cycle mid-interval.
+
+---
+
+**2026-07-24 — v1.5 → v1.6 — structured measurements and per-exercise progress charts (T12 added).**
+
+Owner request: "start planning the progress tracking and visualization… a clean line graph for exercises to show progress if there is progress built into the routine for that exercise," followed by three scoping answers (chart load, edge and time as switchable views; capture them as numbers rather than parsing text; pounds), a scope confirmation (only the three load exercises), and a description of the actual progression pattern that reshaped the design: *drop to a smaller edge, rebuild hold time on it, then add weight or drop again.*
+
+That last detail is the substantive one. Under it, any single continuous line misrepresents the training: hold time sawtooths at every edge change and added load looks flat then arbitrary. The fix is not a smarter line but a refusal to draw an invalid one — see D22.
+
+| Change | Why |
+|---|---|
+| Charts non-goal narrowed rather than dropped | Only the three exercises the plan progresses are charted. No dashboards, PRs, streaks, trend arrows, projections, or whole-block analytics — those remain out of scope, and the reasons are unchanged. |
+| D20 added: charted only where the plan progresses something, metrics declared per exercise | A pass over the plan found most of the catalog has nothing to plot: §4B/§4E rule out PIMA numerically ("nothing to measure without a force gauge"), §8 says keep GtG pull-ups trivial, and warm-ups and prehab are not progressed at all. Metrics are per-exercise because they are not uniform — a max hang has an edge, the bar-hung lock-off does not. |
+| D21 added: typed measurements beside the free text, never parsed from it; lb / mm / s | D17's reasoning applied to logging. A parser over "20mm +10kg" mis-reads anything off-pattern, and a wrong trend line is worse than no line when §7's entire purpose is spotting a *downward* trend early. |
+| Numeric fields **replace** free-text load/reps on those three exercises | Owner decision. The trio fully covers what the strings held there, so keeping both would be the same data entered twice. The other seventeen exercises are untouched, and pre-T12 sets still render from their text. |
+| D22 added: edge is the condition, not a peer metric — series never cross an edge change | The owner's progression pattern. This is the charting form of §4E's "changing edge size invalidates the comparison more than any training variable": the app declines to draw the comparison rather than annotating it afterwards. |
+| Bodyweight recorded as a known limitation with a revisit gate | §4E records bodyweight alongside added load because the two are only meaningful together. Tracking it needs a capture surface and a granularity decision no decision covers, and the owner has not asked. Written down so the chart is not later mistaken for a complete strength measure. |
+
+**Net effect on scope:** one task, three decisions, one new type plus three optional `SetEntry` fields and one optional `Exercise` field, and metric declarations on three catalog entries. No new dependencies (the chart is inline SVG), no storage or backup schema change (`DB_VERSION` and `BACKUP_SCHEMA_VERSION` both unchanged), and no reversal of D2a, D9, D15, or D16.

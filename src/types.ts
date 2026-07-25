@@ -35,6 +35,10 @@ export interface Exercise {
   // Both optional: absent means this exercise simply has no timer (T10).
   holdSeconds?: [min: number, max: number]; // min === max for a fixed target
   restSeconds?: number; // prescribed rest between sets
+  // D20: charted only where the training plan actually progresses something —
+  // three exercises. Absent means no numeric fields and no chart. Order matters:
+  // it is the chart toggle's order and its default selection.
+  metrics?: ProgressMetric[];
   cues: string[]; // form/technique reminders
   safetyNotes: string[]; // may be empty; rendered visually distinct
   gtgEligible: boolean; // true = suitable for greasing-the-groove use; drives a badge in T3
@@ -47,10 +51,25 @@ export interface Routine {
   exerciseIds: string[]; // ordered
 }
 
+// D20: what an exercise progresses by. Declaration order on `Exercise.metrics`
+// is chart order and the default view — hold time leads on the max hangs because
+// it is what moves session to session (D22).
+export type ProgressMetric = 'holdSec' | 'addedLb' | 'edgeMm';
+
 export interface SetEntry {
+  // Free text, unchanged, and still the only fields on the seventeen exercises
+  // that declare no metrics. On the three that do, the numeric fields below
+  // replace these in the UI — entering "20mm +35lb" and then 20 and 35 again
+  // would be the same data twice.
   load: string; // free-text: "35lb", "20mm +10kg", "5s"
   reps: string;
   rpe: number | null;
+  // D21: typed measurements, never parsed out of the strings above. Present only
+  // where the exercise declares the metric, and optional so pre-T12 sets and
+  // backups read as "no measurement" with no migration.
+  holdSec?: number; // measured, not carried forward — see lastTime.CARRIED_METRICS
+  addedLb?: number;
+  edgeMm?: number;
 }
 
 export interface LoggedExercise {
