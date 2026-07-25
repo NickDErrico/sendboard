@@ -6,17 +6,21 @@ import {
   deleteSet,
   finishLog,
   getSets,
+  isExerciseCompleted,
+  setExerciseCompleted,
   setExerciseNotes,
   setSessionNotes,
   updateSet,
 } from '../lib/session';
 import { SetLogger } from '../components/SetLogger';
+import { ExerciseDetail } from './ExerciseDetail';
 
 export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: () => void }) {
   const [log, setLog] = useState<WorkoutLog | null>(null);
   const [routine, setRoutine] = useState<Routine | null>(null);
   const [exercisesById, setExercisesById] = useState<Map<string, Exercise>>(new Map());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   // Ref mirrors the latest log so rapid taps build from current state, never a
   // stale closure — otherwise concurrent "Add set" taps would drop entries.
@@ -91,12 +95,24 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
     return <p className="mx-auto max-w-md p-4 text-sm text-slate-400">Loading session…</p>;
   }
 
+  // AC6: full protocol without leaving the session. Rendered over the session
+  // rather than routed to, so back returns here with every set intact — and
+  // auto-persist (T4) means nothing is riding on component state anyway.
+  const detailExercise = detailId === null ? undefined : exercisesById.get(detailId);
+  if (detailExercise) {
+    return <ExerciseDetail exercise={detailExercise} onBack={() => setDetailId(null)} />;
+  }
+
   return (
     <div className="mx-auto max-w-md p-4 pb-28">
       <header className="mb-4">
         <p className="text-xs uppercase tracking-wide text-slate-500">Session</p>
         <h1 className="text-xl font-bold tracking-tight text-slate-100">{routine.name}</h1>
-        <p className="text-xs text-slate-500">Started {new Date(log.startedAt).toLocaleString()}</p>
+        <p className="text-xs text-slate-500">
+          Started {new Date(log.startedAt).toLocaleString()} ·{' '}
+          {routine.exerciseIds.filter((id) => isExerciseCompleted(log, id)).length} of{' '}
+          {routine.exerciseIds.length} done
+        </p>
       </header>
 
       <div className="space-y-3">
@@ -105,11 +121,26 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
           const sets = getSets(log, exId);
           const isOpen = expanded.has(exId);
           const entryNotes = log.entries.find((e) => e.exerciseId === exId)?.notes ?? '';
+          const done = isExerciseCompleted(log, exId);
           return (
-            <section key={exId} className="rounded-xl border border-slate-700 bg-brand-surface p-3">
+            <section
+              key={exId}
+              className={`rounded-xl border p-3 ${
+                done ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-slate-700 bg-brand-surface'
+              }`}
+            >
               <div className="flex items-start justify-between gap-2">
                 {/* Missing catalog entry → fall back to the raw id, never crash. */}
-                <h2 className="font-semibold text-slate-100">{exercise?.name ?? exId}</h2>
+                {exercise ? (
+                  <button
+                    onClick={() => setDetailId(exId)}
+                    className="min-w-0 text-left font-semibold text-slate-100"
+                  >
+                    {exercise.name} <span aria-hidden className="text-slate-500">›</span>
+                  </button>
+                ) : (
+                  <h2 className="font-semibold text-slate-100">{exId}</h2>
+                )}
                 {exercise && (
                   <button
                     onClick={() => toggleExpanded(exId)}
@@ -150,6 +181,22 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
                 aria-label={`${exercise?.name ?? exId} notes`}
                 className="mt-2 w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-slate-200 placeholder:text-slate-500 focus:border-brand-accent focus:outline-none"
               />
+
+              {/* D16: explicit and independent of sets — several plan items
+                  (warm-up progression, get-ups, wall press) have nothing numeric
+                  worth typing, and adding a set never implies completion. */}
+              <button
+                onClick={() => mutate((l) => setExerciseCompleted(l, exId, !done))}
+                aria-pressed={done}
+                className={`mt-2 flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold ${
+                  done
+                    ? 'bg-emerald-500/20 text-emerald-200'
+                    : 'border border-slate-700 text-slate-300'
+                }`}
+              >
+                <span aria-hidden>{done ? '✓' : '○'}</span>
+                {done ? 'Completed' : 'Mark done'}
+              </button>
             </section>
           );
         })}

@@ -41,9 +41,21 @@ export function LogDetail({ log, onBack }: { log: WorkoutLog; onBack: () => void
                 key={entry.exerciseId}
                 className="rounded-xl border border-slate-700 bg-brand-surface p-3"
               >
-                <h2 className="font-semibold text-slate-100">{name}</h2>
+                <div className="flex items-start justify-between gap-2">
+                  <h2 className="font-semibold text-slate-100">{name}</h2>
+                  {/* D16: distinguishes "did it, logged no numbers" from a row
+                      that only carries a note. Pre-T9 logs have no flag → absent. */}
+                  {entry.completed && (
+                    <span className="shrink-0 rounded-md bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-300">
+                      ✓ Done
+                    </span>
+                  )}
+                </div>
                 {entry.sets.length === 0 ? (
-                  <p className="mt-1 text-xs text-slate-500">No sets.</p>
+                  // A done-with-no-sets exercise is complete data, not a gap (AC9).
+                  <p className="mt-1 text-xs text-slate-500">
+                    {entry.completed ? 'Completed — no sets logged.' : 'No sets.'}
+                  </p>
                 ) : (
                   <ul className="mt-2 space-y-1">
                     {entry.sets.map((set, i) => (

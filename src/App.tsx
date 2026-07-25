@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { Routine, WorkoutLog } from './types';
-import { createLog } from './lib/session';
-import { getAllLogs, getRoutine, getSettings, saveLog, saveSettings } from './lib/storage';
+import type { Routine } from './types';
+import { getAllLogs, getRoutine, getSettings, saveSettings } from './lib/storage';
 import { go, useRoute, type Route } from './lib/routes';
 import { Home } from './screens/Home';
 import { ExerciseList } from './screens/ExerciseList';
 import { RoutineList } from './screens/RoutineList';
+import { RoutineDetail } from './screens/RoutineDetail';
 import { ActiveSession } from './screens/ActiveSession';
 import { History } from './screens/History';
 import { Settings } from './screens/Settings';
@@ -133,70 +133,17 @@ function SessionRoute() {
 }
 
 function RoutineStartRoute({ routineId }: { routineId: string }) {
-  // AC1 (T6): navigate directly to a routine's start screen, bypassing home. Uses
-  // only existing screens (no new screen file per the T6 context manifest): a
-  // focused start block here in App. Unknown id → not-found. If a session is
-  // already in progress, surface Resume instead of silently starting a second log
-  // (the T4 resume-precedence edge case).
+  // Resolves the id and owns the not-found decision; the screen itself is
+  // RoutineDetail (T9), which lists the exercises and handles start/resume.
   const [routine, setRoutine] = useState<Routine | null | undefined>(undefined);
-  const [inProgress, setInProgress] = useState<WorkoutLog | null>(null);
 
   useEffect(() => {
-    void (async () => {
-      const [r, logs] = await Promise.all([getRoutine(routineId), getAllLogs()]);
-      setRoutine(r ?? null);
-      setInProgress(logs.find((l) => l.completedAt === null) ?? null);
-    })();
+    void (async () => setRoutine((await getRoutine(routineId)) ?? null))();
   }, [routineId]);
 
   if (routine === undefined) return <CenteredNote>Loading…</CenteredNote>;
   if (routine === null) return <NotFound path={`/routine/${routineId}`} />;
-
-  async function start() {
-    const log = createLog(routine!.id, crypto.randomUUID(), new Date().toISOString());
-    await saveLog(log);
-    go({ name: 'session' });
-  }
-
-  return (
-    <div className="mx-auto max-w-md p-4 pb-24">
-      <header className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight text-slate-100">{routine.name}</h1>
-        <button
-          onClick={() => go({ name: 'home' })}
-          className="rounded px-1 py-1 text-sm text-slate-400 hover:text-slate-200"
-        >
-          Home
-        </button>
-      </header>
-
-      {inProgress ? (
-        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
-          <p className="text-sm font-semibold text-amber-200">You have an unfinished session</p>
-          <p className="mt-0.5 text-xs text-amber-100/80">
-            Started {new Date(inProgress.startedAt).toLocaleString()}. Finish or discard it before
-            starting another.
-          </p>
-          <button
-            onClick={() => go({ name: 'session' })}
-            className="mt-3 rounded-lg bg-brand-accent px-4 py-2 text-sm font-semibold text-brand-bg"
-          >
-            Resume session
-          </button>
-        </div>
-      ) : (
-        <div className="rounded-xl border border-slate-700 bg-brand-surface p-4">
-          <p className="text-sm text-slate-400">{routine.exerciseIds.length} exercises</p>
-          <button
-            onClick={() => void start()}
-            className="mt-3 w-full rounded-lg bg-brand-accent px-4 py-2 font-semibold text-brand-bg"
-          >
-            Start {routine.name}
-          </button>
-        </div>
-      )}
-    </div>
-  );
+  return <RoutineDetail routine={routine} />;
 }
 
 function ChecksRoute() {

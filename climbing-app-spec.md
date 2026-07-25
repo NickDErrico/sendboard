@@ -1,7 +1,7 @@
 # SPEC: Personal Climbing Training App ("Sendboard")
 
-Version 1.3 — 2026-07-23
-Status: PRD approved with amendments — Gate 1 passed. See the Amendments log at the end of this file for what changed from v1.0 and why.
+Version 1.4 — 2026-07-24
+Status: PRD approved with amendments — Gate 1 passed. T1–T8 built. See the Amendments log at the end of this file for what changed from v1.0 and why.
 
 > **Executor note:** This file is the source of truth. Read it in full before writing code. Mark task status markers in place as you go. If a decision you need was not made here, STOP, mark the task `[f]` with one line why, and escalate — do not improvise.
 
@@ -63,6 +63,8 @@ Recorded once here so no downstream task re-derives or contradicts them.
 | D6 | **Exercise catalog is a typed constant in source, seeded at first run** | 18 exercises, changed rarely, authored by the owner. A CRUD editor is unjustified complexity in v1. Adding an exercise = edit one file, redeploy. |
 | D7 | **Hosting: GitHub Pages from the repo, via GitHub Actions on push to `main`** | Free, no account beyond GitHub, HTTPS by default (required for PWA install), deploys from Windows with no extra tooling. |
 | D8 | **Routines are first-class; a workout log always references a routine** | The plan is structured as named days (Day 1 Fingerboard, Day 3 Pull/Antagonist, etc.), not a flat exercise pool. Logging "did some exercises" would not answer "did I complete week 3." |
+| D15 | **"Which routine am I supposed to do" is answered by rotation order, never by a calendar day** | Owner decision 2026-07-24. The two strength routines alternate (A → B → A), so "up next" is derivable from *which was completed least recently* with no schedule state at all. A day-of-week assignment would reverse D2a (which removed scheduling), require a rest-day/missed-day concept, and produce a "you're behind" state on any week that shifts — which training plan §3's "rest 2–3 days" and §4F's "take a lighter week regardless of the schedule" both explicitly invite. Rotation degrades correctly: a skipped or shifted week just changes what is oldest. `Routine.dayOfWeek` stays `null` on both seeds and remains unused. |
+| D16 | **A logged exercise carries an explicit `completed` flag, separate from its sets** | T4 AC6 omits zero-set exercises from `entries`, which makes "did it, didn't log numbers" indistinguishable from "skipped it." Several plan items have nothing numeric worth typing (warm-up progression, Turkish get-ups, the wall press), so the owner is forced to either fabricate a set row or lose the record. A boolean answers "was this session actually completed" without weakening AC6 for genuinely untouched exercises. |
 
 **Documented alternative, not chosen:** Expo + EAS Build → real native app with `expo-notifications` scheduling reminders in-app. Gate to revisit: owner is willing to pay $99/yr for the Apple Developer Program **and** external reminders have proven insufficient in real use (e.g. he wants the notification itself to name the day's routine). Revisit no earlier than the end of the 8-week block. Do not build toward this in v1.
 
@@ -93,6 +95,7 @@ Risk-first ordering. T0 is a spike: the entire architecture rests on assumptions
 | T6 | Settings shell + deep-link routes | T2 | T5, T5b |
 | T7 | Backup export/import | T2, T6 | — |
 | T8 | Navigation shell, install onboarding, final device pass | T3–T7 | — |
+| T9 | Routine rotation, routine preview, in-session detail + per-exercise completion | T8 | — |
 
 **Gate 2 (decomposition review) happens here** — before T1 starts, after T0 reports.
 
@@ -618,6 +621,65 @@ Design/scope calls:
 
 ---
 
+### [T9] Outcome: The owner opens the app, is told which routine is up next, can preview its exercises before committing, can read any exercise's full protocol without leaving the session, and can mark an exercise done without inventing set data.
+Spec: this file | Status: [x] | Depends on: T8
+
+#### Context manifest
+Create: `src/lib/rotation.ts`, `src/lib/rotation.test.ts`, `src/screens/RoutineDetail.tsx` | Modify: `src/types.ts` (`LoggedExercise.completed`), `src/lib/session.ts` (+ `session.test.ts`), `src/screens/Home.tsx`, `src/screens/ActiveSession.tsx`, `src/screens/LogDetail.tsx`, `src/App.tsx` (route `routine` → the new screen) | Read: `src/lib/checks.ts` (local-calendar helpers), `src/screens/ExerciseDetail.tsx` | Conform to: D15, D16, D10
+
+**The routine content is not in scope and does not change.** Training plan §3 fixes the week at four training days: Day 1 (fingerboard), Day 2 (climbing volume), Day 3 (pull/antagonist), Day 4 (climbing limit). Two of those are the seeded routines; the other two are climbing check-offs per D9. The seeded set of two routines is therefore already correct and complete — this task adds *selection and completion*, not new routines. Do not add a third routine, do not reverse D9, and do not edit `src/data/*`.
+
+`rotation.ts` is pure (no storage import beyond the calendar helpers) for the same reason `checks.ts` and `session.ts` are: the ordering rules must be testable without IndexedDB.
+
+#### Acceptance criteria
+1. WHEN the home screen renders THE app SHALL designate exactly one routine as "up next" — the one whose most recent *completed* log is oldest, with a never-completed routine ranking ahead of any completed one, ties broken by seed order. [x]
+2. WHEN a routine is displayed on home THE app SHALL show when it was last completed in relative terms ("2 days ago", "never"), and both routines SHALL remain startable in one tap regardless of which is up next. [x]
+3. WHEN the home screen renders THE app SHALL show which of the two routines have been completed in the current Monday-start week (D10). [x]
+4. WHEN `#/routine/:id` is opened THE screen SHALL list that routine's exercises in order with name and summary, before any session is started. [x]
+5. WHEN an exercise row on that screen is tapped THE app SHALL show that exercise's full detail — `prescription`, all `howTo` steps, `cues`, and `safetyNotes` — and back SHALL return to the routine, not to home. [x]
+6. WHEN an exercise is tapped during an active session THE app SHALL show the same full detail, and back SHALL return to the session with all logged sets intact. [x]
+7. WHEN an exercise's "Done" control is toggled on during a session THE app SHALL persist `completed: true` for that exercise even if it has zero sets and no notes, and the entry SHALL survive in `entries`. [x]
+8. WHEN "Done" is toggled off and the exercise has no sets and no notes THE entry SHALL be pruned from `entries`, matching T4 AC6's treatment of untouched exercises. [x]
+9. WHEN a completed session is viewed in history THE detail SHALL distinguish exercises marked done from those merely logged, and SHALL render a done-with-no-sets exercise without an empty or misleading block. [x]
+
+#### Edge cases
+- No sessions ever logged → the first routine in seed order is up next; "never" rather than a computed interval. [x]
+- Both routines completed today → still exactly one up next (the earlier `completedAt`); no "rest day" state and no lock on starting either. This is the D15 no-guilt corollary — mirrors T5b's no-streak-mechanics non-goal. [x]
+- An in-progress (uncompleted) log SHALL NOT count as "last completed" for rotation, or an abandoned session would silently advance the rotation. The existing Resume banner is what surfaces it. [x]
+- A log whose `routineId` no longer exists → ignored by rotation, no crash. [x]
+- Backup files written before this task have entries with no `completed` field → treated as `false`, import unaffected. The field is optional and `BACKUP_SCHEMA_VERSION` does NOT change (an added optional field is backward-compatible in both directions). [x]
+- Marking done, then adding a set, then deleting the set → the entry survives on the `completed` flag alone. [x]
+- Daylight-saving / timezone change inside a week → "days ago" and "this week" computed from local calendar dates via the existing helpers, never from millisecond deltas (D10). [x]
+
+#### Non-goals & do-not-touch
+- MUST NOT add day-of-week scheduling, a rest-day concept, or any "you are behind / you missed X" copy (D15, and T5b's non-goal for the same reason).
+- MUST NOT add a third routine, edit `src/data/exercises.ts` or `src/data/routines.ts`, or reverse D9's climbing check-offs.
+- MUST NOT add 8-week block/periodization tracking (owner deferred 2026-07-24). §4B's week 1–4 vs 5–8 PIMA variants stay in the exercise `prescription` text for the owner to apply.
+- MUST NOT bump `BACKUP_SCHEMA_VERSION` or `DB_VERSION` — the added field is optional.
+- MUST NOT auto-mark an exercise done when a set is added; done is an explicit tap.
+
+#### Verify
+`npm run test -- rotation && npm run test -- session && npm run build && npm run lint`, plus an in-browser pass of criteria 1–9.
+
+#### Amendments
+
+**2026-07-24 — T9 built. Build + lint clean, 69 tests green (15 new rotation cases, 7 new session cases); all 9 criteria and all 7 edge cases verified in-browser at 375px with seeded logs.** Files: `src/lib/rotation.ts` (+ `rotation.test.ts`), `src/screens/RoutineDetail.tsx`; modified `src/types.ts`, `src/lib/session.ts`, `src/screens/Home.tsx`, `src/screens/ActiveSession.tsx`, `src/screens/LogDetail.tsx`, `src/App.tsx`. No new dependencies, no storage schema change, no catalog change.
+
+**Scope note — no new routines were added, deliberately.** The request that opened this task asked for "an A and B routine, possibly more depending on research." Research was unnecessary: training plan §3 already fixes the week at four training days, of which exactly two are strength routines (already seeded since T2) and two are climbing days (check-offs per D9). A and B is therefore the correct count, and the gap was never *content* — it was that nothing told the owner which one to do, nothing let them preview a routine before starting it, and nothing let them mark an exercise done without inventing set data. This task closed those three.
+
+**Bug found and fixed while building (worth recording — it would have silently mis-dated sessions).** `storage.dateKey()` string-slices the first 10 characters of a string input. That is correct for `Check.date`, which is always a local date-only key, but **wrong for `WorkoutLog.completedAt`, which is a full UTC instant** (`new Date().toISOString()`). West of UTC, an evening session would have been attributed to the *next* calendar day — so "days ago" would read one high, and a Sunday-evening session would have landed in the following Monday-start week, corrupting the D10 week grouping this task depends on. `rotation.ts` now normalizes through `localDayKey()`, which routes anything carrying a time component through `new Date()` so `dateKey` takes its local-getters path. Caught because the rotation tests were written with local wall-clock times rather than UTC ones. **T5b/checks.ts is not affected** — verified that every `Check` write (`WeekStatus`, `DailyGtgStatus`, `CheckLog`) stores `dateKey(new Date())`, i.e. date-only.
+
+Design calls (each logged per "amend before you code"):
+- **Rotation is derived, never stored.** `routineRotation()` is a pure function of (routines, logs, today), so there is no schedule state to keep in sync, nothing to migrate, and nothing that can drift from the logs. It also means an imported backup immediately produces the right "up next" with no rebuild step.
+- **In-progress logs are excluded from "last completed"**, so an abandoned session cannot silently advance the rotation. The T4/T8 resume banner remains the only thing that surfaces an unfinished log.
+- **Up next is a suggestion, never a lock.** Both routines keep a one-tap Start (T8 AC1 preserved), both are always startable, and there is no rest-day, missed-day, or streak state anywhere — D15's no-guilt corollary, consistent with T5b's non-goal and training plan §7/§8, which both treat *stopping* as correct behavior under fatigue.
+- **`RoutineDetail.tsx` replaces T6's inline start block in `App.tsx`.** T6 kept that block inline only because its context manifest forbade new screen files; that constraint does not apply here, and the screen now needs real content (the exercise list). `App.tsx` keeps ownership of id-resolution and the not-found decision, so the screen stays presentational. `RoutineList.tsx` (the `#/routines` screen) is untouched.
+- **`ExerciseDetail` is reused verbatim in three places** (exercise list, routine preview, active session) as a conditional render over the current route rather than a navigation. Back therefore returns to wherever it was opened from, with no route state to manage — the same pattern T3 established for "back preserves the filter."
+- **`completed` is optional on `LoggedExercise`**, so pre-T9 logs and backup files read as not-completed with no migration. `DB_VERSION` and `BACKUP_SCHEMA_VERSION` are both unchanged, and a T9 backup restored into an older build simply loses the flag rather than failing to parse.
+- **The zero-set prune rule generalized rather than being weakened.** T4 AC6 dropped entries with no sets and no notes; the predicate is now `sets || notes || completed`, so genuinely untouched exercises still vanish from `entries` while an explicit "I did this" survives.
+
+---
+
 ## Execution notes
 
 - **Gates:** Gate 1 = PRD approved (now, by the owner). Gate 2 = decomposition approved after T0's spike report. Gate 3 = implementation reviewed against acceptance criteria after T8.
@@ -682,3 +744,20 @@ Two drivers. (1) Owner's scope decision: GtG applies to general movements — pu
 | T3 exercise count 19 → 20; T5b criteria and edge cases renamed | Consistency; no new surface. |
 
 **Net effect on scope:** no new tasks, no new components. One catalog entry, two renamed enum members, two flag flips.
+
+---
+
+**2026-07-24 — v1.3 → v1.4 — routine selection, preview, and per-exercise completion (T9 added).**
+
+Owner request: "add routines… an A and B routine swapped throughout the week; I should be able to select the routine I am supposed to do, see the list of exercises, select an exercise to see the details, and log the exercise as completed."
+
+Investigation before scoping found most of that already shipped (two seeded routines since T2, one-tap Start since T8, an ordered in-session exercise list since T4), and that the "possibly more routines depending on research" half needed no research: training plan §3 fixes four training days per week, of which two are strength routines and two are climbing days already covered by D9's check-offs. The real gaps were selection, preview, and completion.
+
+| Change | Why |
+|---|---|
+| D15 added: "which routine" is answered by rotation order, never by a calendar | Owner chose next-up rotation over a day-of-week schedule. Rotation needs no schedule state, cannot produce a "you're behind" state, and degrades correctly on a shifted or skipped week — which §3's "rest 2–3 days" and §4F's "lighter week regardless of the schedule" both invite. `Routine.dayOfWeek` stays `null` and unused; D2a is not reversed. |
+| D16 added: `LoggedExercise.completed`, independent of sets | T4 AC6 made "did it, logged no numbers" indistinguishable from "skipped it," and several plan items (warm-up progression, get-ups, wall press) have nothing numeric worth typing. Optional field → no schema bump, no migration. |
+| T9 added: rotation, routine preview screen, in-session full detail, per-exercise completion | The four gaps between the request and what already shipped. |
+| 8-week block / periodization tracking explicitly deferred | Owner decision. §4B's week 1–4 vs 5–8 PIMA variants and the week-7 deload stay in the exercise `prescription` text; tracking them needs a block start date and a post-week-8 policy that no decision covers yet. |
+
+**Net effect on scope:** one task, two decisions, one optional type field. No new routines, no catalog change, no storage or backup schema change, no new dependencies, and no reversal of D2a or D9.

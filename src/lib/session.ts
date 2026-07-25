@@ -20,8 +20,16 @@ export function getEntry(log: WorkoutLog, exerciseId: string): LoggedExercise | 
   return log.entries.find((e) => e.exerciseId === exerciseId);
 }
 
+// An entry is worth keeping if it carries any signal at all. T4 AC6 prunes
+// untouched exercises (no sets, no notes) so they never pollute a log; T9/D16
+// adds `completed` as a third kind of signal, so "I did this, nothing numeric
+// worth typing" survives while genuinely untouched exercises still vanish.
+function isMeaningful(entry: LoggedExercise): boolean {
+  return entry.sets.length > 0 || entry.notes.trim() !== '' || entry.completed === true;
+}
+
 // Applies fn to the entry for exerciseId, lazily creating it if absent, then
-// drops any entry left with neither sets nor notes (AC6: zero-set → omitted).
+// drops any entry left with no signal (see isMeaningful).
 function mapEntry(
   log: WorkoutLog,
   exerciseId: string,
@@ -33,7 +41,7 @@ function mapEntry(
   const kept = existing
     ? log.entries.map((e) => (e.exerciseId === exerciseId ? updated : e))
     : [...log.entries, updated];
-  return { ...log, entries: kept.filter((e) => e.sets.length > 0 || e.notes.trim() !== '') };
+  return { ...log, entries: kept.filter(isMeaningful) };
 }
 
 const BLANK_SET: SetEntry = { load: '', reps: '', rpe: null };
@@ -63,6 +71,21 @@ export function deleteSet(log: WorkoutLog, exerciseId: string, index: number): W
 
 export function setExerciseNotes(log: WorkoutLog, exerciseId: string, notes: string): WorkoutLog {
   return mapEntry(log, exerciseId, (e) => ({ ...e, notes }));
+}
+
+export function isExerciseCompleted(log: WorkoutLog, exerciseId: string): boolean {
+  return getEntry(log, exerciseId)?.completed === true;
+}
+
+// Explicit tap only — adding a set never implies completion (T9 non-goal), so
+// the two signals stay independent and a set can be logged mid-exercise without
+// claiming the exercise is finished.
+export function setExerciseCompleted(
+  log: WorkoutLog,
+  exerciseId: string,
+  completed: boolean,
+): WorkoutLog {
+  return mapEntry(log, exerciseId, (e) => ({ ...e, completed }));
 }
 
 export function setSessionNotes(log: WorkoutLog, sessionNotes: string): WorkoutLog {

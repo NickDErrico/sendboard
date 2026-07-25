@@ -51,6 +51,10 @@ export interface LoggedExercise {
   exerciseId: string;
   sets: SetEntry[];
   notes: string;
+  // D16: explicit "I did this" mark, independent of sets. Optional so logs and
+  // backup files written before T9 read as not-completed without a migration —
+  // this is why BACKUP_SCHEMA_VERSION and DB_VERSION are unchanged.
+  completed?: boolean;
 }
 
 export interface WorkoutLog {

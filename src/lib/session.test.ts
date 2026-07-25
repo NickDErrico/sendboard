@@ -5,7 +5,10 @@ import {
   deleteSet,
   finishLog,
   getSets,
+  isExerciseCompleted,
   isInProgress,
+  setExerciseCompleted,
+  setExerciseNotes,
   setSessionNotes,
   updateSet,
 } from './session';
@@ -73,6 +76,59 @@ describe('deleteSet + zero-set omission (AC6)', () => {
     const log = addSet(base(), 'pima-finger-pull-half-crimp');
     expect(log.entries).toHaveLength(1);
     expect(log.entries[0].exerciseId).toBe('pima-finger-pull-half-crimp');
+  });
+});
+
+describe('setExerciseCompleted (T9 AC7/AC8, D16)', () => {
+  it('persists a completed exercise that has no sets and no notes', () => {
+    const log = setExerciseCompleted(base(), 'kb-turkish-getup', true);
+    const entry = log.entries.find((e) => e.exerciseId === 'kb-turkish-getup');
+    expect(entry).toEqual({ exerciseId: 'kb-turkish-getup', sets: [], notes: '', completed: true });
+    expect(isExerciseCompleted(log, 'kb-turkish-getup')).toBe(true);
+  });
+
+  it('prunes the entry when un-completed with nothing else on it (AC8)', () => {
+    let log = setExerciseCompleted(base(), 'kb-turkish-getup', true);
+    log = setExerciseCompleted(log, 'kb-turkish-getup', false);
+    expect(log.entries).toEqual([]);
+    expect(isExerciseCompleted(log, 'kb-turkish-getup')).toBe(false);
+  });
+
+  it('keeps the entry when un-completed but sets remain', () => {
+    let log = setExerciseCompleted(base(), 'max-hang-half-crimp', true);
+    log = addSet(log, 'max-hang-half-crimp');
+    log = setExerciseCompleted(log, 'max-hang-half-crimp', false);
+    expect(getSets(log, 'max-hang-half-crimp')).toHaveLength(1);
+    expect(isExerciseCompleted(log, 'max-hang-half-crimp')).toBe(false);
+  });
+
+  it('survives on the completed flag alone after its last set is deleted (edge case)', () => {
+    let log = setExerciseCompleted(base(), 'oi-wall-press', true);
+    log = addSet(log, 'oi-wall-press');
+    log = deleteSet(log, 'oi-wall-press', 0);
+    expect(isExerciseCompleted(log, 'oi-wall-press')).toBe(true);
+    expect(getSets(log, 'oi-wall-press')).toEqual([]);
+  });
+
+  it('does not mark an exercise completed just because a set was added (non-goal)', () => {
+    const log = addSet(base(), 'pima-finger-pull-half-crimp');
+    expect(isExerciseCompleted(log, 'pima-finger-pull-half-crimp')).toBe(false);
+  });
+
+  it('preserves completion across other edits', () => {
+    let log = setExerciseCompleted(base(), 'external-rotations', true);
+    log = setExerciseNotes(log, 'external-rotations', 'band, blue');
+    log = addSet(log, 'external-rotations');
+    log = updateSet(log, 'external-rotations', 0, { reps: '15/side' });
+    expect(isExerciseCompleted(log, 'external-rotations')).toBe(true);
+  });
+
+  it('treats a pre-T9 entry with no completed field as not completed', () => {
+    // Shape written by an older build (or an older backup file).
+    const log = { ...base(), entries: [{ exerciseId: 'pushups-or-dips', sets: [], notes: 'ok' }] };
+    expect(isExerciseCompleted(log, 'pushups-or-dips')).toBe(false);
+    // …and it must not be pruned by the new predicate — its notes still count.
+    expect(setExerciseNotes(log, 'pushups-or-dips', 'ok').entries).toHaveLength(1);
   });
 });
 
