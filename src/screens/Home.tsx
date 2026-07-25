@@ -6,6 +6,7 @@ import { describeLastCompleted, routineRotation, type RoutineStatus } from '../l
 import { go } from '../lib/routes';
 import { WeekStatus } from '../components/WeekStatus';
 import { DailyGtgStatus } from '../components/DailyGtgStatus';
+import { BodyweightCard } from '../components/BodyweightCard';
 
 // "Day 1 — Fingerboard" → "Day 1", so the week line stays on one row at 390px.
 // Falls back to the full name if there is no em-dash to split on.
@@ -153,6 +154,10 @@ export function Home() {
 
       <WeekStatus />
       <DailyGtgStatus />
+      {/* T15: last, because it is the least time-sensitive thing on this screen —
+          a weigh-in has no day it belongs to (D24), unlike the week's climbing
+          balance or today's GtG. */}
+      <BodyweightCard />
     </div>
   );
 }

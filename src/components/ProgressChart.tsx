@@ -1,11 +1,12 @@
 import {
-  METRIC_CONFIG,
+  SERIES_CONFIG,
   timeFraction,
   valueFraction,
   type ProgressSegment,
   type ProgressSeries,
 } from '../lib/progress';
 import { isSafetySignal } from '../lib/setReason';
+import { MAX_STALENESS_DAYS } from '../lib/bodyweight';
 
 // Inline SVG, no charting dependency — the whole thing is a polyline, some
 // circles, and labels, and every prior task shipped without adding a package.
@@ -34,7 +35,7 @@ function shortDate(iso: string): string {
 }
 
 export function ProgressChart({ series }: { series: ProgressSeries }) {
-  const config = METRIC_CONFIG[series.metric];
+  const config = SERIES_CONFIG[series.kind];
 
   const x = (at: string) =>
     PAD.left + timeFraction(at, series.startAt, series.endAt) * PLOT_W;
@@ -115,10 +116,19 @@ export function ProgressChart({ series }: { series: ProgressSeries }) {
           a low point can be read as a tissue event instead of a strength result,
           and an unexplained symbol would do the opposite. Still no verdict: the
           caption names the fact and stops (D23). */}
-      {(flagged || config.lowerIsBetter) && (
+      {(flagged || config.lowerIsBetter || series.droppedForNoBodyweight > 0) && (
         <figcaption className="mt-1 space-y-0.5 text-center text-[10px] text-slate-500">
           {flagged && <span className="block">Ringed point — set ended on pain or form</span>}
           {config.lowerIsBetter && <span className="block">Axis inverted — a smaller edge sits higher</span>}
+          {/* AC5: said out loud, because a percentage view quietly missing
+              sessions reads as a complete record of a shorter block. */}
+          {series.droppedForNoBodyweight > 0 && (
+            <span className="block">
+              {series.droppedForNoBodyweight} session
+              {series.droppedForNoBodyweight === 1 ? '' : 's'} hidden — no bodyweight recorded
+              within {MAX_STALENESS_DAYS} days
+            </span>
+          )}
         </figcaption>
       )}
     </figure>

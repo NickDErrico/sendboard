@@ -36,6 +36,10 @@ function lastCompletedAt(logs: WorkoutLog[], routineId: string): string | null {
 /**
  * The local calendar day an input falls on, as a `yyyy-mm-dd` key.
  *
+ * Exported because every module that compares a stored date key against a
+ * `WorkoutLog` timestamp needs this exact conversion (T15's bodyweight matching
+ * is the second). Reimplementing it is how the bug below gets reintroduced.
+ *
  * This exists because rotation consumes two different shapes. A `Check.date` is
  * already a local date-only key, but `WorkoutLog.completedAt` is a full UTC
  * instant (`new Date().toISOString()`) — and `storage.dateKey` string-slices the
@@ -45,7 +49,7 @@ function lastCompletedAt(logs: WorkoutLog[], routineId: string): string | null {
  * Routing timestamps through `new Date()` first makes `dateKey` take its
  * local-getters path instead.
  */
-function localDayKey(input: string | Date): string {
+export function localDayKey(input: string | Date): string {
   if (typeof input === 'string' && input.includes('T')) return dateKey(new Date(input));
   return dateKey(input);
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   backupFilename,
   collectBackup,
@@ -8,7 +8,15 @@ import {
   triggerDownload,
   type BackupFile,
 } from '../lib/backup';
-import { getAllChecks, getAllLogs } from '../lib/storage';
+import {
+  deleteBodyweight,
+  getAllBodyweights,
+  getAllChecks,
+  getAllLogs,
+  saveBodyweight,
+} from '../lib/storage';
+import { parseBodyweight } from '../lib/bodyweight';
+import type { BodyweightEntry } from '../types';
 import { PERSISTENCE_COPY, checkPersistence, type PersistenceState } from '../lib/persistence';
 import { beepTest } from '../lib/beep';
 
@@ -17,7 +25,18 @@ import { beepTest } from '../lib/beep';
 // live in an external alarm/Todoist — see README.
 
 type Message = { kind: 'ok' | 'error'; text: string };
-type Pending = { data: BackupFile; currentLogs: number; currentChecks: number };
+type Pending = {
+  data: BackupFile;
+  currentLogs: number;
+  currentChecks: number;
+  /** Set when an older backup was read and upgraded (D28), so the owner is told. */
+  upgradedFrom?: number;
+};
+
+/** "3 sessions", "1 session" — used in every backup message. */
+function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
 
 export function Settings({
   onExit,
@@ -28,6 +47,9 @@ export function Settings({
 }) {
   const [message, setMessage] = useState<Message | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
+  // Bumped after an import so the bodyweight list re-reads instead of showing
+  // the data that was just replaced.
+  const [bwReloadKey, setBwReloadKey] = useState(0);
 
   async function handleExport() {
     try {
@@ -35,7 +57,7 @@ export function Settings({
       triggerDownload(backupFilename(backup.exportedAt), serializeBackup(backup));
       setMessage({
         kind: 'ok',
-        text: `Exported ${backup.logs.length} ${backup.logs.length === 1 ? 'session' : 'sessions'} and ${backup.checks.length} check-offs.`,
+        text: `Exported ${plural(backup.logs.length, 'session')}, ${backup.checks.length} check-offs, and ${plural(backup.bodyweight.length, 'bodyweight reading')}.`,
       });
     } catch {
       setMessage({ kind: 'error', text: 'Export failed. Nothing was changed.' });
@@ -64,22 +86,39 @@ export function Settings({
     }
 
     // Restore straight into an empty store (AC2); otherwise confirm the overwrite
-    // and name the counts first (AC4).
-    const [logs, checks] = await Promise.all([getAllLogs(), getAllChecks()]);
-    if (logs.length === 0 && checks.length === 0) {
-      await doImport(result.data);
+    // and name the counts first (AC4). Bodyweight counts here too (T15): an import
+    // clears it, so a store holding only readings must not be wiped unannounced.
+    const [logs, checks, bodyweight] = await Promise.all([
+      getAllLogs(),
+      getAllChecks(),
+      getAllBodyweights(),
+    ]);
+    if (logs.length === 0 && checks.length === 0 && bodyweight.length === 0) {
+      await doImport(result.data, result.upgradedFrom);
     } else {
-      setPending({ data: result.data, currentLogs: logs.length, currentChecks: checks.length });
+      setPending({
+        data: result.data,
+        currentLogs: logs.length,
+        currentChecks: checks.length,
+        upgradedFrom: result.upgradedFrom,
+      });
     }
   }
 
-  async function doImport(data: BackupFile) {
+  async function doImport(data: BackupFile, upgradedFrom?: number) {
     try {
       await importBackup(data);
       setPending(null);
+      setBwReloadKey((k) => k + 1); // the list below is now showing the old data
       setMessage({
         kind: 'ok',
-        text: `Restored ${data.logs.length} ${data.logs.length === 1 ? 'session' : 'sessions'} and ${data.checks.length} check-offs.`,
+        text:
+          `Restored ${plural(data.logs.length, 'session')}, ${data.checks.length} check-offs, and ${plural(data.bodyweight.length, 'bodyweight reading')}.` +
+          // D28: an upgrade is stated, never silent — the owner should know why a
+          // restored file came back with no bodyweight in it.
+          (upgradedFrom === undefined
+            ? ''
+            : ` That file was written by an older version (v${upgradedFrom}), which recorded no bodyweight.`),
       });
     } catch {
       setMessage({ kind: 'error', text: 'Import failed. Your data was not changed.' });
@@ -130,6 +169,8 @@ export function Settings({
           <span className="text-slate-500">→</span>
         </button>
 
+        <BodyweightLog reloadKey={bwReloadKey} />
+
         <section className="space-y-3 rounded-xl border border-slate-700 bg-brand-surface p-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Data backup</h2>
           <p className="text-sm text-slate-400">
@@ -157,11 +198,11 @@ export function Settings({
           {pending && (
             <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
               <p className="text-sm text-amber-100">
-                This will replace your current {pending.currentLogs}{' '}
-                {pending.currentLogs === 1 ? 'session' : 'sessions'} and {pending.currentChecks}{' '}
-                check-offs with {pending.data.logs.length}{' '}
-                {pending.data.logs.length === 1 ? 'session' : 'sessions'} and{' '}
-                {pending.data.checks.length} check-offs from the file. This can’t be undone.
+                This will replace your current {plural(pending.currentLogs, 'session')} and{' '}
+                {pending.currentChecks} check-offs with {plural(pending.data.logs.length, 'session')}{' '}
+                and {pending.data.checks.length} check-offs from the file. Bodyweight readings are
+                replaced too ({plural(pending.data.bodyweight.length, 'reading')} in the file). This
+                can’t be undone.
               </p>
               <div className="mt-3 flex gap-2">
                 <button
@@ -171,7 +212,7 @@ export function Settings({
                   Cancel
                 </button>
                 <button
-                  onClick={() => void doImport(pending.data)}
+                  onClick={() => void doImport(pending.data, pending.upgradedFrom)}
                   className="flex-1 rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-200"
                 >
                   Replace all
@@ -219,6 +260,89 @@ export function Settings({
 // T13 AC1/AC3: replaces T0's temporary write-a-timestamp probe, which could not
 // survive the owner's update workflow anyway (deleting the app deleted the
 // probe). This reports the browser's actual answer instead of inferring it.
+/**
+ * The recorded bodyweights, correctable in place (T15 AC9).
+ *
+ * This exists because the value is a *denominator*: a fat-fingered 187 for 178
+ * silently shifts every %BW figure computed from it, and unlike a mistyped set it
+ * is not visible anywhere near where the error shows up. Editing writes back to
+ * the same date key, so a correction replaces rather than adds (D24).
+ *
+ * Reports, never comments: no trend, no goal, no delta between readings (D23).
+ */
+function BodyweightLog({ reloadKey }: { reloadKey: number }) {
+  const [entries, setEntries] = useState<BodyweightEntry[] | null>(null);
+
+  const refresh = useCallback(async () => {
+    const all = await getAllBodyweights();
+    setEntries([...all].reverse()); // newest first, like History
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh, reloadKey]);
+
+  async function correct(date: string, raw: string) {
+    const lb = parseBodyweight(raw);
+    // A blank or nonsense edit leaves the stored value alone — silently dropping
+    // a denominator would be worse than ignoring a typo.
+    if (lb === null) {
+      await refresh();
+      return;
+    }
+    await saveBodyweight({ date, lb });
+    await refresh();
+  }
+
+  async function remove(date: string) {
+    if (!window.confirm(`Delete the bodyweight recorded on ${date}?`)) return;
+    await deleteBodyweight(date);
+    await refresh();
+  }
+
+  return (
+    <section className="space-y-2 rounded-xl border border-slate-700 bg-brand-surface p-4">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Bodyweight</h2>
+      {entries === null ? (
+        <p className="text-xs text-slate-500">Loading…</p>
+      ) : entries.length === 0 ? (
+        <p className="text-sm text-slate-400">
+          None recorded. Add one from the home screen — added-load figures are only comparable
+          against a known bodyweight (§4E).
+        </p>
+      ) : (
+        <>
+          <p className="text-xs text-slate-500">
+            Correct a mistyped reading here. Every %BW figure is divided by it.
+          </p>
+          <ul className="space-y-1.5">
+            {entries.map((entry) => (
+              <li key={entry.date} className="flex items-center gap-2">
+                <span className="flex-1 font-mono text-xs text-slate-400">{entry.date}</span>
+                <input
+                  defaultValue={String(entry.lb)}
+                  onBlur={(e) => void correct(entry.date, e.target.value)}
+                  inputMode="decimal"
+                  aria-label={`Bodyweight on ${entry.date}, pounds`}
+                  className="w-20 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-right text-sm text-slate-100 focus:border-brand-accent focus:outline-none"
+                />
+                <span className="text-xs text-slate-500">lb</span>
+                <button
+                  onClick={() => void remove(entry.date)}
+                  aria-label={`Delete bodyweight recorded on ${entry.date}`}
+                  className="rounded-md px-2 py-1 text-slate-500 hover:text-red-400"
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
+
 function PersistenceStatus() {
   const [state, setState] = useState<PersistenceState | null>(null);
 

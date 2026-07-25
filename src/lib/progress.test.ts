@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { LoggedExercise, SetEntry, WorkoutLog } from '../types';
 import {
   METRIC_CONFIG,
+  SERIES_CONFIG,
   buildSeries,
   isSegmentedBy,
   timeFraction,
@@ -249,5 +250,77 @@ describe('end reason travels with the point', () => {
     const series = buildSeries([log('a', '2026-06-02T18:00', sets)], EX, 'holdSec', true)!;
     expect(series.max).toBe(9);
     expect(point(series).endReason).toBeNull();
+  });
+});
+
+// ─── % of bodyweight (T15 AC3, AC4, AC5) ─────────────────────────────────────
+
+describe('addedPctBw series', () => {
+  const bw = (date: string, lb: number) => ({ date, lb });
+  const loadLog = (id: string, when: string, addedLb: number, edgeMm?: number) =>
+    log(id, when, [set(edgeMm === undefined ? { addedLb } : { addedLb, edgeMm })]);
+
+  it('divides each session by the bodyweight that applied to it', () => {
+    const logs = [loadLog('a', '2026-07-16T18:00', 35), loadLog('b', '2026-07-23T18:00', 35)];
+    // Same added load, lighter climber: a higher share of bodyweight.
+    const series = buildSeries(logs, EX, 'addedPctBw', false, [
+      bw('2026-07-15', 180),
+      bw('2026-07-22', 170),
+    ])!;
+    expect(values(series)).toEqual([19.4, 20.6]);
+    expect(series.kind).toBe('addedPctBw');
+  });
+
+  it('omits a session with no bodyweight in range, and counts what it dropped', () => {
+    const logs = [
+      loadLog('old', '2026-05-01T18:00', 35),
+      loadLog('recent', '2026-07-16T18:00', 35),
+    ];
+    const series = buildSeries(logs, EX, 'addedPctBw', false, [bw('2026-07-15', 180)])!;
+    expect(series.pointCount).toBe(1);
+    expect(series.droppedForNoBodyweight).toBe(1);
+  });
+
+  it('is null when no session can be converted at all', () => {
+    const logs = [loadLog('a', '2026-07-16T18:00', 35)];
+    expect(buildSeries(logs, EX, 'addedPctBw', false, [])).toBeNull();
+  });
+
+  it('reports nothing dropped on a plain measurement series', () => {
+    const series = buildSeries([loadLog('a', '2026-07-16T18:00', 35)], EX, 'addedLb', false)!;
+    expect(series.droppedForNoBodyweight).toBe(0);
+  });
+
+  it('still breaks the series at every edge change (D22)', () => {
+    const logs = [
+      loadLog('a', '2026-07-16T18:00', 35, 20),
+      loadLog('b', '2026-07-17T18:00', 35, 18),
+    ];
+    const series = buildSeries(logs, EX, 'addedPctBw', true, [bw('2026-07-15', 180)])!;
+    expect(edges(series)).toEqual([20, 18]);
+  });
+
+  it('segments only the surviving points when a dropped session sat between them', () => {
+    const logs = [
+      loadLog('a', '2026-07-16T18:00', 35, 20),
+      loadLog('gap', '2026-06-01T18:00', 35, 18),
+      loadLog('c', '2026-07-17T18:00', 40, 20),
+    ];
+    const series = buildSeries(logs, EX, 'addedPctBw', true, [bw('2026-07-15', 180)])!;
+    // The 18mm session is out of range and gone, so the two 20mm sessions are one
+    // contiguous run — and getting there must not throw.
+    expect(edges(series)).toEqual([20]);
+    expect(counts(series)).toEqual([2]);
+    expect(series.droppedForNoBodyweight).toBe(1);
+  });
+
+  it('is segmented by the same rule as the pounds it came from', () => {
+    expect(isSegmentedBy('addedPctBw', ['holdSec', 'addedLb', 'edgeMm'])).toBe(true);
+    expect(isSegmentedBy('addedPctBw', ['holdSec', 'addedLb'])).toBe(false);
+  });
+
+  it('formats as a percentage, with bodyweight-only reading BW', () => {
+    expect(SERIES_CONFIG.addedPctBw.format(19.9)).toBe('+19.9%');
+    expect(SERIES_CONFIG.addedPctBw.format(0)).toBe('BW');
   });
 });

@@ -101,6 +101,19 @@ export interface WorkoutLog {
   sessionNotes: string;
 }
 
+/**
+ * A bodyweight reading (D24). Keyed by local calendar day, which is what gives
+ * "at most one per day" for free — a second reading the same day replaces the
+ * first instead of accumulating, with no dedupe logic anywhere.
+ *
+ * Pounds (D21). This is a *condition* the added-load numbers are measured under,
+ * like edge size (D22), not a metric the app charts or has an opinion about.
+ */
+export interface BodyweightEntry {
+  date: string; // ISO 8601 local date key, yyyy-mm-dd — also the primary key
+  lb: number;
+}
+
 export type CheckKind = 'climbing-volume' | 'climbing-limit' | 'gtg-general' | 'gtg-pull';
 export type CheckScope = 'weekly' | 'daily'; // climbing-* are weekly; gtg-* are daily
 

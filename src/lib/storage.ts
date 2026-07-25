@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { Check, Exercise, Routine, Settings, WorkoutLog } from '../types';
+import type { BodyweightEntry, Check, Exercise, Routine, Settings, WorkoutLog } from '../types';
 import { EXERCISES } from '../data/exercises';
 import { ROUTINES } from '../data/routines';
 
@@ -13,7 +13,9 @@ export class StorageError extends Error {
   }
 }
 
-export const DB_VERSION = 1;
+// v2 (T15) adds the `bodyweight` store. Bumped rather than versionless because
+// IndexedDB creates object stores only inside an upgrade transaction.
+export const DB_VERSION = 2;
 const DB_NAME = 'sendboard';
 const SETTINGS_KEY = 'app';
 const DEFAULT_SETTINGS: Settings = { installGuideDismissed: false };
@@ -22,6 +24,10 @@ interface SendboardDB extends DBSchema {
   logs: { key: string; value: WorkoutLog; indexes: { 'by-startedAt': string } };
   checks: { key: string; value: Check };
   settings: { key: string; value: Settings };
+  // Keyed by its own `date` field, so a second reading on the same local day
+  // overwrites the first (D24's "at most one per day", enforced by the keyPath
+  // rather than by a check the UI could forget to make).
+  bodyweight: { key: string; value: BodyweightEntry };
 }
 
 // The exercise catalog and routines are code-seeded constants (D6): editing the
@@ -40,13 +46,19 @@ function getDb(): Promise<IDBPDatabase<SendboardDB>> {
   if (!dbPromise) {
     dbPromise = openDB<SendboardDB>(DB_NAME, DB_VERSION, {
       upgrade(db, oldVersion) {
-        // v1 initial schema. Future versions branch on oldVersion to migrate;
-        // this switch is the upgrade-path stub the spec asks for.
+        // Each branch is additive and guarded by oldVersion, so a database at any
+        // earlier version arrives at the current schema with its data intact —
+        // the owner's 8-week log must survive a feature, not just a deploy (T13).
         if (oldVersion < 1) {
           const logs = db.createObjectStore('logs', { keyPath: 'id' });
           logs.createIndex('by-startedAt', 'startedAt');
           db.createObjectStore('checks', { keyPath: 'id' });
           db.createObjectStore('settings');
+        }
+        if (oldVersion < 2) {
+          // T15. Nothing to backfill: no bodyweight was recorded before it
+          // existed, and inventing one would fabricate a denominator (D24).
+          db.createObjectStore('bodyweight', { keyPath: 'date' });
         }
       },
     }).catch((err: unknown) => {
@@ -110,22 +122,44 @@ export async function saveSettings(settings: Settings): Promise<void> {
   await withDb((db) => db.put('settings', settings, SETTINGS_KEY));
 }
 
+// ─── Bodyweight (T15) ────────────────────────────────────────────────────────
+// One reading per local day (D24): `put` against the date keyPath is an upsert,
+// so correcting today's number is the same operation as recording it.
+export async function saveBodyweight(entry: BodyweightEntry): Promise<void> {
+  await withDb((db) => db.put('bodyweight', entry));
+}
+export async function deleteBodyweight(date: string): Promise<void> {
+  await withDb((db) => db.delete('bodyweight', date));
+}
+/** Every reading, oldest first — the order `bodyweight.ts` resolves against. */
+export async function getAllBodyweights(): Promise<BodyweightEntry[]> {
+  return withDb(async (db) => {
+    const all = await db.getAll('bodyweight');
+    return all.sort((a, b) => a.date.localeCompare(b.date));
+  });
+}
+
 // ─── Bulk replace (backup import, T7) ────────────────────────────────────────
-// Atomically clears logs, checks, and settings, then writes the supplied data in
-// a single transaction — so a mid-write failure cannot leave a half-imported
+// Atomically clears every user-data store, then writes the supplied data in a
+// single transaction — so a mid-write failure cannot leave a half-imported
 // store. Callers validate the payload (see lib/backup.ts) before calling this.
 export async function replaceAll(data: {
   logs: WorkoutLog[];
   checks: Check[];
   settings: Settings;
+  bodyweight: BodyweightEntry[];
 }): Promise<void> {
   await withDb(async (db) => {
-    const tx = db.transaction(['logs', 'checks', 'settings'], 'readwrite');
+    const tx = db.transaction(['logs', 'checks', 'settings', 'bodyweight'], 'readwrite');
     await tx.objectStore('logs').clear();
     await tx.objectStore('checks').clear();
     await tx.objectStore('settings').clear();
+    // Cleared even when the payload has none, so importing a pre-T15 backup
+    // leaves no stale readings behind to be silently divided by (D28).
+    await tx.objectStore('bodyweight').clear();
     for (const log of data.logs) await tx.objectStore('logs').put(log);
     for (const check of data.checks) await tx.objectStore('checks').put(check);
+    for (const entry of data.bodyweight) await tx.objectStore('bodyweight').put(entry);
     await tx.objectStore('settings').put(data.settings, SETTINGS_KEY);
     await tx.done;
   });

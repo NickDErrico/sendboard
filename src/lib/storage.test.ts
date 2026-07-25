@@ -164,3 +164,107 @@ describe('error handling (AC6)', () => {
     }
   });
 });
+
+// ─── Bodyweight store (T15 AC1, AC8) ─────────────────────────────────────────
+
+describe('bodyweight', () => {
+  it('stores one reading per local day, replacing rather than accumulating', async () => {
+    await storage.saveBodyweight({ date: '2026-07-20', lb: 176 });
+    await storage.saveBodyweight({ date: '2026-07-20', lb: 177.5 });
+    expect(await storage.getAllBodyweights()).toEqual([{ date: '2026-07-20', lb: 177.5 }]);
+  });
+
+  it('returns readings oldest first', async () => {
+    await storage.saveBodyweight({ date: '2026-07-20', lb: 176 });
+    await storage.saveBodyweight({ date: '2026-07-01', lb: 180 });
+    await storage.saveBodyweight({ date: '2026-07-13', lb: 178 });
+    expect((await storage.getAllBodyweights()).map((e) => e.date)).toEqual([
+      '2026-07-01',
+      '2026-07-13',
+      '2026-07-20',
+    ]);
+  });
+
+  it('deletes by date', async () => {
+    await storage.saveBodyweight({ date: '2026-07-20', lb: 176 });
+    await storage.deleteBodyweight('2026-07-20');
+    expect(await storage.getAllBodyweights()).toEqual([]);
+  });
+
+  it('reads as empty before anything is recorded', async () => {
+    expect(await storage.getAllBodyweights()).toEqual([]);
+  });
+});
+
+describe('v1 → v2 upgrade (T15 AC8)', () => {
+  // The owner's whole 8-week log has to survive a feature, not just a deploy
+  // (T13's finding). This builds the database exactly as T14 and earlier left it
+  // — v1, three stores, real data — and then opens it through the app's own
+  // storage module, which requests v2.
+  async function buildV1Database(): Promise<void> {
+    await storage._resetForTests();
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const req = indexedDB.open('sendboard', 1);
+      req.onupgradeneeded = () => {
+        const d = req.result;
+        const logs = d.createObjectStore('logs', { keyPath: 'id' });
+        logs.createIndex('by-startedAt', 'startedAt');
+        d.createObjectStore('checks', { keyPath: 'id' });
+        d.createObjectStore('settings');
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(['logs', 'checks', 'settings'], 'readwrite');
+      tx.objectStore('logs').put({
+        id: 'pre-upgrade',
+        routineId: 'day-1-fingerboard',
+        startedAt: '2026-07-18T18:00:00.000Z',
+        completedAt: '2026-07-18T19:00:00.000Z',
+        entries: [
+          {
+            exerciseId: 'max-hang-half-crimp',
+            notes: '',
+            completed: true,
+            sets: [{ load: '', reps: '', rpe: null, holdSec: 8, addedLb: 30, edgeMm: 20 }],
+          },
+        ],
+        sessionNotes: 'written by a v1 database',
+      });
+      tx.objectStore('checks').put({
+        id: 'c-old',
+        kind: 'climbing-volume',
+        date: '2026-07-18',
+        notes: '',
+      });
+      tx.objectStore('settings').put({ installGuideDismissed: true }, 'app');
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  }
+
+  it('keeps every pre-existing record and adds the new store', async () => {
+    await buildV1Database();
+
+    // First read through the app's module triggers the upgrade to DB_VERSION.
+    const logs = await storage.getAllLogs();
+    expect(logs.map((l) => l.id)).toEqual(['pre-upgrade']);
+    expect(logs[0].entries[0].sets[0].addedLb).toBe(30);
+    expect(await storage.getAllChecks()).toHaveLength(1);
+    expect(await storage.getSettings()).toEqual({ installGuideDismissed: true });
+
+    // The v2 store exists and is empty — nothing is backfilled, because no
+    // bodyweight was recorded before it existed (D24).
+    expect(await storage.getAllBodyweights()).toEqual([]);
+  });
+
+  it('accepts writes to the new store immediately after upgrading', async () => {
+    await buildV1Database();
+    await storage.saveBodyweight({ date: '2026-07-20', lb: 176 });
+    expect(await storage.getAllBodyweights()).toEqual([{ date: '2026-07-20', lb: 176 }]);
+    // And the upgraded log is still there alongside it.
+    expect(await storage.getAllLogs()).toHaveLength(1);
+  });
+});

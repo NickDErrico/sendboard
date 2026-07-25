@@ -1,4 +1,11 @@
-import type { ProgressMetric, SetEndReason, SetEntry, WorkoutLog } from '../types';
+import type {
+  BodyweightEntry,
+  ProgressMetric,
+  SetEndReason,
+  SetEntry,
+  WorkoutLog,
+} from '../types';
+import { pctOfBodyweight } from './bodyweight';
 
 // Progress series for the three exercises the training plan actually progresses
 // (D20). Pure — a function of (logs, exerciseId, metric) — like timer.ts,
@@ -10,6 +17,18 @@ import type { ProgressMetric, SetEndReason, SetEntry, WorkoutLog } from '../type
 // interpretation rubric is the owner's to apply, and a cheerful arrow drawn on a
 // declining line would invert the plan's own safety guidance (§7 treats a
 // downward trend as a signal to deload, not to try harder).
+
+/**
+ * What a chart can plot: a stored measurement, or added load re-expressed as a
+ * share of bodyweight (T15).
+ *
+ * `addedPctBw` is deliberately *not* a `ProgressMetric`, because that type indexes
+ * `SetEntry` — a percentage is never stored, it is computed from `addedLb` and a
+ * bodyweight recorded elsewhere (D24), and storing it would be the same number
+ * twice with two ways to disagree. Keeping the types separate means the reading
+ * path can only ever read real fields.
+ */
+export type SeriesKind = ProgressMetric | 'addedPctBw';
 
 export interface MetricConfig {
   label: string; // toggle text
@@ -41,6 +60,23 @@ export const METRIC_CONFIG: Record<ProgressMetric, MetricConfig> = {
   },
 };
 
+/**
+ * Config for everything a chart can plot, including the derived percentage.
+ *
+ * §4E's headline is a *percentage* improvement in max hang load, and it records
+ * bodyweight in the same row for exactly this reason: added pounds and share of
+ * bodyweight are different questions, and the second is the climbing-relevant one.
+ */
+export const SERIES_CONFIG: Record<SeriesKind, MetricConfig> = {
+  ...METRIC_CONFIG,
+  addedPctBw: {
+    label: '%BW',
+    unit: '%',
+    lowerIsBetter: false,
+    format: (v) => (v === 0 ? 'BW' : `+${round1(v)}%`),
+  },
+};
+
 function round1(v: number): number {
   return Math.round(v * 10) / 10;
 }
@@ -64,13 +100,20 @@ export interface ProgressSegment {
 }
 
 export interface ProgressSeries {
-  metric: ProgressMetric;
+  kind: SeriesKind;
   segments: ProgressSegment[];
   pointCount: number;
   min: number;
   max: number;
   startAt: string;
   endAt: string;
+  /**
+   * Sessions that had the underlying measurement but no bodyweight in range, so
+   * they are absent from a `addedPctBw` series (AC5). Surfaced rather than
+   * swallowed: a chart quietly missing three of eight points is a chart that
+   * misleads, and the fix ("record a bodyweight") is the owner's to make.
+   */
+  droppedForNoBodyweight: number;
 }
 
 function readMetric(set: SetEntry, metric: ProgressMetric): number | undefined {
@@ -150,35 +193,61 @@ function segmentByEdge(points: ProgressPoint[]): ProgressSegment[] {
  * `segmented` is false when charting `edgeMm` itself: there the edge is the
  * subject rather than the condition, so cutting the line at every change would
  * leave a chart made entirely of single points.
+ *
+ * For `addedPctBw` the stored `addedLb` is read and then divided by the bodyweight
+ * that applied to that session (D24). A session with no bodyweight in range is
+ * dropped and counted, never estimated — the conversion is monotonic within a
+ * session (one bodyweight, all sets), so the heaviest set is still the best one
+ * and the best-set rule above needs no special case.
  */
 export function buildSeries(
   logs: WorkoutLog[],
   exerciseId: string,
-  metric: ProgressMetric,
+  kind: SeriesKind,
   segmented: boolean,
+  bodyweights: BodyweightEntry[] = [],
 ): ProgressSeries | null {
-  const points = logs
-    .map((log) => sessionValue(log, exerciseId, metric))
+  const readAs: ProgressMetric = kind === 'addedPctBw' ? 'addedLb' : kind;
+  const measured = logs
+    .map((log) => sessionValue(log, exerciseId, readAs))
     .filter((p): p is ProgressPoint => p !== null)
     .sort((a, b) => a.at.localeCompare(b.at));
+
+  let droppedForNoBodyweight = 0;
+  const points: ProgressPoint[] = [];
+  for (const point of measured) {
+    if (kind !== 'addedPctBw') {
+      points.push(point);
+      continue;
+    }
+    const pct = pctOfBodyweight(point.value, bodyweights, point.at);
+    if (pct === null) droppedForNoBodyweight += 1;
+    else points.push({ ...point, value: pct });
+  }
 
   if (points.length === 0) return null;
 
   const values = points.map((p) => p.value);
   return {
-    metric,
+    kind,
     segments: segmented ? segmentByEdge(points) : [{ edgeMm: null, points }],
     pointCount: points.length,
     min: Math.min(...values),
     max: Math.max(...values),
     startAt: points[0].at,
     endAt: points[points.length - 1].at,
+    droppedForNoBodyweight,
   };
 }
 
-/** True when a metric's chart is cut by edge (D22): everything except edge itself. */
-export function isSegmentedBy(metric: ProgressMetric, declared: ProgressMetric[]): boolean {
-  return metric !== 'edgeMm' && declared.includes('edgeMm');
+/**
+ * True when a series is cut by edge (D22): everything except edge itself.
+ *
+ * A percentage is cut exactly like the pounds it came from — changing the unit on
+ * the y-axis does not make two different edges comparable.
+ */
+export function isSegmentedBy(kind: SeriesKind, declared: ProgressMetric[]): boolean {
+  return kind !== 'edgeMm' && declared.includes('edgeMm');
 }
 
 /**
@@ -208,5 +277,5 @@ export function valueFraction(value: number, series: ProgressSeries): number {
   const range = series.max - series.min;
   if (range <= 0) return 0.5;
   const raw = (value - series.min) / range;
-  return METRIC_CONFIG[series.metric].lowerIsBetter ? 1 - raw : raw;
+  return SERIES_CONFIG[series.kind].lowerIsBetter ? 1 - raw : raw;
 }

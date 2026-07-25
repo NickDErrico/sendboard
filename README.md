@@ -10,13 +10,14 @@ The full build specification and its decision log live in
 
 ## Status
 
-Feature-complete (T1–T14): data layer, exercise browsing, session logging, history,
+Feature-complete (T1–T15): data layer, exercise browsing, session logging, history,
 climbing/GtG check-offs, settings with JSON backup export/import, hash routing, a
 home + tab-bar navigation shell, install onboarding, routine rotation with preview and
 per-exercise completion, an in-session hold + rest timer, last-time carry-forward,
-per-exercise progress charts, and one-tap capture of why a hold ended.
+per-exercise progress charts, one-tap capture of why a hold ended, and bodyweight with
+a % of bodyweight view.
 
-T15–T28 are a prioritized backlog in the spec — capture before comfort, because the
+T16–T28 are a prioritized backlog in the spec — capture before comfort, because the
 8-week block has not started and a missing measurement cannot be backfilled.
 
 Remaining is the on-device acceptance pass: export/import on iOS Safari (T7), the T8
@@ -33,6 +34,10 @@ isn't necessary: the service worker updates itself (`registerType: 'autoUpdate'`
 Close Sendboard and reopen it twice, then check the **Build** timestamp at the top of
 Settings — that's how you confirm an update landed. It changes with every deploy, which
 `v0.1.0` never did.
+
+A backup exported by an **older** version still imports — it's read as simply not having
+the newer data, and the app tells you which version it upgraded from. A backup from a
+*newer* version is refused rather than partially restored.
 
 Settings also reports whether the browser granted **persistent storage**, which asks it
 not to evict your log under storage pressure. That's a request, not a guarantee, and it
@@ -81,9 +86,21 @@ A point drawn with a **red ring** is a set that ended on pain or a form breakdow
 see below. It is marked, never excluded: dropping the low points would erase the only
 thing that makes a declining line visible.
 
-Note that bodyweight isn't tracked yet, so an added-load line only compares cleanly
-against a stable bodyweight — §4E records both together for that reason. That's the
-next task in the backlog.
+## Bodyweight, and the %BW view
+
+§4E records edge, added weight and **bodyweight** as one row, because added load
+without bodyweight is half a measurement: `+35lb` at 175 and at 182 are different
+performances. Record it from the home screen whenever you happen to weigh yourself —
+one number, at most one per day, no reminder and no target.
+
+The two max hangs and the lock-off then offer a **%BW** view beside **Load**. A session
+is converted using the most recent bodyweight recorded *on or before* it, within 14
+days. Outside that window the session is **left out of the percentage view and the
+chart says how many it hid** — a made-up denominator would be a wrong number that looks
+right. A later weigh-in never applies backwards to an earlier session.
+
+Settings lists every reading so a mistyped one can be corrected, which matters more
+than it looks: every percentage is divided by it.
 
 ## Why a hold ended
 
