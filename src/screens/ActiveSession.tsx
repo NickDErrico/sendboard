@@ -45,6 +45,7 @@ import {
 } from '../lib/timer';
 import { reasonApplies, reasonsFor } from '../lib/setReason';
 import { gearOf, type Gear } from '../lib/gear';
+import { chainPosition, formatChain, setSpecOf } from '../lib/chain';
 import { primeAudio } from '../lib/beep';
 import { useWakeLock } from '../lib/wakeLock';
 import { SetLogger } from '../components/SetLogger';
@@ -224,16 +225,42 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   // The timer belongs to the session, not to a card, so it renders over the
   // exercise detail view too — reading the cues is exactly what the owner does
   // during a 3 minute rest, and the countdown must not vanish to allow it.
+  /**
+   * "set 3 of 5" for an exercise, or null where the plan declares no count.
+   *
+   * A report over the logged sets, never a stored counter — which is what makes
+   * it move back when a set is deleted (AC8) and what stops it claiming a set
+   * that no record contains (D16).
+   */
+  function chainLabelFor(exerciseId: string): string | null {
+    const spec = setSpecOf(exercisesById.get(exerciseId));
+    if (spec === null) return null;
+    return formatChain(chainPosition(getSets(log as WorkoutLog, exerciseId).length, spec));
+  }
+
   const timerExercise = timer.exerciseId ? exercisesById.get(timer.exerciseId) : undefined;
+  // T19: one value serves both views, because "the set that is next to be logged"
+  // *is* the set being held while a hold runs, and the one after a rest. It moves
+  // only when a set is recorded — so a hold that was performed and not logged
+  // leaves it where it was, and the Log button that fixes that is on this bar.
+  const timerChainLabel = timer.exerciseId
+    ? chainLabelFor(timer.exerciseId)
+    : null;
   const timerBar = isTimerVisible(timer) ? (
     <SessionTimer
       state={timer}
       exerciseName={timerExercise?.name ?? timer.exerciseId ?? ''}
       hold={holdSpecOf(timerExercise)}
+      chainLabel={timerChainLabel}
       onStop={handleStop}
       onSkip={() => setTimer(clearTimer())}
       onExtend={(seconds) => setTimer((t) => extendRest(t, seconds))}
       onLogHeld={handleLogHeld}
+      onStartNext={
+        timer.exerciseId && holdSpecOf(timerExercise)
+          ? () => beginHold(timer.exerciseId as string)
+          : undefined
+      }
     />
   ) : null;
 
@@ -273,6 +300,7 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
           const holdSpec = holdSpecOf(exercise);
           const restMs = restMsOf(exercise);
           const isTiming = timer.exerciseId === exId && timer.phase !== 'idle';
+          const chainLabel = chainLabelFor(exId);
           return (
             <section
               key={exId}
@@ -337,7 +365,9 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
                   disabled={isTiming}
                   className="mt-2 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-semibold text-slate-200 disabled:opacity-40"
                 >
-                  {isTiming ? 'Timing…' : `▶ Start hold · ${formatHoldTarget(holdSpec)}`}
+                  {isTiming
+                    ? 'Timing…'
+                    : `▶ Start ${chainLabel ?? 'hold'} · ${formatHoldTarget(holdSpec)}`}
                 </button>
               ) : (
                 restMs !== null && (
@@ -357,6 +387,7 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
                 askEndReason={reasonApplies(exercise)}
                 endReasons={reasonsFor(exercise)}
                 gear={gear}
+                nextSetLabel={chainLabel}
                 onAdd={() =>
                   mutate((l) =>
                     addSet(l, exId, seedForNextSet(getSets(l, exId), last, edgeSeedFor(exId))),

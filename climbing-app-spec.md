@@ -1255,6 +1255,88 @@ Design calls:
 
 ---
 
+### [T19] Outcome: The owner always knows which set they are on against what the plan asked for, and finishing a rest offers the next set without scrolling back to the card.
+Spec: this file | Status: [x] | Depends on: T18 | Wave 1
+
+#### Context manifest
+Create: `src/lib/chain.ts` (+ `chain.test.ts`) | Modify: `src/types.ts`, `src/data/exercises.ts`, `src/components/SessionTimer.tsx`, `src/screens/ActiveSession.tsx` | Conform to: D16, D17, D19, D23 | Delete: nothing
+
+**The gap this closes.** A Day 1 session is 5 sets × (7–10s hang + 3 min rest) per grip, and the set count lives only in `prescription` prose — so mid-session the owner answers "which set am I on?" by counting logged rows on a phone on the floor, and answers "how many left?" by re-reading a sentence. Worse, the timer bar covers the card: when a 3 minute rest ends, the next hold is one scroll and one tap away rather than just one tap, and the thing that ends up skipped is the *rest*, not the scroll.
+
+**No new decision is needed, and that is worth stating.** The set count is a typed catalog field beside the prose for exactly D17's reason (`4–6 sets` and a weeks-1–4 variant of `5 sets` live in one PIMA string, and a regex over that picks a number by luck). The counter reports position and never grades, per D23. Rows still appear only when logged, per D16/D19 — the app does not pre-create five blank sets, because a blank row is a claim that a set exists.
+
+**The counter counts logged sets, never attempts.** That is the rule that keeps it honest: if a hold is stopped and not logged, the position does not advance, and the "Log 7.4s as a set" button that would advance it is already on screen. The alternative — counting holds performed — would let the app believe in a set that no record contains, which is the one thing D16 was added to prevent.
+
+#### Catalog additions — one optional field, populated only where the plan states a count
+
+```ts
+interface Exercise {
+  // …
+  prescribedSets?: [min: number, max: number];   // min === max for a fixed count
+}
+```
+
+| Exercise | `prescribedSets` | Source |
+|---|---|---|
+| `pima-finger-pull-half-crimp`, `pima-finger-pull-open-hand` | `[4, 6]` | §4B "4–6 sets" (the weeks 1–4 variant's 5 sets falls inside it) |
+| `max-hang-half-crimp`, `max-hang-open-hand` | `[5, 5]` | §4C "Sets: 5" |
+| `oi-bar-pull-extended`, `oi-bar-pull-90`, `oi-bar-pull-top` | `[3, 3]` | §5A "3 sets" |
+| `weighted-lockoff-hold` | `[3, 3]` | §5B "3 holds" |
+| `kb-single-arm-row`, `kb-goblet-squat`, `pushups-or-dips`, `oi-wall-press` | `[3, 3]` | §5C, §5D |
+| `external-rotations`, `wrist-extensor-work` | `[2, 2]` | §5D |
+| `test-max-hang-half-crimp`, `test-max-hang-open-hand` | `[3, 5]` | §4E "work up in 3–5 sets" |
+| `test-lockoff-90-left`, `test-lockoff-90-right` | `[1, 1]` | §4E "one attempt per side" |
+
+Left absent, deliberately: the warm-up progression and Abrahangs (a duration, not a set count), `bodyweight-pullups` and the GtG doses (§8 is a daily habit, not a session — D11), `kb-turkish-getup` ("2–3 per side" is reps), `test-max-pullup-load` (§4E's "heaviest single" is worked up to, with no prescribed number of attempts), and both climbing entries (never logged as sessions — D9). An absent field means the app shows no position, exactly as an absent `holdSeconds` means no timer.
+
+#### Acceptance criteria
+1. WHEN an exercise declares `prescribedSets` THE session SHALL show which set is next against that count, derived from the number of sets already logged for it in this session. [x]
+2. WHEN a hold is started on such an exercise THE timer bar SHALL name the set being performed alongside the exercise, so the position is readable without leaving the timer. [x]
+3. WHEN a rest is running or complete THE timer bar SHALL name the set that comes next, and the number SHALL advance only when a set is actually logged (never on a hold that was performed and not recorded). [x]
+4. WHEN a rest completes on an exercise that declares a hold THE timer bar SHALL offer starting the next set in one tap, and that tap SHALL start the hold exactly as the card's control does. [x]
+5. WHEN the app offers the next set THE hold SHALL NOT start by itself — no auto-start, no countdown into a hang — because the owner has to be on the board before the clock runs. [x]
+6. WHEN the logged count reaches or passes the prescribed count THE app SHALL keep offering further sets, SHALL report the position plainly (both numbers), and SHALL NOT block, congratulate, mark the exercise complete, or show an adherence figure (D16, D23). [x]
+7. WHEN an exercise declares no `prescribedSets` THE session SHALL look exactly as T18 left it — no position, no invented count. [x]
+8. WHEN a set is deleted THE position SHALL move back with it, because it is a report over the logged sets and not a counter the app keeps. [x]
+9. WHEN the catalog gains the field THE change SHALL require no migration, no `DB_VERSION` bump, and no `BACKUP_SCHEMA_VERSION` bump — the field is on the code-seeded catalog, which is not stored (T2's design call). [x]
+
+#### Edge cases
+- A range (`4–6`) reads as a range, not as a single target: "set 3 of 4–6". Rounding it to one number would invent a prescription the plan deliberately left open. [x]
+- Beyond the prescribed count → "set 6 (5 prescribed)", which reports both facts and passes judgment on neither. §4F's "lighter week regardless of the schedule" makes *fewer* sets correct as often as more, so neither direction is an error to flag. [x]
+- A set logged by `+ Add set` counts identically to one logged from the timer — the position is over the record, not over the timer's history. [x]
+- An exercise with a hold but no rest (the wall press) still shows its position on the hold control; there is simply no rest view to carry it. [x]
+- The §4E lock-off tests declare `[1, 1]`: the second attempt on a side reads "set 2 (1 prescribed)" rather than being refused, because §4E's "one attempt" is the protocol, not a lock the app enforces. [x]
+- Deleting the set that a running rest belongs to leaves the rest running and the position recomputed — the clock is measuring a real interval either way (D18). [x]
+- A hold performed and dismissed without logging leaves the position where it was, and the next hold reads the same set number. That is correct: no record, no set. [x]
+
+#### Non-goals & do-not-touch
+- MUST NOT auto-start a hold, ever (AC5).
+- MUST NOT pre-create empty set rows to "fill in" (D16, D19 — a row is a claim that a set happened).
+- MUST NOT block, cap, or warn at the prescribed count, and MUST NOT compute a percentage, a completion state, or a "sets remaining" call to action (D23).
+- MUST NOT mark an exercise completed when the count is reached. Completion stays the explicit tap D16 made it.
+- MUST NOT parse the set count out of `prescription` (D17).
+- MUST NOT shorten, skip, or auto-advance a rest to keep a chain moving. §4C prescribes 3 minutes and the app's job is to run it, not to hurry it.
+- MUST NOT add a "start next set" control while a rest is still running — Skip already exists for cutting one short, and a second control that does it silently is how a prescribed interval erodes.
+- MUST NOT change the storage schema (AC9).
+
+#### Verify
+`npm run test && npm run build && npm run lint`, plus an in-browser pass: start a max hang and confirm the timer reads set 1 of 5; log it and confirm the rest view names set 2; let the rest run out and confirm one tap starts the next hold; stop a hold without logging it and confirm the position does not advance; add a sixth set and confirm it reads "set 6 (5 prescribed)" with nothing blocked; delete a set and confirm the position moves back; check a rep-based exercise with no declared count is unchanged.
+
+#### Amendments
+
+**2026-07-25 — T19 built. Build + lint clean, 324 tests green (19 new, all in `chain`). All nine ACs verified in a running browser, including a real 3 minute rest run to completion rather than a shortened one.** Files: `src/lib/chain.ts` (+ `chain.test.ts`); modified `src/types.ts`, `src/data/exercises.ts` (18 entries gain `prescribedSets`), `src/components/SessionTimer.tsx`, `src/components/SetLogger.tsx`, `src/screens/ActiveSession.tsx`. **No new decision, no new dependency, and no schema movement of any kind** — the field is on the code-seeded catalog, which T2 deliberately does not store, so `DB_VERSION` and `BACKUP_SCHEMA_VERSION` stay at 2 and the live database was confirmed unchanged at four stores.
+
+Verified on the running app: a max-hang card with one set logged read `▶ Start set 2 of 5 · 7–10s` and `+ Add set 2 of 5` (AC1); starting the hold put `set 2 of 5 · target 7–10s` beside the running clock (AC2); stopping it at 3.2s **without logging** left the rest bar reading `next · set 2 of 5` — the position did not advance on a set that no record contained — with `Log 3.2s as a set` on the same bar, and tapping that moved it to `next · set 3 of 5` (AC3); the 3 minute rest was allowed to run out in real time, at which point the bar offered `▶ Start set 3 of 5 · 7–10s` and **sat at 0:00 waiting** rather than starting anything (AC4, AC5); tapping it opened `HOLD · set 3 of 5 · target 7–10s` (AC4); adding sets past five produced `set 6 (5 prescribed)` … `set 8 (5 prescribed)` with every control still working and no completion, percentage, or praise anywhere (AC6); deleting four sets walked the label back to `set 4 of 5` (AC8); and the warm-up progression, which declares no count, showed a plain `+ Add set` and no position at all (AC7).
+
+Design calls:
+- **One label serves both the hold and the rest views, because it is one fact.** "The set that is next to be logged" *is* the set being held while a hold runs, and the set after a rest — so `chainLabelFor` is computed once from `getSets(...).length` and read by both. The alternative (a "current" and a "next") would have had to disagree the moment a hold went unlogged, and picking which one to trust is exactly the ambiguity D16 exists to remove.
+- **The position counts logged sets, so it self-corrects in public.** A hold performed and dismissed leaves the counter where it was, which looks wrong for about a second and then reads as the truth: there is no record, so there is no set. The remedy is on screen at that moment, which is the best possible place for it.
+- **The start-next control appears only once the rest is actually complete.** Offering it mid-rest would put a second, quieter way to end a prescribed 3 minute interval next to the honest one (`Skip`), and §4C's rest is the part of the protocol most easily rationalised away. It also never fires itself (AC5): the owner has to be on the board before a max-effort finger clock runs.
+- **`prescribedSets` is absent more often than present, and each absence is a reading of the plan.** A warm-up is a duration, Abrahangs are a ten-minute cycle, the get-up is "2–3 per side" (reps, not sets), §4E's max pull-up is worked *up to* with no prescribed attempts, GtG is a daily habit rather than a session (D11), and climbing is never logged (D9). A test pins each of those as `undefined` so a later edit cannot quietly invent a count.
+- **The label format changed once, in verification.** `set 6 · 5 prescribed` inside a control that already carries a `·` separator produced `▶ Start set 8 · 5 prescribed · 7–10s` — three middots and no structure. It became `set 8 (5 prescribed)`, which is the same two facts and readable at a glance mid-set. Found by looking at the rendered button, not by reading the string.
+
+---
+
 ## Execution notes
 
 - **Gates:** Gate 1 = PRD approved (now, by the owner). Gate 2 = decomposition approved after T0's spike report. Gate 3 = implementation reviewed against acceptance criteria after T8.
@@ -1460,4 +1542,19 @@ Owner decision, on being asked to settle T17's three open choices: *"I don't car
 **Net effect on scope:** one task, two decisions, two optional `Settings` fields, one new pure module and one new component. No new dependencies, no new object store, no `DB_VERSION` or `BACKUP_SCHEMA_VERSION` bump (`settings` already travels through the backup whole — the same property that made `standardEdgeMm` free in T16), and no reversal of D2a, D6, D9, D15, D16, D18–D22, or D27. T17 remains specced-but-unbuilt in the backlog table and can be picked up at any point in the block, in full or reduced to its cheap half (the plan-cited card firing on T14's existing `pain` / `form-broke` reasons, with no symptom record at all).
 
 **Built the same day; every prediction above held, including the version numbers.** See T18's amendment for the verification pass. Two things the spec did not anticipate, both found while building: `canPick` had to be a type predicate rather than a boolean, so `holdSec` cannot reach a picker through a widened metric type; and deleting a set needs to close an open panel explicitly, since T14's stale-index rule only catches an index that falls off the end. **T19 (chained sets: set *n* of *N* against the prescription) is next in Wave 1**, and it now enters values through this logger.
+
+---
+
+**2026-07-25 — T19 specced and built: chained sets, and the first task in the backlog that needed no new decision.**
+
+The set count moves out of `prescription` prose and into a typed `Exercise.prescribedSets`, populated on the 18 entries where the plan states a number. Everything about how it behaves was already settled: D17 says a machine-readable prescription is a typed field rather than a regex over prose (§4B carries "4–6 sets" *and* a weeks-1–4 "5 sets" variant in one string); D23 says the app reports a position and never scores it; D16 and D19 say a row exists only once a set is logged, so nothing is pre-created and the counter counts records rather than attempts. Worth recording as a fact about the spec rather than a fact about the task: five waves in, the decisions the PRD accumulated are now answering new questions without amendment, which is what they were for.
+
+| Change | Why |
+|---|---|
+| `Exercise.prescribedSets?: [min, max]` added, 18 catalog entries populated | D17's pattern exactly. A range stays a range (`4–6`), because rounding it to a single target would invent a prescription §4B deliberately left open. |
+| The timer bar names the set, and offers the next one when a rest completes | The bar covers the card, so the next hold used to cost a scroll — and what gets cut short to avoid a scroll is the 3 minute rest §4C prescribes, not the scroll. |
+| Nothing auto-starts, nothing blocks, nothing completes | AC5 and AC6. A max-effort finger hold must not begin without the owner on the board, and §4F's lighter week makes *fewer* sets correct as often as more — so neither direction is an error to flag. |
+| No `DB_VERSION` / `BACKUP_SCHEMA_VERSION` change | The catalog is code-seeded and not stored (T2's design call), so a new catalog field costs nothing at all in storage terms. Confirmed against the live database. |
+
+**Net effect on scope:** one task, zero decisions, one optional catalog field, one new pure module. No new dependencies, no storage or backup change, and no reversal of anything. **T20 (spoken cues: "3–2–1–pull", set announcements, band-pitch tone) is next in Wave 1**, and it now has a set number to announce.
 

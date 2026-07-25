@@ -41,6 +41,19 @@ export interface Exercise {
   // `setReason.reasonApplies` — reading one declaration.
   holdSeconds?: [min: number, max: number] | 'open'; // min === max for a fixed target
   restSeconds?: number; // prescribed rest between sets
+  /**
+   * How many sets the plan asks for (T19), typed beside the prose for D17's
+   * reason: §4B carries "4–6 sets" and a weeks-1–4 variant of "5 sets" in one
+   * string, and a regex over that picks a number by luck.
+   *
+   * A range stays a range — rounding `4–6` to a single target would invent a
+   * prescription the plan deliberately left open. Absent means the app shows no
+   * position at all, exactly as an absent `holdSeconds` means no timer, and it is
+   * absent wherever the plan states a duration or a rep count instead of a set
+   * count. The number is a *position*, never a quota: nothing is blocked at it
+   * and nothing is graded against it (D23).
+   */
+  prescribedSets?: [min: number, max: number]; // min === max for a fixed count
   // D20: charted only where the training plan actually progresses something —
   // three exercises. Absent means no numeric fields and no chart. Order matters:
   // it is the chart toggle's order and its default selection.

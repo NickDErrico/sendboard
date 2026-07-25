@@ -88,6 +88,7 @@ export const EXERCISES: Exercise[] = [
     ],
     prescription:
       'Peak: 4–6 sets x 3–5s @ 100% effort, 3 min rest. Tendon variant (weeks 1–4): 5 sets x 4 reps x 3s @ ~90%, ~10s between reps, 3 min between sets.',
+    prescribedSets: [4, 6], // T19
     // Times the peak variant's 3–5s effort. The weeks 1–4 rep-structured variant
     // nests a second interval (~10s between reps) inside the set; T10 explicitly
     // does not build a cadence runner for it — the 3s rep is inside this range.
@@ -119,6 +120,7 @@ export const EXERCISES: Exercise[] = [
     ],
     prescription:
       'Peak: 4–6 sets x 3–5s @ 100% effort, 3 min rest. Tendon variant (weeks 1–4): 5 sets x 4 reps x 3s @ ~90%, ~10s between reps, 3 min between sets.',
+    prescribedSets: [4, 6], // T19
     holdSeconds: [3, 5],
     restSeconds: 180,
     cues: [
@@ -142,6 +144,7 @@ export const EXERCISES: Exercise[] = [
       'Rest 3 minutes; repeat for 5 sets.',
     ],
     prescription: '5 sets x 7–10s hang @ ~85–90% of max for the edge, 3 min rest',
+    prescribedSets: [5, 5], // T19
     holdSeconds: [7, 10],
     restSeconds: 180,
     // D20/D22: §4F progresses this by load. Edge is declared because it is the
@@ -171,6 +174,7 @@ export const EXERCISES: Exercise[] = [
       'Rest 3 minutes; repeat for 5 sets.',
     ],
     prescription: '5 sets x 7–10s hang @ ~85–90% of max for the edge, 3 min rest',
+    prescribedSets: [5, 5], // T19
     holdSeconds: [7, 10],
     restSeconds: 180,
     metrics: ['holdSec', 'addedLb', 'edgeMm'],
@@ -195,6 +199,7 @@ export const EXERCISES: Exercise[] = [
       'Hold 5 seconds, then rest 2 minutes.',
     ],
     prescription: '3 sets x 5s max effort, 2 min rest (one of 3 angles in the session)',
+    prescribedSets: [3, 3], // T19
     holdSeconds: [5, 5],
     restSeconds: 120,
     cues: [
@@ -218,6 +223,7 @@ export const EXERCISES: Exercise[] = [
       'Rest 2 minutes; 3 sets.',
     ],
     prescription: '3 sets x 5s max effort, 2 min rest',
+    prescribedSets: [3, 3], // T19
     holdSeconds: [5, 5],
     restSeconds: 120,
     cues: ["Start at the angle you're weakest at — usually 90° for climbers."],
@@ -238,6 +244,7 @@ export const EXERCISES: Exercise[] = [
       'Rest 2 minutes; 3 sets.',
     ],
     prescription: '3 sets x 5s max effort, 2 min rest',
+    prescribedSets: [3, 3], // T19
     holdSeconds: [5, 5],
     restSeconds: 120,
     cues: ['Third of the three session angles: extended, 90°, near-top.'],
@@ -258,6 +265,7 @@ export const EXERCISES: Exercise[] = [
       'Rest 2 minutes; 3 holds.',
     ],
     prescription: '3 holds x 8–10s, 2 min rest; add kettlebell via dip belt as it gets easy (start bodyweight)',
+    prescribedSets: [3, 3], // T19
     holdSeconds: [8, 10],
     restSeconds: 120,
     // No edgeMm: this hangs from a bar via a dip belt, so there is no edge to
@@ -281,6 +289,7 @@ export const EXERCISES: Exercise[] = [
       '8 reps per side, 3 sets.',
     ],
     prescription: '3 x 8 per side',
+    prescribedSets: [3, 3], // T19
     cues: ['Focus on scapular control, not just moving the weight.'],
     safetyNotes: [],
     gtgEligible: false,
@@ -299,6 +308,7 @@ export const EXERCISES: Exercise[] = [
       '10 reps (session) or 10–15 for a GtG set.',
     ],
     prescription: 'Session: 3 x 10. GtG: 10–15 reps, morning and evening',
+    prescribedSets: [3, 3], // T19
     cues: [
       "Leg drive matters for hard bouldering — don't skip lower body.",
       'GtG version: bodyweight or the 35lb bell, kept easy.',
@@ -338,6 +348,7 @@ export const EXERCISES: Exercise[] = [
       '10–15 reps (session) or about half your max for a GtG set.',
     ],
     prescription: 'Session: 3 x 10–15. GtG: 8–12 (about half your max) whenever you pass a clear floor',
+    prescribedSets: [3, 3], // T19
     cues: [
       'Antagonist balance lets you safely train the pullers harder.',
       'GtG: never to failure — stop well before a pump.',
@@ -359,6 +370,7 @@ export const EXERCISES: Exercise[] = [
       '3 efforts (session) or 1–2 for a GtG dose.',
     ],
     prescription: 'Session: 5s x 3. GtG: 5s x 1–2 in any doorway',
+    prescribedSets: [3, 3], // T19
     // No restSeconds: plan §5D prescribes no rest interval for the wall press, and
     // inventing one would be exactly the fabrication D17 exists to prevent. The
     // hold still times; it just ends without starting a countdown.
@@ -384,6 +396,7 @@ export const EXERCISES: Exercise[] = [
       '10–15 reps per side.',
     ],
     prescription: 'Session: 2 x 15 per side. GtG: 10–12 per side, morning and evening',
+    prescribedSets: [2, 2], // T19
     cues: ['Light load, strict form — this is prehab, not a strength lift.'],
     safetyNotes: [],
     gtgEligible: true,
@@ -402,6 +415,7 @@ export const EXERCISES: Exercise[] = [
       '10–15 reps.',
     ],
     prescription: 'Session: 2 x 15. GtG: 10–15 reps, e.g. every time you make coffee',
+    prescribedSets: [2, 2], // T19
     cues: ['Directly offsets the finger-flexor load from Day 1 — protects the elbow.'],
     safetyNotes: [],
     gtgEligible: true,
@@ -472,6 +486,7 @@ export const EXERCISES: Exercise[] = [
       'Record the edge, the heaviest added weight held for 7s, and your bodyweight.',
     ],
     prescription: 'Work up in 3–5 sets x 7s, 3 min rest, to the max added weight held for 7s. Stop at the first failed attempt (§4E)',
+    prescribedSets: [3, 5], // T19
     holdSeconds: [7, 7],
     restSeconds: 180,
     // No holdSec: the hold is fixed at 7s by the protocol, so the only things that
@@ -502,6 +517,7 @@ export const EXERCISES: Exercise[] = [
       'Record the edge, the heaviest added weight held for 7s, and your bodyweight.',
     ],
     prescription: 'Same protocol as the half-crimp test, open-hand grip (§4E)',
+    prescribedSets: [3, 5], // T19
     holdSeconds: [7, 7],
     restSeconds: 180,
     metrics: ['addedLb', 'edgeMm'],
@@ -550,6 +566,7 @@ export const EXERCISES: Exercise[] = [
       'Record the seconds held.',
     ],
     prescription: 'Longest static hold at bodyweight, one attempt per side — record seconds each side (§4E)',
+    prescribedSets: [1, 1], // T19
     // 'open' (T16): the duration is the measurement, so there is no maximum to
     // auto-stop at. Left and right are separate entries because a session's chart
     // point is its *best* set, and a best-of-both-arms number is not a per-side
@@ -574,6 +591,7 @@ export const EXERCISES: Exercise[] = [
       'Record the seconds held.',
     ],
     prescription: 'Longest static hold at bodyweight, one attempt per side — record seconds each side (§4E)',
+    prescribedSets: [1, 1], // T19
     holdSeconds: 'open',
     metrics: ['holdSec'],
     cues: ['One attempt per side — a second try after a rest is a different test.'],

@@ -57,20 +57,35 @@ export function SessionTimer({
   state,
   exerciseName,
   hold,
+  chainLabel = null,
   onStop,
   onSkip,
   onExtend,
   onLogHeld,
+  onStartNext,
 }: {
   state: TimerState;
   exerciseName: string;
   hold: HoldSpec | null;
+  /**
+   * T19: the set that is next to be *logged* — the one being held right now, or
+   * the one after a rest. Null where the plan declares no set count. It advances
+   * only when a set is recorded, so a hold performed and not logged leaves it
+   * where it was; the "Log …" button that would advance it is on this same bar.
+   */
+  chainLabel?: string | null;
   /** `auto` distinguishes the timer ending the hold from the owner ending it — the
       first records the prescription, the second records real elapsed time. */
   onStop: (auto?: boolean) => void;
   onSkip: () => void;
   onExtend: (seconds: number) => void;
   onLogHeld: (heldMs: number) => void;
+  /**
+   * Starts the next hold from the timer bar once a rest is done (T19 AC4) — the
+   * bar covers the card, so without this the next set costs a scroll and the
+   * thing that gets skipped is the rest. Absent where the exercise has no hold.
+   */
+  onStartNext?: () => void;
 }) {
   const now = useNow(state.phase !== 'idle');
   const restDone = isRestComplete(state, now);
@@ -106,7 +121,13 @@ export function SessionTimer({
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-700 bg-slate-900/95 px-4 pt-3 backdrop-blur-sm [padding-bottom:calc(0.75rem+env(safe-area-inset-bottom))]">
       <div className="mx-auto max-w-md">
         {state.phase === 'holding' && hold && (
-          <HoldView elapsed={elapsedMs(state, now)} hold={hold} name={exerciseName} onStop={onStop} />
+          <HoldView
+            elapsed={elapsedMs(state, now)}
+            hold={hold}
+            name={exerciseName}
+            chainLabel={chainLabel}
+            onStop={onStop}
+          />
         )}
 
         {state.heldMs !== null && (
@@ -123,8 +144,11 @@ export function SessionTimer({
             fraction={state.restMs > 0 ? restRemainingMs(state, now) / state.restMs : 0}
             done={restDone}
             name={exerciseName}
+            chainLabel={chainLabel}
+            holdTarget={hold ? formatHoldTarget(hold) : null}
             onSkip={onSkip}
             onExtend={onExtend}
+            onStartNext={onStartNext}
           />
         )}
       </div>
@@ -136,11 +160,13 @@ function HoldView({
   elapsed,
   hold,
   name,
+  chainLabel,
   onStop,
 }: {
   elapsed: number;
   hold: HoldSpec;
   name: string;
+  chainLabel: string | null;
   onStop: (auto?: boolean) => void;
 }) {
   const status = holdStatus(elapsed, hold);
@@ -155,7 +181,12 @@ function HoldView({
         <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-slate-400">
           Hold · <span className="text-slate-300">{name}</span>
         </p>
-        <p className="shrink-0 text-xs text-slate-500">target {formatHoldTarget(hold)}</p>
+        {/* T19: the position rides beside the target, where the eye already goes
+            for "how long" — mid-hang is not the moment to count logged rows. */}
+        <p className="shrink-0 text-xs text-slate-500">
+          {chainLabel && <span className="text-slate-400">{chainLabel} · </span>}
+          target {formatHoldTarget(hold)}
+        </p>
       </div>
 
       <div className="mt-1 flex items-baseline gap-3">
@@ -237,15 +268,21 @@ function RestView({
   fraction,
   done,
   name,
+  chainLabel,
+  holdTarget,
   onSkip,
   onExtend,
+  onStartNext,
 }: {
   remaining: number;
   fraction: number;
   done: boolean;
   name: string;
+  chainLabel: string | null;
+  holdTarget: string | null;
   onSkip: () => void;
   onExtend: (seconds: number) => void;
+  onStartNext?: () => void;
 }) {
   return (
     <div>
@@ -257,7 +294,7 @@ function RestView({
           className={`shrink-0 text-xs font-semibold ${done ? 'text-emerald-300' : 'text-slate-500'}`}
           aria-live="polite"
         >
-          {done ? 'Rest complete — go' : 'resting'}
+          {done ? 'Rest complete — go' : chainLabel ? `next · ${chainLabel}` : 'resting'}
         </p>
       </div>
 
@@ -293,6 +330,23 @@ function RestView({
           style={{ width: `${Math.min(1, Math.max(0, fraction)) * 100}%` }}
         />
       </div>
+
+      {/* T19 AC4: the next hold, from here, once the rest is actually over. The
+          bar covers the card, so without this the next set costs a scroll — and
+          the thing that gets cut short to avoid the scroll is the rest §4C
+          prescribes. Deliberately NOT offered while the rest is still running:
+          Skip already exists for that, and a second control that quietly ends a
+          3 minute interval is how a prescribed rest erodes. It never starts by
+          itself either (AC5) — the owner has to be on the board first. */}
+      {done && onStartNext && (
+        <button
+          onClick={onStartNext}
+          className="mt-2 w-full rounded-lg bg-emerald-400 px-4 py-3 text-base font-bold text-slate-900"
+        >
+          ▶ Start {chainLabel ?? 'next hold'}
+          {holdTarget ? ` · ${holdTarget}` : ''}
+        </button>
+      )}
     </div>
   );
 }

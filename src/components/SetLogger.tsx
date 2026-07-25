@@ -53,6 +53,7 @@ export function SetLogger({
   askEndReason = false,
   endReasons = [],
   gear = {},
+  nextSetLabel = null,
   onAdd,
   onUpdate,
   onDelete,
@@ -70,6 +71,12 @@ export function SetLogger({
    * picker over a board the app invented (D31, AC5).
    */
   gear?: Gear;
+  /**
+   * T19: "set 3 of 5" for the row this control would create, or null where the
+   * plan declares no set count. It is the only place the position shows on the
+   * rep-based exercises, which have no timer to carry it.
+   */
+  nextSetLabel?: string | null;
   onAdd: () => void;
   onUpdate: (index: number, patch: Partial<SetEntry>) => void;
   onDelete: (index: number) => void;
@@ -287,7 +294,7 @@ export function SetLogger({
         onClick={onAdd}
         className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm font-medium text-slate-200 active:border-slate-500"
       >
-        + Add set
+        + Add {nextSetLabel ?? 'set'}
       </button>
     </div>
   );
