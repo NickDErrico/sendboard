@@ -19,6 +19,7 @@ import {
 } from '../lib/storage';
 import { parseBodyweight } from '../lib/bodyweight';
 import { parseEdgeMm } from '../lib/retest';
+import { parseEdgeList, parseLoadStep } from '../lib/gear';
 import type { BodyweightEntry } from '../types';
 import { PERSISTENCE_COPY, checkPersistence, type PersistenceState } from '../lib/persistence';
 import { beepTest } from '../lib/beep';
@@ -174,6 +175,8 @@ export function Settings({
 
         <StandardEdge reloadKey={bwReloadKey} />
 
+        <GearSettings reloadKey={bwReloadKey} />
+
         <BodyweightLog reloadKey={bwReloadKey} />
 
         <section className="space-y-3 rounded-xl border border-slate-700 bg-brand-surface p-4">
@@ -322,6 +325,107 @@ function StandardEdge({ reloadKey }: { reloadKey: number }) {
         never change it mid-block — changing edge size invalidates the comparison more than any
         training variable.”
       </p>
+    </section>
+  );
+}
+
+/**
+ * The board and the plate rack (T18, D26).
+ *
+ * This is the only place the app learns what the owner physically owns, and it
+ * buys exactly one thing: a set value that used to cost an iOS keyboard now
+ * costs a tap. It changes no prescription and hides no exercise — D26's line
+ * between configuring an *input* and editing the *catalog* (D6).
+ *
+ * Both fields are permissive by design (D31): a junk edge list leaves the stored
+ * board alone rather than clearing it, and an unusual increment is accepted
+ * because it is gear, not advice. Leaving them blank is a supported state — the
+ * set logger simply stays the text inputs it has always been.
+ */
+function GearSettings({ reloadKey }: { reloadKey: number }) {
+  const [edges, setEdges] = useState<number[] | null>(null);
+  const [step, setStep] = useState<number | null>(null);
+
+  const refresh = useCallback(async () => {
+    const settings = await getSettings();
+    setEdges(settings.edgesMm ?? []);
+    setStep(settings.loadStepLb ?? null);
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh, reloadKey]);
+
+  async function saveEdges(raw: string) {
+    const parsed = parseEdgeList(raw);
+    // Nothing parsed → keep the board. Mistyping a list must not delete it, the
+    // same rule the standard edge and the bodyweight corrections follow.
+    if (parsed.length === 0) {
+      await refresh();
+      return;
+    }
+    const settings = await getSettings();
+    await saveSettings({ ...settings, edgesMm: parsed });
+    await refresh();
+  }
+
+  async function saveStep(raw: string) {
+    const parsed = parseLoadStep(raw);
+    if (parsed === null) {
+      await refresh();
+      return;
+    }
+    const settings = await getSettings();
+    await saveSettings({ ...settings, loadStepLb: parsed });
+    await refresh();
+  }
+
+  return (
+    <section className="space-y-3 rounded-xl border border-slate-700 bg-brand-surface p-4">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your gear</h2>
+
+      <div className="space-y-1">
+        <label className="text-sm text-slate-300" htmlFor="gear-edges">
+          Board edges
+        </label>
+        <input
+          id="gear-edges"
+          key={`edges-${edges?.join(',')}`}
+          defaultValue={edges?.join(', ') ?? ''}
+          onBlur={(e) => void saveEdges(e.target.value)}
+          inputMode="decimal"
+          placeholder="20, 18, 15, 10"
+          aria-label="Board edges, millimetres, comma separated"
+          className="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-accent focus:outline-none"
+        />
+        <p className="text-xs text-slate-500">
+          The rungs that exist on your board, in millimetres. Each one becomes a one-tap choice when
+          you log an edge — typing any other value still works.
+        </p>
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-sm text-slate-300" htmlFor="gear-step">
+          Load increment
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            id="gear-step"
+            key={`step-${step}`}
+            defaultValue={step === null ? '' : String(step)}
+            onBlur={(e) => void saveStep(e.target.value)}
+            inputMode="decimal"
+            placeholder="2.5"
+            aria-label="Load increment, pounds"
+            className="w-20 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-right text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-accent focus:outline-none"
+          />
+          <span className="text-xs text-slate-500">lb</span>
+        </div>
+        <p className="text-xs text-slate-500">
+          The smallest weight you can actually add. It sets the size of the − / + step on added load
+          — §4F asks for increments of 1–3%, and whether to take one is yours.
+        </p>
+      </div>
     </section>
   );
 }

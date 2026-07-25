@@ -44,6 +44,7 @@ import {
   type TimerState,
 } from '../lib/timer';
 import { reasonApplies, reasonsFor } from '../lib/setReason';
+import { gearOf, type Gear } from '../lib/gear';
 import { primeAudio } from '../lib/beep';
 import { useWakeLock } from '../lib/wakeLock';
 import { SetLogger } from '../components/SetLogger';
@@ -66,6 +67,10 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   // where carry-forward has nothing to offer — the §4E battery is exactly that
   // case. Read once; changing it mid-session is not a thing that happens.
   const [standardEdgeMm, setStandardEdgeMm] = useState<number | undefined>(undefined);
+  // T18/D26: the board and the plate rack, which decide what a set value costs in
+  // taps. Read from the same settings fetch — it configures inputs only, so an
+  // empty gear object is a working session, not a degraded one (D31).
+  const [gear, setGear] = useState<Gear>({});
   // Ref mirrors the latest log so rapid taps build from current state, never a
   // stale closure — otherwise concurrent "Add set" taps would drop entries.
   const logRef = useRef<WorkoutLog | null>(null);
@@ -94,6 +99,7 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
       if (cancelled) return;
       setRoutine(r ?? null);
       setStandardEdgeMm(settings.standardEdgeMm);
+      setGear(gearOf(settings));
       setExercisesById(new Map(all.map((e) => [e.id, e])));
       // This log is excluded, so an exercise can never cite itself (T11).
       setLastByExercise(lastPerformanceMap(logs, r?.exerciseIds ?? [], new Date(), logId));
@@ -350,6 +356,7 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
                 metrics={exercise?.metrics}
                 askEndReason={reasonApplies(exercise)}
                 endReasons={reasonsFor(exercise)}
+                gear={gear}
                 onAdd={() =>
                   mutate((l) =>
                     addSet(l, exId, seedForNextSet(getSets(l, exId), last, edgeSeedFor(exId))),

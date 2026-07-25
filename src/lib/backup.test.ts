@@ -113,6 +113,44 @@ describe('collect → import round trip through storage (AC2)', () => {
     expect(await storage.getSettings()).toEqual(SETTINGS);
   });
 
+  // T18 AC9. Gear rides inside `settings`, which the backup carries whole — the
+  // same property that made T16's standardEdgeMm free. Asserted rather than
+  // assumed, because a board and a load increment silently lost on restore would
+  // put the keyboard back with no visible reason.
+  it('round-trips gear, and a settings object written before T18 reads as none', async () => {
+    await storage.saveSettings({
+      installGuideDismissed: true,
+      standardEdgeMm: 20,
+      edgesMm: [20, 18, 15, 10],
+      loadStepLb: 2.5,
+    });
+
+    const backup = await collectBackup('2026-07-25T07:09:08.123Z');
+    expect(backup.settings.edgesMm).toEqual([20, 18, 15, 10]);
+
+    await storage._resetForTests();
+    await importBackup(backup);
+    expect(await storage.getSettings()).toEqual({
+      installGuideDismissed: true,
+      standardEdgeMm: 20,
+      edgesMm: [20, 18, 15, 10],
+      loadStepLb: 2.5,
+    });
+
+    // A pre-T18 file: the fields are simply absent, which is exactly what
+    // "no gear configured" means — no migration, no default board invented.
+    await storage._resetForTests();
+    await importBackup(
+      buildBackup(
+        { logs: [], checks: [], settings: { installGuideDismissed: true }, bodyweight: [] },
+        '2026-07-25T07:09:08.123Z',
+      ),
+    );
+    const restored = await storage.getSettings();
+    expect(restored.edgesMm).toBeUndefined();
+    expect(restored.loadStepLb).toBeUndefined();
+  });
+
   it('replaces existing data rather than merging (AC4 semantics)', async () => {
     // Pre-existing data that should be wiped by the import.
     await storage.saveLog(makeLog('old-1', '2026-07-01T10:00:00.000Z'));

@@ -3,9 +3,17 @@ import type { ProgressMetric, SetEndReason, SetEntry } from '../types';
 import { METRIC_CONFIG } from '../lib/progress';
 import { METRIC_INPUT_ORDER } from '../lib/lastTime';
 import { REASON_CONFIG } from '../lib/setReason';
+import { edgeOptions, hasLoadStepper, type Gear } from '../lib/gear';
+import { SetValuePicker, type PickerField } from './SetValuePicker';
 
 const inputClass =
   'min-w-0 rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-brand-accent focus:outline-none';
+
+// A cell that opens a picker instead of the keyboard (T18). Deliberately the same
+// box as `inputClass`: the row must not change size when gear is configured, or a
+// five-set max hang stops fitting a 390px screen (AC10).
+const cellButtonClass =
+  'min-w-0 rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-center text-sm tabular-nums text-slate-100';
 
 // Column headings for the measured layout. One header row for the whole list
 // beats repeating a label under every set — a max hang is five near-identical
@@ -34,11 +42,17 @@ function parseMeasurement(raw: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+// T18: which panel is open, if any. One piece of state for the value pickers and
+// the reason chips together, because "at most one thing open in this logger" is
+// one rule, not two that can disagree (AC7). Never persisted (D18's reasoning).
+type Panel = { index: number; field: PickerField | 'reason' };
+
 export function SetLogger({
   sets,
   metrics,
   askEndReason = false,
   endReasons = [],
+  gear = {},
   onAdd,
   onUpdate,
   onDelete,
@@ -50,31 +64,57 @@ export function SetLogger({
   askEndReason?: boolean;
   /** Which reasons to offer — an open hold has no `target` to have hit (T16). */
   endReasons?: SetEndReason[];
+  /**
+   * T18/D26: the board and the plate rack. Empty means every cell stays the T12
+   * text input — an unconfigured install is the app exactly as it was, never a
+   * picker over a board the app invented (D31, AC5).
+   */
+  gear?: Gear;
   onAdd: () => void;
   onUpdate: (index: number, patch: Partial<SetEntry>) => void;
   onDelete: (index: number) => void;
 }) {
   const measured = METRIC_INPUT_ORDER.filter((m) => metrics?.includes(m));
-  // Which row's chips the owner opened by hand. `null` defers to the rule below,
-  // which is the case that matters: the set just logged is already open. Never
-  // persisted — it is view state, not data (D18's reasoning).
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [panel, setPanel] = useState<Panel | null>(null);
+
+  // A stale index left by a deleted set falls back to the default rule rather
+  // than opening a panel against a row that shifted underneath it.
+  const stale = panel !== null && panel.index >= sets.length;
+  const open: Panel | null = stale ? null : panel;
 
   // At most one row's chips are open (twenty controls on a five-set card is not a
   // card). Default: the last set, while its reason is unrecorded — which is the
-  // row "Log 7.4s" and "+ Add set" both just created. A stale index left by a
-  // deleted set falls back to the rule rather than opening nothing.
-  const stale = openIndex !== null && openIndex >= sets.length;
-  const isOpen = (i: number) =>
-    openIndex === null || stale
+  // row "Log 7.4s" and "+ Add set" both just created.
+  const isReasonOpen = (i: number) =>
+    open === null
       ? i === sets.length - 1 && sets[i].endReason === undefined
-      : openIndex === i;
+      : open.field === 'reason' && open.index === i;
+
+  const isPickerOpen = (i: number, field: PickerField) =>
+    open !== null && open.index === i && open.field === field;
+
+  /** What this cell can offer: the board (plus whatever is already recorded), or nothing. */
+  const edgesFor = (set: SetEntry) => edgeOptions(gear, set.edgeMm);
+  // A type predicate rather than a boolean, so `holdSec` — which has no picker,
+  // by design — cannot reach one through a widened metric type.
+  const canPick = (
+    set: SetEntry,
+    field: ProgressMetric,
+  ): field is Extract<PickerField, ProgressMetric> =>
+    field === 'edgeMm'
+      ? edgesFor(set).length > 0
+      : field === 'addedLb'
+        ? hasLoadStepper(gear)
+        : // `holdSec` is written by the timer as a measurement (T10/T13); a
+          // stepper there would invite editing a recorded performance rather
+          // than entering a setup.
+          false;
 
   function pickReason(index: number, reason: SetEndReason) {
     // Tapping the active chip clears it: a mistap costs one tap, never a set.
     const next = sets[index].endReason === reason ? undefined : reason;
     onUpdate(index, { endReason: next });
-    setOpenIndex(null);
+    setPanel(null);
   }
 
   return (
@@ -100,16 +140,36 @@ export function SetLogger({
           <span className="w-4 shrink-0 text-xs text-slate-500">{i + 1}</span>
 
           {measured.length > 0 ? (
-            measured.map((m) => (
-              <input
-                key={m}
-                value={set[m] ?? ''}
-                onChange={(e) => onUpdate(i, { [m]: parseMeasurement(e.target.value) })}
-                inputMode="decimal"
-                aria-label={`Set ${i + 1} ${METRIC_CONFIG[m].label.toLowerCase()}`}
-                className={`${inputClass} flex-1 text-center`}
-              />
-            ))
+            measured.map((m) =>
+              // T18: where the gear says what the choices are, the cell is a
+              // button and the panel opens beneath — no keyboard for chalked
+              // hands mid-protocol. Where it does not, this is the T12 input,
+              // unchanged (AC5).
+              canPick(set, m) ? (
+                <button
+                  key={m}
+                  onClick={() => setPanel(isPickerOpen(i, m) ? null : { index: i, field: m })}
+                  aria-expanded={isPickerOpen(i, m)}
+                  aria-label={`Set ${i + 1} ${METRIC_CONFIG[m].label.toLowerCase()}: ${
+                    set[m] ?? 'not recorded'
+                  }. Choose`}
+                  className={`${cellButtonClass} flex-1 ${
+                    isPickerOpen(i, m) ? 'border-brand-accent' : ''
+                  }`}
+                >
+                  {set[m] ?? <span className="text-slate-600">—</span>}
+                </button>
+              ) : (
+                <input
+                  key={m}
+                  value={set[m] ?? ''}
+                  onChange={(e) => onUpdate(i, { [m]: parseMeasurement(e.target.value) })}
+                  inputMode="decimal"
+                  aria-label={`Set ${i + 1} ${METRIC_CONFIG[m].label.toLowerCase()}`}
+                  className={`${inputClass} flex-1 text-center`}
+                />
+              ),
+            )
           ) : (
             <>
               <input
@@ -129,20 +189,27 @@ export function SetLogger({
             </>
           )}
 
-          <input
-            value={set.rpe ?? ''}
-            onChange={(e) => {
-              const v = e.target.value.trim();
-              const n = Number(v);
-              onUpdate(i, { rpe: v === '' || Number.isNaN(n) ? null : n });
-            }}
-            inputMode="numeric"
-            placeholder={measured.length > 0 ? '' : 'RPE'}
-            aria-label={`Set ${i + 1} RPE`}
-            className={`${inputClass} ${measured.length > 0 ? 'w-12' : 'w-12'} text-center`}
-          />
+          {/* RPE is a ten-point scale, not equipment, so it needs no gear to be
+              pickable (AC4) — and it is entered with the same chalked hands as
+              everything else on this row. */}
           <button
-            onClick={() => onDelete(i)}
+            onClick={() => setPanel(isPickerOpen(i, 'rpe') ? null : { index: i, field: 'rpe' })}
+            aria-expanded={isPickerOpen(i, 'rpe')}
+            aria-label={`Set ${i + 1} RPE: ${set.rpe ?? 'not recorded'}. Choose`}
+            className={`${cellButtonClass} w-12 ${
+              isPickerOpen(i, 'rpe') ? 'border-brand-accent' : ''
+            }`}
+          >
+            {set.rpe ?? <span className="text-slate-600">{measured.length > 0 ? '—' : 'RPE'}</span>}
+          </button>
+          <button
+            onClick={() => {
+              // Close first: an open panel would otherwise survive the delete and
+              // reopen against whichever set slid into this index — a picker
+              // pointed at a different set than the one it was opened on.
+              setPanel(null);
+              onDelete(i);
+            }}
             aria-label={`Delete set ${i + 1}`}
             className="w-7 shrink-0 rounded-md px-2 py-1 text-slate-500 hover:text-red-400"
           >
@@ -150,13 +217,34 @@ export function SetLogger({
           </button>
         </div>
 
+        {/* T18: the open picker, beneath the row it belongs to. */}
+        {open !== null && open.index === i && open.field !== 'reason' && (
+          <SetValuePicker
+            field={open.field}
+            value={open.field === 'rpe' ? (set.rpe ?? undefined) : set[open.field]}
+            edges={open.field === 'edgeMm' ? edgesFor(set) : undefined}
+            standardEdgeMm={gear.standardEdgeMm}
+            step={gear.loadStepLb}
+            onChange={(next) =>
+              onUpdate(
+                i,
+                // `rpe` spells "not recorded" as null, the measurements spell it
+                // as absent — the picker speaks one language and the row keeps
+                // its own (setReason.isSafetySignal makes the same allowance).
+                open.field === 'rpe' ? { rpe: next ?? null } : { [open.field]: next },
+              )
+            }
+            onClose={() => setPanel(null)}
+          />
+        )}
+
         {/* D27: why the hold ended. Only on exercises the plan gives a hold —
             "why did your third set of ten squats end" has no answer worth a tap.
             The reason is never inferred from holdSec against the target range: a
             hang 1s short was not necessarily dropped, and guessing would
             fabricate the safety signal §7 depends on. */}
         {askEndReason &&
-          (isOpen(i) ? (
+          (isReasonOpen(i) ? (
             <div className="mt-1 flex flex-wrap gap-1 pl-5">
               {endReasons.map((reason) => {
                 const active = set.endReason === reason;
@@ -177,7 +265,7 @@ export function SetLogger({
             </div>
           ) : (
             <button
-              onClick={() => setOpenIndex(i)}
+              onClick={() => setPanel({ index: i, field: 'reason' })}
               aria-label={
                 set.endReason
                   ? `Set ${i + 1} ended: ${REASON_CONFIG[set.endReason].label}. Change`

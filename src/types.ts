@@ -154,4 +154,20 @@ export interface Settings {
    * as "not chosen yet" with no migration and no BACKUP_SCHEMA_VERSION bump.
    */
   standardEdgeMm?: number;
+  /**
+   * The rungs that actually exist on the owner's board, largest first (D26, T18).
+   *
+   * Gear, not catalog: it decides which edge is one tap, never which edge is
+   * possible (D31), and it changes no prescription. Absent means the edge cell
+   * stays the T12 text input rather than showing a board the app invented.
+   */
+  edgesMm?: number[];
+  /**
+   * The smallest load the owner can physically add, in pounds (D26, D32).
+   *
+   * Drives the − / + step on `addedLb`, which is what §4F's "small load
+   * increments (1–3%)" costs in taps. It is equipment, not advice: the app never
+   * proposes taking a step, and no chip is ever marked recommended.
+   */
+  loadStepLb?: number;
 }

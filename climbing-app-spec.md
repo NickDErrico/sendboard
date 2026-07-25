@@ -79,6 +79,8 @@ Recorded once here so no downstream task re-derives or contradicts them.
 | D26 | **Available gear is Settings data, not catalog content** | Board edges, added-load increments, dip belt yes/no. Every numeric input in the app currently opens an iOS keyboard, and the hands typing on it are chalked and mid-protocol — which is the PRD's problem #2 in its most literal form. Knowing the four edges that actually exist on the board turns edge entry into a segmented pick, and knowing the load increments turns `addedLb` into ± chips at the 1–3% steps §4F asks for. This is not D6 reversed: it configures *input affordances*, not exercises. The catalog stays a typed constant in source, and gear never changes a prescription. |
 | D29 | **The §4E battery is a logged session against a non-rotating test routine, recorded on test-only catalog entries. Its conditions are derived from what is already stored, never re-entered** | Forced by T16. Everything §4E's table asks to record already has a typed home — edge is `edgeMm`, added weight is `addedLb`, seconds are `holdSec`, bodyweight is T15's `BodyweightEntry` — so a parallel `Retest` record would duplicate four fields, need its own backup array and version bump, and split a max-hang number across two stores. Modelling the battery as a `WorkoutLog` instead buys the set logger, the timer, the set-end reason (D27), history, and export/import for free. Two consequences make it a decision rather than an implementation detail. **(a) Test-only entries.** §4E is a maximum under one fixed protocol; §4C training is 85–90% for 5 sets. Logging both against `max-hang-half-crimp` would put two spikes on the trained series at weeks 1 and 8 that read as progress and are actually a different test — D22's refusal-to-draw-an-invalid-comparison applied to intensity instead of edge. The tests therefore get their own entries and their own two-point series, which is the only comparison §4E actually asks for. **(b) Nothing new is stored about conditions.** §4E's "identical conditions" are time of day (`startedAt`), grip (which entry it is), warm-up (D16's `completed` on the warm-up), rest before it (days since the previous completed log), and edge (D30) — every one derivable. The app *shows* the conditions at both occasions rather than asking the owner to certify them, which is D15's derive-don't-store applied a third time. |
 | D30 | **The standard edge is one stored number, chosen at the baseline and prefilled at every test thereafter** | §4E: "Pick **one** standard edge (14–20mm) and never change it mid-block — changing edge size invalidates the comparison more than any training variable." An 8-week gap is exactly long enough to forget which edge week 1 was on, and a retest on the wrong edge does not produce a worse comparison, it produces no comparison at all (D22). So the choice is made once and carried, in `Settings` rather than in the catalog — the same line D26 draws: it configures an input, it does not change a prescription. If it is ever changed mid-block the app keeps both values and declines the delta rather than silently comparing across edges. |
+| D31 | **Gear offers; it never restricts. Every input that gains a picker keeps a way to record a value the gear list does not contain** | Forced by T18. D26's whole justification is chalked hands and an iOS keyboard mid-protocol, which argues for a pick — but a pick that cannot express reality is worse than the keyboard it replaced: the owner hangs on a friend's board, or the 18mm rung is actually 17.5mm, and the choices are then to record a *wrong* number or to record nothing. Both destroy the measurement the whole app exists to keep (§7). So the gear list decides what is **one tap**, never what is **possible**, and a value already recorded off the list is displayed as it was stored and never silently snapped to the nearest chip. The same rule makes an unconfigured install safe: no gear means the T12 keyboard inputs, unchanged, rather than an invented board. |
+| D32 | **A stepper steps the value the owner already has. It never proposes the next one** | The line D19 draws, restated for a control that is easy to slide across it. `+` from a carried-forward `+35lb` is the owner deciding to add; a chip labelled "suggested" or a stepper that pre-moves the value on open would be adaptive load calculation — a standing non-goal — and §4F deliberately puts the 1–3% judgment with the person who can feel whether the last session was an 8 or a 10. The increment is therefore **gear** (what the owner can physically add), not advice: it configures the size of a tap and asserts nothing about whether to take it. No chip is ever highlighted as recommended, and no step is ever applied without a tap. |
 
 **Documented alternative, not chosen:** Expo + EAS Build → real native app with `expo-notifications` scheduling reminders in-app. Gate to revisit: owner is willing to pay $99/yr for the Apple Developer Program **and** external reminders have proven insufficient in real use (e.g. he wants the notification itself to name the day's routine). Revisit no earlier than the end of the 8-week block. Do not build toward this in v1.
 
@@ -1173,6 +1175,86 @@ Design calls:
 
 ---
 
+### [T18] Outcome: The owner can enter a set's edge, added load, and effort from the gear that actually exists on their board — with chalked hands, without the keyboard.
+Spec: this file | Status: [x] | Depends on: — | Wave 1
+
+#### Context manifest
+Create: `src/lib/gear.ts` (+ `gear.test.ts`), `src/components/SetValuePicker.tsx` | Modify: `src/types.ts`, `src/components/SetLogger.tsx`, `src/screens/ActiveSession.tsx`, `src/screens/Settings.tsx` | Conform to: D19, D21, D23, D26, D30, D31, D32 | Delete: nothing
+
+**Why this leads Wave 1 rather than T17.** Owner decision, 2026-07-25 (see the amendment). It is the only Wave 1 task with no dependencies, it is the one every other Wave 1 item sits on top of (T19's chained sets enter values through this logger), and it addresses the PRD's problem #2 in its most literal form: every numeric field in a session currently summons an iOS keyboard, and the hands typing on it are chalked, mid-protocol, and three minutes into a rest interval. Nothing here is unbackfillable — it improves sessions that have not happened yet — so it is ordered by payoff per unit of work, exactly as Wave 1's semantics prescribe.
+
+**The mechanism, stated once: a cell becomes a button, and the panel opens beneath the row.** T14 already established this shape in this component — the end-reason chips render under the set they belong to, at most one row open at a time, with the open row *computed* rather than stored. T18 reuses it rather than inventing a second interaction: tapping a measured cell opens that cell's picker in the same place, and the same "at most one thing open" rule now spans pickers and reason chips together. The row itself does not change size, which is what keeps a five-set max hang readable at 390px (T3 AC5).
+
+**What the keyboard costs, and what replaces it.** Three fields are entered per set on the charted exercises: `edgeMm` (a pick from four rungs), `addedLb` (a step from what was carried forward), and `rpe` (a pick from a ten-point scale). None of them is free text in practice, and all three currently are. The gear that decides the first two is the owner's board and the owner's plates, which is why it is Settings data (D26) — the catalog cannot know it and must not be edited to hold it (D6).
+
+#### Settings additions — two optional fields, no schema movement
+
+```ts
+interface Settings {
+  installGuideDismissed: boolean;
+  standardEdgeMm?: number;   // D30, unchanged
+  edgesMm?: number[];        // D26: the rungs that exist on the board, largest first
+  loadStepLb?: number;       // D26/D32: the smallest load the owner can actually add
+}
+```
+
+Both optional, and `settings` already passes through `backup.ts` whole — so `DB_VERSION` and `BACKUP_SCHEMA_VERSION` both stay at 2, exactly as T16's `standardEdgeMm` did.
+
+#### Acceptance criteria
+1. WHEN the owner enters their board's edges and their smallest load increment in Settings THE values SHALL be stored on `Settings`, normalised (deduped, sorted largest-first, junk refused rather than stored as `NaN`), and SHALL survive a reload. [x]
+2. WHEN an exercise records `edgeMm` and edges are configured THE set's edge cell SHALL open a one-tap picker of those edges instead of focusing a text input, and the standard edge (D30) SHALL be marked in it. [x]
+3. WHEN an exercise records `addedLb` and a load step is configured THE set's load cell SHALL open a − / + stepper at that increment, stepping from the value already in the row and never pre-moving it (D32). [x]
+4. WHEN a set's RPE is entered THE owner SHALL be able to pick it from the scale in one tap, with a way to clear it back to not-recorded — and this SHALL NOT require any gear to be configured, since a ten-point scale is not equipment. [x]
+5. WHEN no gear is configured THE edge and load cells SHALL behave exactly as T12/T14 left them — text inputs, same layout, nothing invented, no empty picker (D31). The RPE scale is not gear and is unaffected (AC4). [x]
+6. WHEN a set already holds a value the gear list does not contain THE value SHALL be displayed as stored, SHALL NOT be snapped to the nearest option, and the panel SHALL still offer a way to type a replacement (D31). [x]
+7. WHEN a picker is open THE app SHALL have at most one panel open across the whole logger — a second tap elsewhere closes the first — and SHALL NOT persist which one it was (D18's reasoning). [x]
+8. WHEN a set row is created by carry-forward, the standard edge, or the timer THE seeded values SHALL be unchanged by this task (D19, D30): the picker changes how a value is *entered*, never what it is seeded to. [x]
+9. WHEN gear is exported and re-imported THE fields SHALL round-trip inside `settings`, and a `settings` object written before this task SHALL read as "no gear configured" with no migration and no version bump. [x]
+10. WHEN the panel is open on a 390px viewport THE set row SHALL keep its layout and the options SHALL be reachable without horizontal scrolling. [x]
+
+#### Edge cases
+- An edge list typed as `20, 18, x, 15,` → the three real numbers are kept and the junk is dropped; a list that parses to nothing leaves the stored value alone rather than clearing the board (`StandardEdge`'s existing rule). [x]
+- Duplicates and out-of-order entry (`18, 20, 18`) → stored once each, largest-first, because that is the order the rungs sit in and the direction progression moves (D22: smaller is harder). [x]
+- Stepping below zero → clamps at 0, which is bodyweight (`METRIC_CONFIG.addedLb` already formats 0 as `BW`), never negative. [x]
+- Stepping from a not-recorded cell → `+` records one step, `−` records 0 (bodyweight). Both are one tap to the two values a first set is actually likely to be, and neither invents a number the owner did not choose. [x]
+- Float drift: a 2.5 step from 32.5, or a 0.1 step anywhere, must never land `35.000000000000004` in a stored measurement — every stepped value is rounded to 0.1 like every other measurement in the app. [x]
+- A load step larger than the owner's real plates (a fat-fingered `50`) is not refused — it is gear, and refusing it would be the app claiming to know the board better than the owner (D31). Bounds reject only what cannot be a load at all. [x]
+- Clearing the edge list in Settings returns those cells to text inputs mid-block with no crash and no orphaned open panel. [x]
+- The picker must not appear on cells belonging to exercises that declare no metrics — the seventeen free-text exercises are untouched, exactly as T14 AC4 required for the reason chips. [x]
+- A picker open on a row that is then deleted → the panel closes rather than reopening against a shifted index (T14's stale-index rule, extended). [x]
+- Gear must not alter `holdSec` entry: it is written by the timer as a measurement (T10/T13), and a stepper on a result would invite editing a recorded performance rather than entering a setup. [x]
+
+#### Non-goals & do-not-touch
+- MUST NOT propose, highlight, or pre-apply a next load (D19, D32, and adaptive load calculation is a standing non-goal). No chip is ever marked recommended.
+- MUST NOT refuse, clamp, or snap a value because the gear list does not contain it (D31).
+- MUST NOT change any `prescription`, hide any exercise, or alter rotation based on gear (D26 configures inputs, not content).
+- MUST NOT store a dip-belt flag. D26 named it, and a pass over what it could drive found only forbidden answers — changing a prescription, hiding an exercise — or nothing at all. See the amendment; re-propose if a use appears.
+- MUST NOT bump `DB_VERSION` or `BACKUP_SCHEMA_VERSION`; both fields are optional on an object the backup already carries whole (AC9).
+- MUST NOT touch bodyweight or standard-edge entry in Settings. Both are entered out of session with clean hands, where a keyboard is the right control.
+- MUST NOT persist open-panel state (D18's reasoning: view state is not data).
+- MUST NOT add a dependency. The picker is the same buttons-and-flexbox the reason chips already are.
+
+#### Verify
+`npm run test && npm run build && npm run lint`, plus an in-browser pass: configure `20, 18, 15, 10` and a `2.5` step; confirm a max-hang set's edge cell opens four chips with 20 marked standard and never raises the keyboard; confirm `+`/`−` move added load by 2.5 from the carried-forward value and clamp at BW; confirm an RPE lands in one tap and clears in one; clear the gear and confirm the same row falls back to the T12 inputs; check that a set recorded on an off-list 17.5mm edge still reads 17.5.
+
+#### Amendments
+
+**2026-07-25 — T18 built. Build + lint clean, 305 tests green (29 new: 28 in `gear`, 1 backup). All ten ACs verified in a running browser against a real Day 1 session.** Files: `src/lib/gear.ts` (+ `gear.test.ts`), `src/components/SetValuePicker.tsx`; modified `src/types.ts`, `src/components/SetLogger.tsx`, `src/screens/ActiveSession.tsx`, `src/screens/Settings.tsx`, `src/lib/backup.test.ts`. **No new dependencies, no new object store, no migration, and `DB_VERSION`/`BACKUP_SCHEMA_VERSION` both still 2** — confirmed by reading the live database after configuring gear, exactly as the spec predicted.
+
+Verified on the running app, not only in tests: `20, 18, x, 15, 10` typed into Settings stored `edgesMm: [20,18,15,10]` — junk dropped, order normalised — alongside `loadStepLb: 2.5`, with the database still at version 2 (AC1, AC9); a max-hang set's edge cell rendered as a button labelled "Set 1 edge: 20. Choose" and opened `20★ 18 15 10` with the standard edge marked in both the chip and its accessible name, while the hold cell stayed the text input the timer writes into (AC2, and the `holdSec` edge case); the load stepper opened reading "not recorded" with the cell untouched, then `+` → 2.5, `+ +` → 7.5, `−` → 5, and three more `−` taps walked 2.5 → 0 → 0 rather than going negative (AC3, D32, the clamp edge case); RPE opened `6 7 8 9 10` and an 8 landed in one tap on an exercise with no gear configured for it (AC4); typing `17.5` into the edge panel stored 17.5 and reopening the picker listed `20★ 18 17.5 15 10` — the off-board rung shown in board order, never snapped (AC6, D31); opening the edge picker closed the load stepper and collapsed the reason chips to "Why did it end?", and re-opening restored them (AC7); `+ Add set` seeded set 2 with `edgeMm 17.5, addedLb 0, rpe null` — carry-forward untouched, RPE still never carried (AC8, D19); clearing all three gear fields and reloading returned the edge and load cells to `INPUT`s with the recorded 17.5 and 8 intact, while RPE stayed a picker (AC5); and with a panel open the document measured `scrollWidth === clientWidth === 390` (AC10).
+
+Design calls:
+- **One `panel` state for pickers and reason chips together.** T14 kept an `openIndex` for the chips with a computed default; T18 needs "at most one thing open in this logger", which is one rule, not two that can disagree. `{index, field}` where `field` is a picker or `'reason'` keeps T14's computed default intact (`panel === null` still means "the last set's chips, if unrecorded") while making every other panel explicit. Nothing is persisted (D18).
+- **A cell becomes a button, and the button is the same box as the input.** `cellButtonClass` deliberately mirrors `inputClass`: the row must not change size when gear is configured, or the five-row max-hang card stops fitting 390px. The measured verification of that is AC10 rather than a screenshot.
+- **`canPick` is a type predicate, not a boolean.** `holdSec` has no picker by design, and a plain boolean let a widened `ProgressMetric` reach `PickerField` — the compiler caught it. Narrowing at the guard means the "the timer owns this value" rule is enforced by the type system rather than by a comment.
+- **The picker holds no arithmetic.** Every ± tap calls `gear.stepLoad`, so the clamp and the 0.1 rounding live in the tested module rather than in a button handler — the same split `progress.sessionValue` and `retest` already use to stop two surfaces disagreeing about a number.
+- **Deleting a set closes the panel explicitly.** T14's stale-index rule only catches an index that falls off the end; deleting set 1 of 2 leaves index 0 valid and would have pointed an open picker at a *different* set than the one it was opened on. One line in the delete handler, and it was worth the browser check that confirmed it.
+- **RPE is offered as 6–10 rather than 1–10.** §4C's max hangs are "very hard by rep 3" and §4B's PIMA runs at 95–100% effort, so the useful range is the top of the scale and a 3 is a mistyped 8 far more often than a real rating. Five chips fit one row at 390px; anything outside the range is still typeable in the same panel (D31), and an already-recorded value is displayed as stored.
+- **The load stepper stays open across taps; a pick closes.** Two `+` taps is the common case for a 5lb move on a 2.5lb rack, and closing after each would double the taps. An edge or an RPE is a single decision, so those close on choice — which is also what makes "at most one open" invisible in practice.
+- **`GearSettings` follows `StandardEdge`'s refusal rule.** A list that parses to nothing, or a step that parses to nothing, leaves the stored value alone rather than clearing it. Mistyping a board must not delete it, and the field re-renders with what is actually stored so the refusal is visible rather than silent.
+
+---
+
 ## Execution notes
 
 - **Gates:** Gate 1 = PRD approved (now, by the owner). Gate 2 = decomposition approved after T0's spike report. Gate 3 = implementation reviewed against acceptance criteria after T8.
@@ -1360,4 +1442,22 @@ The next task in wave order, specced one ahead as Level 2 prescribes. Three thin
 **Net effect on scope:** one task, two decisions, five catalog entries, one seed routine, one optional `Routine` field (`inRotation`), one optional `Settings` field (`standardEdgeMm`), and one union member on `Exercise.holdSeconds`. No new dependencies, no new object store, no `DB_VERSION` or `BACKUP_SCHEMA_VERSION` bump, and no reversal of D2a, D9, D15, D16, D18–D22, or D27.
 
 **Built the same day; every prediction above held.** See T16's amendment for the verification pass. One thing the spec did not anticipate: an open hold must not offer `target` as an end reason, since a test with no prescribed duration cannot have hit one. **Wave 0 is now complete** — set-end reason (T14), bodyweight (T15) and the §4E battery (T16) are all in place, so nothing further is unbackfillable and the 8-week block can start. T17 (symptom check + plan-cited stop-signal card) leads Wave 1.
+
+---
+
+**2026-07-25 — Wave 1 reordered: T18 leads, T17 deferred. T18 spec written, D31 and D32 added.**
+
+Owner decision, on being asked to settle T17's three open choices: *"I don't care about T17 that much."* That is a scoping fact, not an aside. A symptom check is worth exactly what gets tapped into it — an unrecorded stop signal is not a quiet safety net, it is a surface that **looks** like coverage and isn't, which is worse than the honest absence the app has today. Building it against stated indifference would produce that.
+
+| Change | Why |
+|---|---|
+| T17 deferred within Wave 1; T18 leads | Nothing in T17 is unbackfillable (that was Wave 0's property, and it is spent) and nothing depends on it — T18–T21's stated dependencies are T18 → T19 → T20 → T21, with T17 outside that chain. Deferring it costs no ordering and no rework. |
+| T18's dependency reads `—`, as the Level 2 table already had it | The backlog table lists T18 with no dependencies; only the wave-internal ordering moved. No table edit was needed, which is itself the check that the reorder is safe. |
+| D31 added: gear offers, never restricts | The failure mode a picker introduces: a board it cannot express forces a wrong number or no number, and both destroy the measurement §7 asks the owner to watch. So the gear list decides what is one tap, never what is possible — which also makes an unconfigured install identical to today's app rather than a fabricated board. |
+| D32 added: a stepper steps, it never proposes | ± is one small design slip from "suggested next load", which is adaptive load calculation (standing non-goal) and would take §4F's 1–3% judgment away from the only party who can feel whether the last session was an 8 or a 10. The increment is gear — what the owner can physically add — and asserts nothing about whether to add it. |
+| **D26's dip-belt flag deliberately not built** | Recorded openly rather than dropped quietly. A pass over what a stored `hasDipBelt` could actually drive found three candidates: change a prescription (forbidden by D26 itself), hide or grey an exercise that needs one (forbidden — the app narrows emphasis, never hides the plan, per D25), or filter the T3 catalog browser (which already filters by `Equipment`, including `dip-belt`, with no setting at all). That leaves nothing, and a Settings toggle that configures nothing is a question the owner answers once and the app then ignores. Re-propose if a use appears. |
+
+**Net effect on scope:** one task, two decisions, two optional `Settings` fields, one new pure module and one new component. No new dependencies, no new object store, no `DB_VERSION` or `BACKUP_SCHEMA_VERSION` bump (`settings` already travels through the backup whole — the same property that made `standardEdgeMm` free in T16), and no reversal of D2a, D6, D9, D15, D16, D18–D22, or D27. T17 remains specced-but-unbuilt in the backlog table and can be picked up at any point in the block, in full or reduced to its cheap half (the plan-cited card firing on T14's existing `pain` / `form-broke` reasons, with no symptom record at all).
+
+**Built the same day; every prediction above held, including the version numbers.** See T18's amendment for the verification pass. Two things the spec did not anticipate, both found while building: `canPick` had to be a type predicate rather than a boolean, so `holdSec` cannot reach a picker through a widened metric type; and deleting a set needs to close an open panel explicitly, since T14's stale-index rule only catches an index that falls off the end. **T19 (chained sets: set *n* of *N* against the prescription) is next in Wave 1**, and it now enters values through this logger.
 
