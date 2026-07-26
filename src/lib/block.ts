@@ -147,6 +147,27 @@ export function weekOf(startKey: string, today: string | Date): number {
   return Math.max(1, Math.floor(days / 7) + 1);
 }
 
+/**
+ * The earliest local day that belongs to the block — the **Monday of week 1**.
+ *
+ * Distinct from `startKey`, which is the day of the first counted *session*, and
+ * the distinction only ever matters for one record: §4E's battery. §4E puts the
+ * baseline in week 1 "fully rested, after a thorough warm-up", which in practice
+ * means the day *before* the block's first training session — so a floor at
+ * `startKey` excludes the one occasion the whole retest comparison depends on.
+ * Found by T28, where that floor silently dropped the baseline and the poster
+ * reported "the comparison needs two" with two on record.
+ *
+ * Lowering the floor to the week boundary admits *only* batteries: every counted
+ * rotating session is at or after `startKey` by construction. It is also the
+ * boundary the week arithmetic already uses (`weekOf` runs off `mondayOf`), so
+ * this makes membership agree with the numbering rather than introducing a new
+ * rule (D10, D29).
+ */
+export function blockFloorKey(position: BlockPosition): string {
+  return dateKey(mondayOf(position.startKey));
+}
+
 /** "week 6 of 8", "~week 6 of 8", "~week 8+" — the tilde marks a derived anchor. */
 export function formatWeek(week: number, derived: boolean): string {
   const tilde = derived ? '~' : '';

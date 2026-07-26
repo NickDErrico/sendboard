@@ -16,6 +16,8 @@ export type Route =
   | { name: 'routine'; routineId: string }
   | { name: 'session' }
   | { name: 'history' }
+  | { name: 'block' }
+  | { name: 'poster' }
   | { name: 'retest' }
   | { name: 'checks' }
   | { name: 'checklog' }
@@ -42,6 +44,10 @@ export function parseHash(hash: string): Route {
       return { name: 'session' };
     case 'history':
       return { name: 'history' };
+    case 'block':
+      return { name: 'block' };
+    case 'poster':
+      return { name: 'poster' };
     case 'retest':
       return { name: 'retest' };
     case 'checks':

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Routine, WorkoutLog } from '../types';
 import { createLog } from '../lib/session';
-import { getAllLogs, getAllRoutines, getSettings, saveLog } from '../lib/storage';
+import { getAllExercises, getAllLogs, getAllRoutines, getSettings, saveLog } from '../lib/storage';
 import {
   describeLastCompleted,
   rotates,
@@ -10,6 +10,7 @@ import {
 } from '../lib/rotation';
 import { batteryOccasions, type Occasion } from '../lib/retest';
 import { blockPosition, formatPhaseWeeks, phaseFor, type BlockPosition } from '../lib/block';
+import { buildEdgeWeekGrid, describeTension, type EdgeWeekGrid } from '../lib/tension';
 import { LIGHTER_WEEK_CAVEAT } from '../data/blockPhases';
 import { go } from '../lib/routes';
 import { WeekStatus } from '../components/WeekStatus';
@@ -34,16 +35,21 @@ export function Home() {
   // T24/D25: derived, never scheduled — and null until a training session has been
   // completed, which the card states rather than papering over with week 1.
   const [block, setBlock] = useState<BlockPosition | null>(null);
+  // T26: the same block, aggregated. Null exactly when `block` is null, which is
+  // what keeps the entry point below from ever being a control with nothing
+  // behind it (AC10).
+  const [tension, setTension] = useState<EdgeWeekGrid | null>(null);
 
   // Reloads on mount and refocus, so a session finished elsewhere (or a resume
   // after force-close) is reflected — and so "days ago" rolls over at midnight
   // without a reload, the same way T5b's daily status does.
   useEffect(() => {
     const load = async () => {
-      const [rs, logs, settings] = await Promise.all([
+      const [rs, logs, settings, exercises] = await Promise.all([
         getAllRoutines(),
         getAllLogs(),
         getSettings(),
+        getAllExercises(),
       ]);
       setRoutines(rs);
       // getAllLogs is sorted by startedAt descending.
@@ -54,6 +60,7 @@ export function Home() {
       // No `liveLog`: an abandoned session must not advance a count, the same rule
       // `routineRotation` follows. The session screen numbers the live one.
       setBlock(blockPosition({ logs, routines: rs, settings, today: new Date() }));
+      setTension(buildEdgeWeekGrid({ logs, routines: rs, exercises, settings, today: new Date() }));
     };
     void load();
     const onFocus = () => void load();
@@ -156,6 +163,30 @@ export function Home() {
           </>
         )}
       </section>
+
+      {/* T26: where the block's work went, one tap from where the block lives.
+          A sibling of the card above rather than a control on it — T24's card is
+          inert because there is nothing to *do* with a week, and that is still
+          true; this is a second thing to *read*. Rendered only when there is a
+          block behind it, so it is never a dead control (AC10). */}
+      {tension !== null && (
+        <button
+          onClick={() => go({ name: 'block' })}
+          className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-700 bg-brand-surface p-3 text-left"
+        >
+          <span className="min-w-0">
+            <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Edge × week · under tension
+            </span>
+            <span className="mt-0.5 block text-sm tabular-nums text-slate-300">
+              {describeTension(tension.total)}
+            </span>
+          </span>
+          <span aria-hidden className="shrink-0 text-slate-500">
+            ›
+          </span>
+        </button>
+      )}
 
       {/* Sorted up-next first (D15). Both stay startable in one tap — "up next" is
           a suggestion from rotation order, never a lock, and there is deliberately

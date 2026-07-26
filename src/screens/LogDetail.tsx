@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import type { Exercise, WorkoutLog } from '../types';
 import { getAllExercises, getRoutine } from '../lib/storage';
 import { formatSet } from '../lib/lastTime';
+import { describeSessionFacts, sessionFacts, sigilFor } from '../lib/sigil';
+import { SigilLegend, SigilMark } from '../components/SessionSigil';
 
 // Read-only view of a completed session (T5 non-goal: no editing in v1).
 export function LogDetail({ log, onBack }: { log: WorkoutLog; onBack: () => void }) {
@@ -17,6 +19,10 @@ export function LogDetail({ log, onBack }: { log: WorkoutLog; onBack: () => void
   }, [log.routineId]);
 
   const when = log.completedAt ?? log.startedAt;
+  // T27: the catalog arrives asynchronously, so both are null on first paint and
+  // the mark appears with the exercise names rather than before them.
+  const all = [...exercisesById.values()];
+  const sigil = all.length === 0 ? null : sigilFor(log, all);
 
   return (
     <div className="mx-auto max-w-md p-4 pb-24">
@@ -29,6 +35,27 @@ export function LogDetail({ log, onBack }: { log: WorkoutLog; onBack: () => void
 
       <h1 className="text-xl font-bold tracking-tight text-slate-100">{routineName}</h1>
       <p className="mt-0.5 text-xs text-slate-500">{new Date(when).toLocaleString()}</p>
+
+      {/* T27/D44: the mark at the one size it can be read at, with the legend that
+          makes it readable. Rendered here rather than only in the list precisely
+          because this is the screen where the sets it was drawn from are also on
+          display — a mark you can check against the log is a report; one you
+          cannot is a badge. Absent entirely when the session held no holds. */}
+      {sigil !== null && (
+        <section className="mt-4 flex items-start gap-4 rounded-xl border border-slate-700 bg-brand-surface p-3">
+          <span className="text-brand-accent">
+            <SigilMark sigil={sigil} size={104} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold tabular-nums text-slate-200">
+              {describeSessionFacts(sessionFacts(log, all))}
+            </p>
+            <div className="mt-2">
+              <SigilLegend sigil={sigil} />
+            </div>
+          </div>
+        </section>
+      )}
 
       {log.entries.length === 0 ? (
         <p className="mt-6 text-sm text-slate-400">No exercises were logged in this session.</p>
