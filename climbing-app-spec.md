@@ -1,7 +1,7 @@
 # SPEC: Personal Climbing Training App ("Sendboard")
 
 Version 1.8 — 2026-07-25
-Status: PRD approved with amendments — Gate 1 passed. **T1–T16 built — Wave 0 is complete, so the block can start.** T17–T28 remain as a prioritized backlog (v1.8), specced and built one at a time in wave order. See the Amendments log at the end of this file for what changed from v1.0 and why.
+Status: PRD approved with amendments — Gate 1 passed. **T1–T16 built — Wave 0 is complete, so the block can start.** Wave 1's chain is complete: T18–T21 built, T17 deferred within the wave. Wave 2 has opened: T22 and T23 built. T24–T28 remain as a prioritized backlog (v1.8), specced and built one at a time in wave order. See the Amendments log at the end of this file for what changed from v1.0 and why.
 
 > **Executor note:** This file is the source of truth. Read it in full before writing code. Mark task status markers in place as you go. If a decision you need was not made here, STOP, mark the task `[f]` with one line why, and escalate — do not improvise.
 
@@ -1337,6 +1337,319 @@ Design calls:
 
 ---
 
+### [T20] Outcome: The owner can run a set with the phone on the floor and their eyes on the board — counted in, told which set is next, and told by pitch where they are in the hold window.
+Spec: this file | Status: [x] | Depends on: T19 | Wave 1
+
+#### Context manifest
+Create: `src/lib/cues.ts` (+ `cues.test.ts`), `src/lib/speech.ts` | Modify: `src/types.ts`, `src/lib/timer.ts` (+ `timer.test.ts`), `src/lib/beep.ts`, `src/lib/chain.ts` (+ `chain.test.ts`), `src/components/SessionTimer.tsx`, `src/screens/ActiveSession.tsx`, `src/screens/Settings.tsx` | Conform to: D2a, D18, D19, D23, D31, D33, D34 | Delete: nothing
+
+**The gap this closes, and it is the last purely visual one in a session.** Everything T19 added is on a screen the owner cannot look at: mid-hang the eyes are on the board and the phone is on the floor, and the two facts that matter at that exact moment — which set this is, and whether the hang has reached 7 seconds yet — are printed in 12px on a bar six feet away. §4B is worse still: 3–5 seconds at 100% max effort, and the app currently gives no signal at all for *when to start pulling*, so the owner taps Start, looks up, gets set, and pulls whenever they happen to be ready. Every one of those seconds is inside the measured hold.
+
+**Two channels, and only one of them is allowed to matter (D34).** Tones already work on this device, and T13 paid for that: an `AudioContext` primed from a user gesture, `navigator.audioSession.type = 'playback'` so the ringer switch does not silence it, and a resume on the way back to the foreground. Web Speech is a *second* audio path with none of that history — it may be unavailable, may be muted, may lag, and on iOS may queue behind an utterance that is still speaking. So the rule is that the tone carries the **event** and the voice carries the **words**: every cue in this task fires as a tone regardless of settings or platform, and speech is added on top of it. Nothing in the session ever waits on `speechSynthesis`, and an install where speech never makes a sound behaves exactly as an install where it does, minus the words. This is the same failure-tolerance rule `beep.ts` already states, extended to a less reliable API.
+
+**The count owns the clock (D33).** Owner decision, 2026-07-25: tapping Start begins a spoken count and the hold timer begins on **"pull"**, not on the tap. That makes `holdSec` measure the effort rather than the effort plus however long it took to step up and load — the same defect the deferred motion-sensor idea was going to fix, addressed here for the cost of a countdown that the protocol wants anyway. It is a change to what a recorded number *means*, which is why it is a decision and not an implementation detail, and it is free exactly once: the block has not started (confirmed 2026-07-24), so no logged hold exists that would be compared against a differently-measured one. After week 1 it would be D22's invalid comparison, on the axis §7 asks the owner to read.
+
+The count is not an auto-start. T19 AC5 stands untouched: nothing begins a count except a tap, a completed rest still waits, and the seconds between the tap and "pull" are the owner's to cancel.
+
+#### Settings additions — two optional fields, no schema movement
+
+```ts
+interface Settings {
+  // …
+  voiceCues?: boolean;   // D34: absent means on — the owner asked for the voice
+  leadInSec?: number;    // D33: absent means 3; 0 turns the count off entirely
+}
+```
+
+Both optional on an object `backup.ts` already carries whole, so `DB_VERSION` and `BACKUP_SCHEMA_VERSION` stay at 2 for the third task running.
+
+#### Timer additions — one new phase, on the same absolute-instant math
+
+```ts
+type TimerPhase = 'idle' | 'counting' | 'holding' | 'resting';
+interface TimerState { /* … */ leadInMs: number; }   // counting only
+```
+
+The count is a phase in `timer.ts`, not a `setTimeout` in a component, for D18's reason: every reading is `(now - startedAt)` against an absolute instant, so a throttled tick costs a stale frame and never a drifted count. The transition to `holding` sets `startedAt` to `countStart + leadInMs` rather than to the tick that noticed — the same correction `autoStopHold` already makes, and for the same reason: a late tick must not shorten a hold or lengthen a count.
+
+#### The spoken set is closed, and short
+
+| When | Tone (always) | Speech (when on) |
+|---|---|---|
+| Each second of the count | short tick | "three" … "two" … "one" |
+| The count reaching zero | go tone, hold starts | "pull" |
+| A whole second inside the target band | pip, pitch rising across the band | — |
+| The hold reaching its maximum | `beepHoldEnd`, unchanged (T13) | — |
+| A rest completing | `beepRestEnd`, unchanged (T13) | "Rest done. Set 4 of 5." |
+
+**Nothing is spoken while a hold is running.** The owner is at 100% effort with their teeth together, and a voice reading numbers at them is noise they cannot act on. The band is reported in pitch instead, which needs no parsing: a pip at each whole second from `min` up to `max`, rising in frequency across the window, so "am I at 7 yet" and "how much of the window is left" are one sound. A fixed target (`min === max`) has no window and gets no pips — the end tone is the whole message. An open hold (T16's lock-off test) has no band at all and stays silent, because a pitch that reported a position in a range §4E deliberately does not prescribe would be inventing one.
+
+#### Acceptance criteria
+1. WHEN the owner taps Start on a timed hold and a count-in is configured THE app SHALL count down audibly and start the hold clock at zero, and the recorded `holdSec` SHALL measure from that instant rather than from the tap (D33). [x]
+2. WHEN a count is running THE owner SHALL be able to cancel it in one tap, leaving no hold, no rest, no measurement, and no set (D19). [x]
+3. WHEN the count-in is set to 0, or a hold is started with none configured THE hold SHALL begin at the tap exactly as T13/T19 left it. [x]
+4. WHEN a hold is running inside its prescribed band THE app SHALL sound one pip per whole second, rising in pitch across the band, and SHALL sound none before `min`, none for a fixed target, and none for an open hold. [x]
+5. WHEN a rest completes THE app SHALL speak which set is next, using T19's position, and SHALL still sound the existing rest tone whether or not speech is available or enabled. [x]
+6. WHEN spoken cues are turned off THE app SHALL make every tone it makes with them on — count ticks, go, band pips, hold end, rest end — and say nothing. [x]
+7. WHEN speech is unavailable, silenced by the device, or fails THE session SHALL be unaffected: no timer waits on it, no control is disabled, and no error is shown (D34). [x]
+8. WHEN the owner opens Settings THE voice SHALL be togglable, the count-in length SHALL be editable in seconds, and both SHALL be testable off the training floor beside the existing "Test sound". [x]
+9. WHEN the app is backgrounded during a count and returns after it would have ended THE app SHALL cancel the count rather than start (and possibly auto-finish) a hold nobody heard begin. [x]
+10. WHEN a rest completes THE count SHALL NOT start by itself, and neither SHALL a hold (T19 AC5, restated because this task adds a second thing that could violate it). [x]
+11. WHEN these settings are exported and re-imported THEY SHALL round-trip inside `settings`, and a `settings` object written before this task SHALL read as voice-on, count-in 3, with no migration and no version bump. [x]
+
+#### Edge cases
+- A count-in typed as junk, or negative, leaves the stored value alone — `StandardEdge`'s refusal rule, which every Settings field in this app now follows. Bounds accept 0–30: zero is "off", and a count longer than the rest between sets is not a count. [x]
+- Starting a hold while a count is already running restarts the count rather than stacking two. There is one timer because there is one owner (`startHold`'s existing rule). [x]
+- A band whose `min` is 0 (nothing in the catalog, but expressible) pips from second 1, not second 0 — a pip at the instant the clock starts would be indistinguishable from the go tone. [x]
+- The 7–10s band pips at 7, 8 and 9; 10 belongs to `beepHoldEnd`, which already fires there and says something different ("let go", not "still going"). [x]
+- Speech that is still speaking when the next cue fires is cut off, not queued: cues are perishable, and "two" arriving after "pull" is worse than "two" never arriving. [x]
+- A hold started with a count on an exercise with no prescribed rest (the wall press) counts in identically and lands idle-with-a-result exactly as `stopHold` already leaves it. [x]
+- Cancelling a count leaves the previous set's rest *gone*, because starting the hold took the timer slot — the same trade `startHold` has always made, and the reason cancel is one tap rather than buried. [x]
+- The count runs during the §4E battery too. The tests are 7s max hangs and open lock-offs, and a count that starts the clock when the owner is actually loaded makes those numbers *more* comparable, not less. [x]
+
+#### Non-goals & do-not-touch
+- MUST NOT start a hold, a count, or a rest without a tap (T19 AC5, AC10 here).
+- MUST NOT let any timer transition, control, or logged value depend on `speechSynthesis` succeeding (D34, AC7).
+- MUST NOT speak during a running hold, and MUST NOT speak encouragement, adherence, ranking, or a verdict anywhere (D23). The voice reports a number and a word.
+- MUST NOT add a voice picker, rate/pitch controls, or a downloaded voice asset. The platform voice is the platform's business.
+- MUST NOT use the Notification API or anything that fires while the app is backgrounded (D2a, unchanged since v1.1).
+- MUST NOT change `beepHoldEnd` or `beepRestEnd`. They are the two cues the owner has already learned, and T21 is about to lean on them harder.
+- MUST NOT bump `DB_VERSION` or `BACKUP_SCHEMA_VERSION` (AC11).
+- MUST NOT build any part of T21's eyes-shut mode. This task gives it the audio; the surface is its own.
+
+#### Verify
+`npm run test && npm run build && npm run lint`, plus an in-browser pass: start a max hang and confirm "3, 2, 1, pull" with the clock starting at zero on "pull" and the logged hold measuring from there; cancel a count mid-way and confirm nothing is left behind; set the count to 0 and confirm the hold starts on the tap; listen through a 7–10s hang for three rising pips then the low end tone; let a rest run out and hear "Rest done. Set 3 of 5."; turn the voice off and confirm every tone still fires and nothing is said; background the app mid-count and return late, confirming the count was cancelled rather than started.
+
+#### Amendments
+
+**2026-07-25 — T20 built. Build + lint clean, 356 tests green (32 new: 21 in `cues`, 9 in `timer`, 1 in `chain`, 1 in `backup`). All eleven ACs verified in a running browser against a real Day 1 session, including a 3 minute rest run to completion.** Files: `src/lib/cues.ts` (+ `cues.test.ts`), `src/lib/speech.ts`; modified `src/types.ts`, `src/lib/timer.ts` (+ `timer.test.ts`), `src/lib/beep.ts`, `src/lib/chain.ts` (+ `chain.test.ts`), `src/components/SessionTimer.tsx`, `src/screens/ActiveSession.tsx`, `src/screens/Settings.tsx`, `src/lib/backup.test.ts`. **No new dependencies, no new object store, and `DB_VERSION`/`BACKUP_SCHEMA_VERSION` both still 2** — read off the live database mid-session, four stores, exactly as the spec predicted for the third task running.
+
+**The audio was verified by recording it, not by trusting it.** Cues are the one thing a screenshot cannot show, so the pass instrumented `AudioContext.prototype.createOscillator` and `speechSynthesis.speak` and read the log back. A max-hang set produced, in order: ticks at 440Hz on each of three seconds, the 990Hz go tone, then — measured from "pull" — pips at **7.00s (620Hz), 8.01s (767Hz) and 9.00s (913Hz)**, and the 520Hz hold-end tone at 9.99s, with the bar reading `✓ Held 10.0s` (AC1, AC4). Spoken alongside: "3", "2", "1", "pull", and nothing at all while the hold ran. A full 3 minute rest was allowed to run out, producing the rest tones followed by **"Rest done. Set 2 of 5."** with the bar offering `▶ Start set 2 of 5 · 7–10s` and sitting at 0:00 rather than starting it (AC5, AC10). Also verified: cancelling mid-count left no bar, no set and no go tone (AC2); a count-in of 0 put the tap straight into `HOLD` with no ticks and a manual Stop still recording real elapsed time (AC3); with the voice off, all five tones of a hold fired and the only utterance was the silent priming one (AC6); with `speak` rewired to throw on every call, the whole hold ran through — count, go, auto-stop at 10.0s, rest — with an empty console (AC7); the settings surface stored `leadInSec` and `voiceCues` and both survived a reload, with a junk count refused and the field snapping back to the stored value (AC8, AC11); and a count that was "slept through" (`Date.now` shifted forward 10s mid-count) was **dropped rather than started** — one tick, no go tone, no "pull", no hold (AC9).
+
+Design calls:
+- **A `counting` phase, and the hold back-dated to "pull".** The alternative — a `setTimeout` in the bar — would drift exactly where D18 says it must not, and would have to invent an answer for a count the app slept through. As a phase it is `(now - startedAt)` like everything else, and `holdFromLeadIn` sets the hold's `startedAt` to `countStart + leadInMs` rather than to the tick that noticed, the mirror of `autoStopHold`'s correction at the other end.
+- **The stale-clock clamp, found by listening.** The bar's clock ticks every 100ms, so a count started while the bar was *already on screen* was first rendered against a `now` read up to a tick before it began — 3100ms of a 3 second count, and it said **"four"**. Clamping `leadInRemainingMs` to the count's own length fixed it; the browser log is what caught it, because the printed digit and the spoken one come from the same number and both were wrong for one frame. A count can never have more left than its length, which is now a test.
+- **The refusal had to be made visible.** A junk count-in left the junk sitting in the field: the stored value was unchanged, so the value-keyed remount never happened. A read counter in the key remounts the input against what is actually stored, so a refused edit snaps back. The same wrinkle exists on the standard edge and gear fields (T16/T18) where the typed value differs from the stored one — noted, not touched, since it is those tasks' surface.
+- **Nothing is spoken while a hold runs, and the band is pitched instead.** Confirmed as a deliberate silence rather than an omission: the words list for a full max-hang set is "3, 2, 1, pull" and then nothing until the rest ends. At 100% effort a voice reading numbers is noise the owner cannot act on; three rising pips are a fact they can.
+- **The one announcement is at rest-end, not at set-start.** It was going to be both, and the two would have collided — "set 3 of 5" is still being spoken when the count needs to say "three", and `speak` cancels rather than queues (perishable cues). Rest-end is also where the phone is furthest away, which is where a spoken number is worth the most.
+- **The spoken position drops the parenthetical.** `speakChain` says "set 6" past the prescription where the screen says "set 6 (5 prescribed)", and "4 to 6" where the screen says "4–6". A voice cannot punctuate, and the screen still carries both numbers — D23 is unchanged either way: a position, never a verdict.
+
+---
+
+### [T21] Outcome: The owner can run a whole exercise — start, hang, log, rest, next — from one full-screen surface whose every control is findable without reading, with the protocol legible from the board.
+Spec: this file | Status: [x] | Depends on: T20 | Wave 1
+
+#### Context manifest
+Create: `src/lib/focus.ts` (+ `focus.test.ts`), `src/lib/timerCues.ts`, `src/components/FocusHold.tsx` | Modify: `src/components/SessionTimer.tsx`, `src/screens/ActiveSession.tsx` | Conform to: D16, D18, D19, D23, D33, D34, D35, D36 | Delete: nothing
+
+**What is left after T20, stated precisely.** The cues now cover the parts of a set the owner cannot watch: counted in, pipped through the target window, told when the rest is done and which set is next. What they do not cover is the two moments that still require *finding something*: tapping Start, which lives on one of six cards in a scrolling list, and tapping "Log 8.4s as a set", which is a 14px strip on a bar at the bottom of the screen — with chalked hands, standing at the board, immediately after a maximum effort. Those two taps are the whole of what is left, and both are aim problems rather than reading problems.
+
+**So the surface changes, not the behaviour (D35).** Focus is a *rendering* of the session that already exists: it calls the same handlers, writes through the same `addSet`, runs the same timer state, and stores nothing of its own. That is a decision rather than an implementation note because the obvious next request — "let me fix the load from in here" — is what would turn it into a second source of truth with its own rules about carry-forward and completion. Values are entered on the card, where the eyes are already open (T18's pickers exist for exactly that moment).
+
+**And the screen is not a button (D36).** The owner chose one giant Stop over tap-anywhere, and the reason generalises: a hold ends on a deliberate control or on its prescribed maximum (T13), never on ambient contact. A knee, a hip, a brushed screen on the way past must not end a max hang, because ending it writes a number that then enters the series §7 asks the owner to read. Blind-operable means *findable by feel*, which a full-width control at the bottom of the screen is; it does not mean *triggerable by accident*.
+
+**The wall card, on the screen that is already in the room.** The v1.8 ideation rejected a printable protocol card ("I'm just not going to print it") and recorded that this task covers the problem it addressed. So focus shows what that card would have: the exercise's prescription and cues, the position against the prescribed sets, and what the same exercise measured last time (T11) — at a size that reads from a few feet, in the two phases where the owner is standing still and can look (idle and resting), and never at the expense of the clock while a hold runs.
+
+#### The cue seam — extracted, because two views must not both sound
+
+The auto-stop and every cue currently live inside `SessionTimer`. A second view of the same timer would either double every tone or silence half of them, so both move into `useTimerCues(...)` in `src/lib/timerCues.ts` alongside `useNow`, and **exactly one of the two views is mounted at a time**. The hook is given the *timer's* exercise, not the focused one, so cues keep firing correctly even when focus is open on something else.
+
+#### Acceptance criteria
+1. WHEN an exercise declares a hold THE session SHALL offer a full-screen focus surface for it; an exercise with no hold SHALL be unchanged (no control, no surface). [x]
+2. WHEN focus is open THE whole set loop — start, count, hold, log, rest, next set — SHALL be driven by one primary control at a time, filling the width and at least a fifth of the viewport height, positioned at the bottom of the screen and reachable without scrolling. [x]
+3. WHEN a hold is running THE elapsed time SHALL be rendered at least four times the body text size, and the ONLY control that ends it SHALL be that primary button — the surface, the backdrop, and every readout SHALL be inert (D36). [x]
+4. WHEN a hold ends THE measured time SHALL be loggable in one tap, and that tap SHALL produce exactly the set the card's control produces — same carry-forward, same standard edge, same auto-stop end reason (D35). [x]
+5. WHEN focus is open THE cues SHALL fire exactly once each: no doubled tone, no doubled utterance, and the count, auto-stop, band pips and rest announcement SHALL behave exactly as T13/T19/T20 left them. [x]
+6. WHEN focus is open and no hold is running THE exercise's prescription, cues, position, and last time's numbers SHALL be shown at a size readable from the board; WHEN a hold is running the clock SHALL have the screen. [x]
+7. WHEN the owner leaves focus THE timer SHALL keep running, every logged set SHALL be intact, and re-entering SHALL show the phase the timer is actually in. [x]
+8. WHEN a rest completes in focus THE next set SHALL start in one tap and SHALL NOT start by itself (T19 AC5, D33's count still applies). [x]
+9. WHEN focus is opened on an exercise while the timer belongs to a different one THE surface SHALL say so plainly rather than hiding a running clock, and starting here SHALL take the timer exactly as it always has. [x]
+10. WHEN a set's values need entering THE owner SHALL do it on the card: focus SHALL NOT reproduce the pickers, the reason chips, the notes field, or the delete control (D35). [x]
+11. WHEN focus is open THE state SHALL be view state only — nothing persisted, nothing in the backup, no `DB_VERSION` or `BACKUP_SCHEMA_VERSION` movement (D18). [x]
+
+#### Edge cases
+- An exercise with a hold but no rest (the wall press) returns to the Start control after logging rather than showing a rest that the plan does not prescribe. [x]
+- §4E's open hold has no maximum to auto-stop at, so Stop is the only way it can end — which is exactly why it is the largest thing on the screen. No target band, no pips, no "in range" (T16). [x]
+- An exercise with no `prescribedSets` shows no position at all, exactly as T19 AC7 requires — the surface does not invent one to fill the space. [x]
+- Leaving focus mid-count leaves the count running on the bar; the count does not belong to the view (D18). [x]
+- A hold performed and dismissed rather than logged leaves the position where it was, and the surface reads the same set number when it comes back around (T19's rule, unchanged). [x]
+- Focus opened on an exercise with no last-time record shows the protocol without an empty "Last —" line. [x]
+- The exit control is small and cornered on purpose: it is the one thing on this screen that must *not* be easy to hit by feel. [x]
+
+#### Non-goals & do-not-touch
+- MUST NOT end a hold on a tap outside the primary control, a swipe, a shake, or any ambient contact (D36).
+- MUST NOT auto-start anything, auto-log anything, or mark an exercise completed (D16, D19, T19 AC5).
+- MUST NOT duplicate any set-entry control: no pickers, no chips, no notes, no delete (D35, AC10).
+- MUST NOT introduce a second timer, a second cue path, or a second definition of the position. Both views read one state through one hook.
+- MUST NOT persist which exercise is focused, or restore focus on reload (D18: view state is not data).
+- MUST NOT grade, congratulate, or show an adherence figure on a surface this prominent (D23 — a full-screen "3 of 5 done!" is exactly the thing the rule exists to prevent).
+- MUST NOT add a dependency, an animation library, or a fullscreen/orientation API. It is a fixed-position div.
+
+#### Verify
+`npm run test && npm run build && npm run lint`, plus an in-browser pass at 390px: open focus on a max hang and confirm the primary control's measured height is at least a fifth of the viewport at every step; run a full set — count, hold, giant Stop, one-tap log — and confirm the logged set matches what the card writes; confirm the tone and utterance log shows each cue exactly once with focus open; leave focus mid-rest and confirm the bar has the same clock; re-enter and confirm the same phase; confirm an exercise with no hold offers no focus control.
+
+#### Amendments
+
+**2026-07-25 — T21 built. Build + lint clean, 364 tests green (8 new, all in `focus`). All eleven ACs verified in a running browser at 375×812, including a second real 3 minute rest run to completion inside the surface.** Files: `src/lib/focus.ts` (+ `focus.test.ts`), `src/lib/timerCues.ts`, `src/components/FocusHold.tsx`; modified `src/components/SessionTimer.tsx`, `src/screens/ActiveSession.tsx`. **No new dependencies, no storage of any kind, and the live database unchanged at version 2 with four stores** — focus is view state that does not survive a reload, which the pass confirmed by reloading into the session and finding the surface closed and every set intact.
+
+**The controls were measured, not eyeballed.** "Findable by feel" is a size claim, so the pass read `getBoundingClientRect()` at every step of a full set rather than looking at it: Cancel, STOP, Log and Start each rendered **179px tall — 0.22 of an 812px viewport — full width, bottom edge at 796px**, with the clock at **72px, 4.5× the 16px body text**. The `min-h-[22vh]` is deliberate for that reason: a padding guess does not survive a short viewport, and AC2 is a fraction of the screen.
+
+Verified on the running app: focus is offered on the five exercises that declare a hold and withheld from the warm-up progression, which does not (AC1); a full set ran count → hold → Stop → log entirely from the primary control, and the set it wrote (`holdSec 1.6`, carry-forward fields identical) matches the shape the bar writes, with no `endReason` because a manual stop is ambiguous and an auto-stop is not — exactly T14's rule (AC4); **three ambient taps during a running hold — the backdrop, the exercise title, and the clock itself — did nothing, the hold continuing from 1.1s to 1.6s with STOP still on screen** (AC3, D36); the cue log for a full auto-stopped hang read 440, 990, 620, 767, 913, 520 with each tone exactly once and no doubled utterance, proving the extracted `useTimerCues` fires for one mounted view only (AC5); the prescription and cues were on screen before the count and during it, **absent while holding**, and back the moment the hold ended (AC6); exiting mid-rest left the bar reading the same clock (2:31) and re-entering came back to the same phase at the same second (AC7); a 3 minute rest run out inside focus produced the rest tones, "Rest done. Set 4 of 5.", a clock sitting at **0:00**, and a control that had become `▶ Start set 4 of 5` **without starting anything** (AC8); opening focus on the open-hand hang while the half-crimp rest ran showed "A timer is still running on Max Hang — Half-Crimp. Starting here takes it over." rather than a hidden clock (AC9); and the surface contains **zero inputs and exactly three other buttons** — Exit, +30s, Skip rest — so no picker, chip, note or delete was reproduced (AC10).
+
+Design calls:
+- **The cues had to move before the second view could exist.** `useTimerCues` is not a refactor for tidiness: two views of one timer would double every tone and every utterance, and the alternative (keeping the bar mounted but hidden) would have made "which view is sounding" a rendering accident. Extracting it makes the rule enforceable — exactly one view is mounted, and it holds the hook. The hook is given the *timer's* exercise rather than the focused one, which is what lets a rest on one exercise announce correctly while focus is open on another.
+- **An unlogged result outranks a running rest.** The bar can show both at once; a surface with one control has to choose, and `focusStep` chooses the set that stops existing if it is not tapped (D16). That is one line of a tested function rather than a ternary chain in a view, which is the same split `chain.ts` and `gear.ts` already use.
+- **A running rest gets no button at all.** The `wait` step renders a dashed, non-interactive panel of the same height rather than a Skip — layout does not jump, and §4C's three minutes get no enormous escape hatch. Skip and +30s stay small, above, where a deliberate hand finds them and a hurried one does not (T19's rule, restated where the button would have been huge).
+- **The exit is the one control that must not be findable by feel.** Small, cornered, and low-contrast on purpose. Everything else on this screen is designed to be hit without looking; leaving mid-set is the one action that should cost a glance.
+- **The wall card yields to the clock.** The rejected printable card's content — prescription, cues, last time's numbers — lives here, but only while the owner is standing still. Rendering it under a running hold would trade the one number they cannot afford to lose for text they cannot read mid-effort.
+
+---
+
+### [T22] Outcome: The three minutes the plan prescribes between sets become the surface that teaches the protocol and reports the numbers the next set is chosen against — paced, unactionable, and drawn entirely from the catalog.
+Spec: this file | Status: [x] | Depends on: T19 | Wave 2
+
+#### Context manifest
+Create: `src/lib/rest.ts` (+ `rest.test.ts`), `src/components/RestCard.tsx` | Modify: `src/lib/timer.ts` (+ `timer.test.ts`), `src/components/SessionTimer.tsx`, `src/components/FocusHold.tsx`, `src/screens/ActiveSession.tsx` | Conform to: D6, D18, D19, D23, D35, D37, D38 | Delete: nothing
+
+**What the rest actually looks like today, stated precisely.** A Day 1 session is five sets of three minutes (§4C) plus four to six of the same on the PIMA pulls (§4B) — around fifteen minutes per session, eight weeks of them, and the app currently spends every one of those minutes on a countdown, a `+30s` and a `Skip`. Focus mode (T21) is the honest illustration: while a rest runs, the primary control renders a dashed box reading *"Rest — the app will tell you"*. That box is the task.
+
+**Two things exist in the app and are never on screen when they are useful.** The first is each exercise's `howTo` and `safetyNotes` — authored from the plan at T2, and reachable only by leaving the session for the detail view. The second is a side-by-side of what this exercise has done *this session* against what it did *last* time, which is precisely the comparison §4F's "small load increments (1–3%)" and §7's "spot a downward trend" ask the owner to make, and which currently costs a scroll past the timer bar to the card. The rest is when both are wanted and neither is shown.
+
+**Why it may pace itself, and why that is not D36 loosening.** D36 says a hold ends on a deliberate control or its prescribed maximum, never on ambient contact — because ending a hold *writes a number* into the series §7 asks the owner to read. Nothing on this surface writes anything, and nothing on it is tappable, so nothing about it can misfire. That asymmetry is worth stating as a rule rather than assuming, which is what **D37** does: dead time is a reading surface, never a control surface. Content that cannot be acted on is allowed to advance on its own; content that can, never is.
+
+**And it teaches from the catalog, not from the plan file (D38).** `docs/training-plan.md` is not in the app and does not become so here — T25 owns that, and pulling the prose in early would fork the question of what "in-app plan" means across two tasks. The catalog is already the plan, transcribed once at T2 under D6's no-invention rule, and its `safetyNotes` already carry their citations inline ("…(plan §7)"). So D23's *report and cite* is satisfied by content that was cited when it was written, and this task authors no training copy at all.
+
+#### The deck — one card a minute, chosen by a pure function
+
+`restDeck(...)` builds the interval's reading list and `restCardIndex(...)` says which card is up. Both are pure, both live in `src/lib/rest.ts`, and both serve two renderings, exactly as `chain.ts` serves the bar and the focus surface.
+
+- **A card is a minute.** `CARD_MS = 60_000`. The index is `floor(elapsedRest / CARD_MS)` clamped to the deck, so it is `(now - startedAt)` arithmetic like everything else in D18's world — a throttled tick costs a stale frame, never a lost card, and a backgrounded rest comes back on the card it should be on.
+- **The deck is as long as the interval affords**, `round(restMs / CARD_MS)`, floored at one and capped at the number of distinct cards available — so a 3 min max-hang rest reads three, §5A's 2 min reads two, and the abrahangs' 50s reads one. A card never repeats inside one deck.
+- **`+30s` may lengthen the deck; it can never reorder it.** Two things are needed for that, not one. The index is computed from elapsed time rather than from the deck, so a longer deck cannot move the card on screen; *and* the offset into the pool is strided by what the **prescribed** rest affords rather than by what the running one does, so a longer deck cannot change which cards are in it. Extending a rest therefore appends, and nothing shifts under the reader.
+- **The report leads, the protocol follows.** Card one is the session report where there is anything to report; the rest are drawn from the exercise's own `howTo`, then `cues`, then `safetyNotes`, in that fixed order.
+- **Consecutive rests teach different things.** The protocol cards start at an offset of `rotation × slots` into the pool and wrap, where `rotation` is the count of sets already logged for that exercise. Five rests therefore walk the whole protocol instead of showing cue #1 five times. It is keyed on the logged count and not on a stored cursor, for T19's reason: delete a set and the position moves back with it.
+- **Nothing random.** Not a taste call — the surface re-renders every 100ms, so a `Math.random()` selection would resample on every tick and the card would strobe.
+
+#### Acceptance criteria
+1. WHEN a rest is running THE surface SHALL show one card at a time drawn from the exercise's own catalog content and this session's logged sets, and SHALL advance approximately once a minute without any tap. [x]
+2. WHEN the deck advances THE card shown SHALL be a function of elapsed rest time only — re-rendering, backgrounding and returning, or extending the rest SHALL NOT move it backwards or reorder what has already been read. [x]
+3. WHEN a rest is extended by `+30s` THE deck MAY gain a card at the end and SHALL NOT change the card currently on screen. [x]
+4. WHEN the interval is too short to afford a second card THE deck SHALL be one card long rather than flashing several. [x]
+5. WHEN consecutive rests of the same exercise run THE protocol cards SHALL differ, walking the pool in order and wrapping, until every `howTo` step, cue and safety note has been shown. [x]
+6. WHEN the session report card is shown THE sets logged for that exercise this session AND last time's summary SHALL be readable together, with no target, no delta, no percentage and no verdict of any kind (D23). [x]
+7. WHEN a rest completes THE reading SHALL end and the surface SHALL return to what T19/T21 already do — the next set, in one tap, started by the owner and never by itself. [x]
+8. WHEN the surface is rendered THE whole of it SHALL be inert: no card, dot, label or body text SHALL be a control, and nothing on it SHALL end the rest, start a set, or write to a log (D37). [x]
+9. WHEN focus mode is open during a running rest THE deck SHALL occupy the reading area at a size legible from the board, and the primary-control slot SHALL keep the non-interactive panel T21 gave it. [x]
+10. WHEN the timer bar is the only view THE same card SHALL appear in a compact form that adds no more than two lines and covers nothing on the card beneath it — the owner is entering that set's load while it runs. [x]
+11. WHEN an exercise has no catalog content and no history THE surface SHALL fall back to exactly what T21 renders today rather than showing an empty frame. [x]
+12. WHEN the deck is built THE state SHALL be view state only — nothing persisted, nothing in the backup, no `DB_VERSION` or `BACKUP_SCHEMA_VERSION` movement, and no new field on any stored type (D18). [x]
+
+#### Edge cases
+- A rest started from the bare "Start rest" control (an exercise with a rest but no hold) has no hold to report; the deck is protocol-only and shows no empty report card. [x]
+- A rest running on one exercise while focus is open on another keeps reporting the *timer's* exercise, exactly as the cues do (T21 AC9) — the deck follows the clock, not the view. [x]
+- The first rest of a first-ever session has nothing under "Last"; the report card shows this session's sets alone rather than an empty line. [x]
+- A hold stopped and not yet logged leaves the report showing the sets that exist; the unlogged one is absent, because the app must not believe in a set no record contains (D16). [x]
+- An exercise whose `safetyNotes` are empty simply has a shorter pool — the deck shortens, and nothing is invented to fill it (D6). [x]
+- A rest extended repeatedly past the pool's length stops adding cards rather than repeating one. [x]
+- Deleting a set mid-rest moves `rotation` back, which is allowed to change the *next* rest's cards and must not change the one on screen. [x]
+
+#### Non-goals & do-not-touch
+- MUST NOT make any part of the surface tappable, or add a second way to end, skip, or extend a rest (D37). `+30s` and `Skip` stay exactly where and exactly as small as T19 left them.
+- MUST NOT read, bundle, parse, or quote `docs/training-plan.md` — the catalog is the source, and the plan file is T25's (D38, D6).
+- MUST NOT author new training copy, reword a cue, or add a catalog field.
+- MUST NOT compute a delta, a percentage, a target, a projection, or a "you're up 3lb" of any kind on the report card (D23, D19) — it shows the numbers and stops.
+- MUST NOT auto-start the next set when the last card is reached, or shorten a rest because the reading finished (T19 AC5).
+- MUST NOT use `Math.random`, a `setTimeout`, an animation library, or a transition that costs a frame budget on a 100ms render loop.
+- MUST NOT persist which card was reached, or restore it on reload.
+
+#### Verify
+`npm run test && npm run build && npm run lint`, plus an in-browser pass at 390px: run a real 3 minute rest and confirm three distinct cards, each for about a minute, the first being the session report; press `+30s` at 2:30 and confirm the card on screen does not change; background the app for 90s mid-rest and confirm it returns on the card the clock says, not on the one it left; run the second and third rests of the same exercise and confirm the protocol cards differ from the first's; confirm the bar version adds no more than two lines and the card beneath stays reachable; tap every part of the surface during a rest and confirm nothing happens.
+
+#### Amendments
+
+**2026-07-25 — T22 built. Build + lint clean, 391 tests green (27 new: 26 in `rest`, 1 in `timer`). All twelve ACs verified in a running browser at 375×812 against a real Day 1 session, driving the rest clock rather than waiting out four three-minute intervals.** Files: `src/lib/rest.ts` (+ `rest.test.ts`), `src/components/RestCard.tsx`; modified `src/lib/timer.ts` (+ `timer.test.ts`), `src/components/SessionTimer.tsx`, `src/components/FocusHold.tsx`, `src/screens/ActiveSession.tsx`. **No new dependencies, no new field on any stored type, and the live database unchanged at version 2 with four stores** — read off the running app after four logged sets.
+
+**The clock was driven, not waited out.** Verifying a paced surface honestly means seeing it at 0:30, 1:30 and 2:30 of four separate three-minute rests, so the pass shimmed `Date.now` with an offset and read the DOM back — which is legitimate here precisely because D18 means every reading is `(now - startedAt)`, so a shifted clock exercises the real code path rather than a stub. A full max-hang rest read, in order: **`THIS SESSION · 20mm · +35lb · 10.0s ×4`, then `HOW TO · STEP 1 OF 4`, then `HOW TO · STEP 2 OF 4`**, at 18px body against a 12px label, with the dot row moving 1/3 → 2/3 → 3/3 (AC1, AC6). Across the session's four rests the protocol cards were `h3,h4` → `c1,c2` → `s1,s2` → `h1,h2`: **the exercise's whole eight-card pool, no card twice, wrapping exactly where the arithmetic says** (AC5). Also verified: the deck vanished the instant the rest completed and T21's wall card came back with `▶ Start set 4 of 5` (AC7); the card block contained **zero interactive elements and only `DIV`, `P` and `SPAN` tags**, and the primary slot was still a non-interactive `DIV` at 179px, 0.22 of the viewport (AC8, AC9); the compact form measured **44px — a label and one line** — with the just-logged set's inputs at y=608 still clear of the bar top at y=659 (AC10); and a rest backgrounded from 0:40 to 2:10 came back on `SAFETY 2 OF 2`, the card the clock says rather than the one it left (AC2).
+
+**The one thing the spec got wrong, and the browser is what caught it.** AC3 failed on the first pass: pressing `+30s` at 1:05 changed the card *on screen* from `CUE 1 OF 2` to `SAFETY 1 OF 2`. The spec had asserted the guarantee and only built half of it — the index was correctly a function of elapsed time, but the **offset into the pool was strided by the deck's own length**, so a longer deck meant a longer stride meant a different slice of the pool. The stride now comes from the rest the *plan* prescribes rather than the one the owner is running, which is the honest split: extending an interval is the owner's business, and where the reading picks up is the exercise's. Re-verified at the same moment — the card held, the dot row went 2/3 → 2/4, and the appended card appeared at 3:05. Both halves of the guarantee are now tests, across every rotation rather than the one that happened to be on screen.
+
+Design calls:
+- **Two numbers, not one, and the second exists only because of that bug.** `restMs` sets how long the deck is; `prescribedRestMs` sets where it starts. Collapsing them reads cleaner and is wrong, which is the sort of thing a unit test written from the same assumption as the code will happily confirm.
+- **Logging a set mid-rest does change the deck, and that is correct.** The report card cannot exist before there is something to report (D16), so tapping Log adds it and advances the rotation. In practice the window is the two seconds between STOP and Log; recorded here rather than engineered away, because the alternative — pre-empting a set no record contains — is the thing D16 exists to forbid.
+- **The report is the exercise's own rows, not a comparison of them.** `20mm · +35lb · 10.0s ×4` and last time's line, and nowhere for a delta to live — the returned object has exactly four fields, which is now a test. §4F's 1–3% is a judgment about how the last set *felt*, and this surface is three minutes of the owner's attention at exactly the moment that judgment is made, which is precisely when an arrow would do the deciding for them.
+- **The citations came free.** `SAFETY 1 OF 2` rendered "One max-intensity finger session per week is enough; keep the second submaximal (plan §7)" — D23's *cite* satisfied by content that was cited when it was transcribed at T2, which is the whole argument for D38 in one line of output.
+- **The deck follows the clock, not the view.** Resolved once in `ActiveSession` for the timer's exercise and handed to whichever view is mounted — the same rule the cues follow, and the reason a rest on the half-crimp hang keeps reporting the half-crimp while focus sits on the open-hand one.
+
+**2026-07-25 — T21 AC6 amended by this task.** T21 required that with focus open and no hold running, "the exercise's prescription, cues, position, and last time's numbers SHALL be shown". That block is now replaced *for the duration of a running rest only* by the paced deck, which carries the same content plus `howTo` and `safetyNotes`, one piece at a time instead of all at once. Before the first set, after a rest completes, and any other time no hold is running, T21 AC6 is unchanged and the static wall card renders exactly as it did. Recorded here rather than assumed: showing both would put the same cue on screen twice, and the deck is a superset of what it replaces.
+
+---
+
+### [T23] Outcome: The 10–15 minutes §7 calls the difference between a plateau and a torn pulley are run from one surface — staged where the plan stages, cadenced where the plan cadences, and inventing neither.
+Spec: this file | Status: [x] | Depends on: T19 | Wave 2
+
+#### Context manifest
+Create: `src/lib/warmup.ts` (+ `warmup.test.ts`), `src/components/WarmupRunner.tsx` | Modify: `src/screens/ActiveSession.tsx` | Conform to: D6, D16, D17, D18, D19, D23, D33, D35, D36, D37, D39, D40 | Delete: nothing
+
+**What the warm-up gets today, stated precisely.** §7 names cold pulleys "the #1 cause of finger injuries in exactly your grade range" and §4A gives the warm-up 10–15 minutes and four ordered stages. In the app, `finger-warmup-progression` declares no `holdSeconds`, no `restSeconds` and no `prescribedSets`, so it renders as a card with "+ Add set", a notes field and "Mark done" — the four stages are `howTo` prose, reachable only through Info or the detail view. The other warm-up, `abrahangs-no-hang`, is `10s on / 50s off` for about ten minutes: roughly ten rounds, and therefore roughly ten taps on a control that scrolls away under the timer bar. T10 looked at that shape and explicitly declined to build a cadence runner for it. This task builds it, for the warm-up only.
+
+**Two shapes, one gate, and the gate is the catalog.** A runner is offered where `category === 'warmup'` and nowhere else. That is deliberately a property of the exercise rather than a flag on a surface: it is what makes it impossible for a max hang or a PIMA pull to ever reach the auto-repeating path, no matter what is built on top of this later. Within the gate the form follows what the entry declares — a hold and a rest means a **cycle**, anything else with `howTo` steps means a **staged** run.
+
+**The runner paces what the plan paces and reports what it does not (D40).** §4A states "10–15 min" for the whole warm-up and never says how long the jugs take. So the staged form advances on a deliberate tap and shows elapsed against the prescription; it does not count down a stage duration, because inventing one would be authoring training content the plan withheld (D6), and a countdown is read as a prescription no matter how it is captioned. The cycle form is the opposite case — §4A's abrahangs *do* state both intervals, so the app runs exactly those two numbers and counts the rounds rather than capping them at a total it would have to infer from prose.
+
+**And a warm-up round may start itself, where a working set never may (D39).** T19 AC5 exists because a max-effort finger hold must not begin with the owner off the board — the hold *authors a number* that enters the series §7 asks them to read. An abrahang authors nothing: the entry declares no `metrics`, the runner writes no set, and a round nobody performed leaves the log byte-identical. That is the same asymmetry D37 used for the rest surface, applied to starting instead of reading. It is fenced twice: by the catalog gate above, and by a visibility rule — a transition the app slept through **ends** the cycle rather than starting a round nobody heard begin, exactly as T20 AC9 drops a count-in it slept through.
+
+#### Acceptance criteria
+1. WHEN an exercise is catalogued as a warm-up THE session SHALL offer a runner for it; every other exercise SHALL be unchanged — no control, no surface, and no path by which anything can start itself. [x]
+2. WHEN the warm-up declares no cadence THE runner SHALL show its stages one at a time in the plan's order, advanced only by a deliberate tap, with total elapsed shown against the prescription and no stage counting down. [x]
+3. WHEN the warm-up declares a hold and a rest THE runner SHALL run rounds of exactly those two intervals and SHALL report how many rounds have run, without capping them at a number the plan states only in prose. [x]
+4. WHEN a round's rest completes with the runner on screen THE next round SHALL begin without a tap; WHEN the app was suspended past that moment THE cycle SHALL end instead (T20 AC9's rule, restated for starting a round). [x]
+5. WHEN a cycle runs THE cues SHALL be exactly the ones T13/T20 already fire, through the one existing path — no new audio, no doubled tone, no doubled utterance. [x]
+6. WHEN a round ends THE app SHALL write nothing: no set, no measurement, no end reason, and no completion (D16, D19). [x]
+7. WHEN the runner is open THE loop SHALL be driven by one primary control at a time, filling the width and at least a fifth of the viewport height, at the bottom of the screen and reachable without scrolling (T21's rule, restated). [x]
+8. WHEN a run is finished THE owner SHALL be able to mark the warm-up complete in one tap from here, and it SHALL NOT be marked by anything else (D16) — this is the condition §4E reads back as "after a thorough warm-up". [x]
+9. WHEN the owner leaves the runner THE auto-repeat SHALL stop rather than continue unattended; an interval already running SHALL keep running on the bar, and every logged set SHALL be intact (T21 AC7). [x]
+10. WHEN the runner is open THE state SHALL be view state only — nothing persisted, nothing restored on reload, nothing in the backup, no `DB_VERSION` or `BACKUP_SCHEMA_VERSION` movement, and no new catalog or stored field. [x]
+
+#### Edge cases
+- §4E's battery opens with the same warm-up entry, so the runner is offered there identically — which is the point, since "after a thorough warm-up" is a recorded condition of that test (D29). [x]
+- A cycle round starts the hold directly, with **no count-in**: D33's count exists so `holdSec` measures the effort rather than the tap offset, and a warm-up round records no `holdSec` — so the count would buy nothing and spend three seconds of a prescribed sixty-second cadence. [x]
+- A warm-up declaring an open hold (`'open'`) has no maximum to auto-stop at, so it is not a cycle and falls to the staged form rather than repeating forever. [x]
+- A warm-up declaring a hold but no rest has no cadence to repeat and likewise runs staged. [x]
+- The last stage of a staged run offers finishing rather than a fifth stage that does not exist. [x]
+- Re-entering the runner starts a fresh run: the elapsed clock is view state and does not survive leaving (D18). [x]
+
+#### Non-goals & do-not-touch
+- MUST NOT offer a runner, or any auto-start, for an exercise outside `category === 'warmup'` (D39). §4B's rep-structured PIMA variant (5 × 4 × 3s, ~10s between reps) is a cadence too, and it is a **max-effort protocol** — it stays exactly as T10 left it, and re-proposing it needs its own decision.
+- MUST NOT invent a per-stage duration, reword a stage, or add a catalog field to hold one (D6, D40).
+- MUST NOT log a set, write a measurement, or mark anything completed without an explicit tap (D16, D19).
+- MUST NOT introduce a second timer, a second cue path, or a second definition of a hold. The cycle drives the session's one timer, and exactly one view is mounted.
+- MUST NOT keep repeating while the surface is closed or the app is suspended (D39's fence — an unattended cycle beeping into an empty room is the failure mode the carve-out has to exclude).
+- MUST NOT persist which stage or round was reached, or restore a run on reload (D18).
+- MUST NOT grade the warm-up, score it against 10–15 min, or say it was too short (D23) — §4A's range is a range, and §4F's lighter week makes a shorter one correct as often as not.
+
+#### Verify
+`npm run test && npm run build && npm run lint`, plus an in-browser pass at 390px: open the runner on the finger warm-up and confirm four stages advancing only on a tap with elapsed climbing and nothing counting down; open it on the abrahangs and confirm rounds of 10s and 50s repeating with no tap, the round counter advancing, and the tone log showing each cue exactly once per round; leave mid-cycle and confirm the repeat stops while the running interval survives on the bar; suspend the app across a rest boundary and confirm the cycle ended rather than started a round; confirm the log is byte-identical after a full cycle; confirm no non-warm-up exercise offers the control.
+
+#### Amendments
+
+**2026-07-25 — T21 AC1 amended by this task.** T21 required a focus surface wherever an exercise declares a hold, which included `abrahangs-no-hang`. A warm-up's full-screen surface is now the **runner** instead: it starts the same holds, adds §4A's cadence, and paces the stages an untimed warm-up has in place of a clock. Two full-screen surfaces for one exercise would be two answers to the same question, so the runner takes the place of both the hold control and ⤢ Focus on the two warm-up cards. Every other exercise's controls are untouched, and T21 AC1 is unchanged for them.
+
+**2026-07-25 — T23 built. Build + lint clean, 408 tests green (17 new, all in `warmup`). All ten ACs verified in a running browser at 375×812, including three consecutive auto-started rounds of the real 10s/50s cadence.** Files: `src/lib/warmup.ts` (+ `warmup.test.ts`), `src/components/WarmupRunner.tsx`; modified `src/screens/ActiveSession.tsx`. **No new dependencies, no catalog field, no stored field, and the live database unchanged** — the runner's only reachable effect on the log is D16's completion mark, and only on a tap.
+
+**The fence was verified by hitting it, twice, by accident.** The pass drove `Date.now` with an offset, as T22's did. The first two attempts at the cycle stopped dead after round one — and both times the cause was the harness advancing simulated time faster than the 100ms render loop samples it, so every rest boundary arrived more than `CYCLE_GRACE_MS` late and **the cycle correctly ended rather than starting a round nobody heard begin** (AC4). A third stop had a different cause and the same character: the preview pane reports `document.visibilityState === 'hidden'`, which is exactly what D39's second fence blocks on. Three independent ways of not being watched, three refusals to auto-start. Crawling the clock across each boundary at under a render tick, with visibility simulated as on-screen, produced what the plan asks for: **rounds 1, 2 and 3 with one tap total**, each firing 520Hz at the hang's end and 880Hz/1170Hz at the rest's, with "Rest done." spoken once per round — T13 and T20's existing cues through the existing path, nothing new (AC5).
+
+Also verified on the running app: the runner is offered on exactly `finger-warmup-progression` and `abrahangs-no-hang` and on nothing else, with the PIMA pulls and max hangs still showing Start + ⤢ Focus unchanged (AC1); the staged run walked §4A's four stages in order, advancing only on a tap, with the dots filling and **nothing counting down** (AC2); the primary control measured **179px — 0.22 of an 812px viewport, bottom edge at 796px** — at every step of both forms (AC7); exiting mid-cycle left the running rest on the bar and pushing 120s past its end started nothing (AC9); and **the log was byte-identical before and after three full rounds** — four max-hang sets, no abrahangs entry at all (AC6). Completion was recorded by the "✓ Warmed up" tap and by nothing else: opening the runner marked nothing, reaching the last stage marked nothing (AC8).
+
+Design calls:
+- **The gate is `category === 'warmup'`, in the catalog.** Not a prop, not a flag on the surface, not a list in the component. It is the whole safety argument for D39, so it is the first line of `warmupPlanOf` and it has a test that enumerates every catalog entry and asserts exactly two of them can reach the path.
+- **The run clock ticks unconditionally, unlike the other two surfaces.** `SessionTimer` and `FocusHold` pass `state.phase !== 'idle'` to `useNow` because they have nothing to show when the timer is idle. A *staged* warm-up leaves the session timer idle from beginning to end while its own elapsed clock runs, so this surface ticks on its own. Found the way these things are found: the clock read 0:00 for four stages.
+- **Finishing records; nothing else does.** The last stage's primary is `✓ Warmed up` and it marks the exercise done on the way out — still one deliberate tap, which is all D16 asks. What D16 forbids is the *app* deciding, not the owner saying so with the button already under their thumb. The small toggle stays for the cycle form and for taking it back.
+- **A stopped cadence resumes from a small control.** `▶ More rounds` sits above the primary at secondary size, T21's rule restated: the button that resumes a warm-up must not be the size of the one that ends it.
+
+**Two observations, neither introduced here and neither in scope:** re-entering any full-screen surface while a *completed* rest sits on the timer re-fires its rest-end cue, because `useTimerCues` keys on the phase's start instant through a ref that is fresh on mount — T21 behaviour, now easier to trigger. And exiting a cycle mid-round leaves an unlogged `✓ Held 10.0s` on the bar offering to log a warm-up round as a set; it is honest (the hold did happen) and D16 means nothing is written unless tapped, but it is an invitation the plan has no use for.
+
+---
+
 ## Execution notes
 
 - **Gates:** Gate 1 = PRD approved (now, by the owner). Gate 2 = decomposition approved after T0's spike report. Gate 3 = implementation reviewed against acceptance criteria after T8.
@@ -1557,4 +1870,95 @@ The set count moves out of `prescription` prose and into a typed `Exercise.presc
 | No `DB_VERSION` / `BACKUP_SCHEMA_VERSION` change | The catalog is code-seeded and not stored (T2's design call), so a new catalog field costs nothing at all in storage terms. Confirmed against the live database. |
 
 **Net effect on scope:** one task, zero decisions, one optional catalog field, one new pure module. No new dependencies, no storage or backup change, and no reversal of anything. **T20 (spoken cues: "3–2–1–pull", set announcements, band-pitch tone) is next in Wave 1**, and it now has a set number to announce.
+
+---
+
+**2026-07-25 — T20 specced, D33 and D34 added. Two owner decisions taken before writing it.**
+
+Both were put to the owner because either answer produces a different build and the wrong one is expensive to unwind mid-block:
+
+| Question | Answer | What follows |
+|---|---|---|
+| What does "3–2–1–pull" do to the clock? | **The count owns the clock** — the hold begins on "pull", not on the tap | D33. `holdSec` starts measuring when the owner is actually loaded, which is the tap-offset defect the deferred motion-sensor idea was going to fix, bought here for a countdown §4B wants anyway. The alternatives — a decorative count, or a per-exercise declaration of which efforts get counted in — either leave the defect in place or add a catalog field to express a judgment one tap already expresses. |
+| Voice on or off by default? | **On**, with a Settings toggle | The owner asked for the feature and every cue is foreground-only. Off-by-default would cost a setup tap to reach the state that was requested. |
+
+| Change | Why |
+|---|---|
+| D33 added: the count-in owns the clock — a counted hold is measured from "pull" | It changes what a recorded number means, so it is a decision rather than an implementation detail. It is also free exactly once: the block has not started (confirmed 2026-07-24), so no logged hold exists to be compared against a differently-measured one. Taken after week 1 this would be D22's invalid comparison on the very axis §7 asks the owner to watch. |
+| D34 added: tones carry the event, speech carries the words — and nothing depends on speech | T13 paid for a beep that survives the iOS ringer switch, a suspended `AudioContext` and a backgrounded PWA. Web Speech has none of that history and can be unavailable, muted, or queued behind an utterance still speaking. So every cue fires as a tone regardless, speech is added on top, and an install where the voice never sounds behaves identically minus the words. |
+| `Settings.voiceCues?` and `Settings.leadInSec?` | Two optional fields on an object the backup already carries whole — the third task running with no `DB_VERSION` or `BACKUP_SCHEMA_VERSION` movement. |
+| A `counting` phase in `timer.ts`, not a `setTimeout` in a component | D18: every reading is `(now - startedAt)` against an absolute instant, and the transition to `holding` back-dates itself to `countStart + leadInMs` exactly as `autoStopHold` back-dates a late auto-stop. A throttled tick costs a stale frame, never a drifted count. |
+| Nothing is spoken during a hold; the band is reported in pitch | At 100% effort a voice reading numbers is noise the owner cannot act on. A pip per second rising across the 7–10s window answers "am I at 7 yet" and "how much is left" in one sound, and it says nothing at all where there is no window to report (fixed targets, and §4E's open holds). |
+
+**Net effect on scope:** one task, two decisions, two optional `Settings` fields, one new timer phase, two new modules (one pure and tested, one fire-and-forget wrapper). No new dependencies, no new object store, no version bumps, and no reversal of D2a (this is foreground Web Speech, exactly as the v1.8 amendment already predicted), D18, D19, D22, D23, or D31.
+
+**Built the same day; every prediction above held, including the version numbers.** See T20's amendment for the verification pass, which recorded the audio rather than trusting it. Two things the spec did not anticipate, both found by listening: a count started while the timer bar was *already* on screen said **"four"** for a three-second count, because the bar's 100ms clock renders the first frame against a `now` from before the count began — `leadInRemainingMs` now clamps to the count's own length; and a refused count-in left the junk visible in the field, because an unchanged stored value never triggers the value-keyed remount the other Settings fields rely on. **T21 (eyes-shut hold mode) is next in Wave 1**, and the audio it was waiting for now exists: a count that starts the clock when the owner is loaded, a pitch that reports the target window, and a voice that names the next set.
+
+---
+
+**2026-07-25 — T21 specced, D35 and D36 added. Two owner decisions again, and the second one is a safety rule.**
+
+With T20's cues in place, what remains of the phone-on-the-floor problem is two *aim* problems, not reading problems: finding Start among six cards, and finding "Log 8.4s as a set" on a bar strip straight after a maximum effort.
+
+| Question | Answer | What follows |
+|---|---|---|
+| Where does eyes-shut mode live? | **A full-screen focus surface for one exercise** | It fixes both taps rather than only the second one (the alternative — expanding the timer bar while it runs — never helps you *start*), and it is the surface the rejected printable wall card was for: protocol, cues, position and last time's numbers, legible from the board. |
+| How does a hold end in it? | **One giant Stop button, not tap-anywhere** | D36. Blind-operable must mean findable by feel, not triggerable by accident. |
+
+| Change | Why |
+|---|---|
+| D35 added: focus is a rendering of the session, never a second source of truth | It calls the same handlers, writes through the same `addSet`, and stores nothing. The obvious next request — "let me fix the load from in here" — is what would fork carry-forward, completion and end-reason behaviour into two sets of rules. Values are entered on the card, where T18's pickers already live and the eyes are already open. |
+| D36 added: a hold ends on a deliberate control or its prescribed maximum, never on ambient contact | Ending a hold *writes a number*, and that number enters the series §7 asks the owner to read. A knee or a brushed screen must not be able to author one. This also settles the same question for anything later (shake-to-stop, proximity, motion) without re-litigating it. |
+| `useTimerCues` extracted from `SessionTimer` | Two views of one timer would otherwise double every tone and utterance, or silence half of them. The cues belong to the timer state, not to a rendering of it — the same reasoning that put the interval math in `timer.ts` rather than in a component. Exactly one view is mounted at a time. |
+
+**Net effect on scope:** one task, two decisions, one new pure module, one extracted hook, one new component. No new dependencies, no storage or backup change, no new state that outlives a render, and no reversal of D16, D18, D19, D23 or anything in Wave 1.
+
+**Built the same day; every prediction above held.** See T21's amendment for the verification pass, which measured the controls rather than eyeballing them. Nothing in the spec turned out to be wrong, which is the first time that has happened in Wave 1 — the two things it did not say were both consequences of D36 rather than gaps in it: the exit control had to be deliberately *hard* to hit by feel, and a running rest reads better as a non-interactive panel of the same height than as a missing button. **Wave 1's stated chain (T18 → T19 → T20 → T21) is complete.** What remains in the wave is T17, deferred on 2026-07-25 against the owner's stated indifference and still available in full or in its cheap half; the next unstarted wave is 2 — T22 (rest screen as the teaching surface), which now has a rest surface worth teaching on, T23, T24 and T25.
+
+---
+
+**2026-07-25 — Wave 2 opens. T22 specced, D37 and D38 added. Three owner decisions, and the third one is why there is a module rather than a component.**
+
+Wave 2's premise is arithmetic: a Day 1 session is five 3 minute rests on the max hangs (§4C) and four to six more on the PIMA pulls (§4B), so the app spends roughly fifteen minutes of every session — eight weeks of them — rendering a countdown and two small buttons. T21 made the waste legible rather than creating it: with focus open, a running rest renders a dashed box that says *"Rest — the app will tell you"*. Three questions were put to the owner before writing anything, because each produces a different build:
+
+| Question | Answer | What follows |
+|---|---|---|
+| What should the three minutes put on screen? | **The session report *and* one piece of the protocol** | The report is the §4F decision — this session's sets against last time's — made where it is actually made instead of a scroll away. The protocol is `howTo` and `safetyNotes`, which have existed since T2 and have never once been on screen during a session. |
+| Does it change by itself while the rest runs? | **Yes — paced, roughly a card a minute** | The task exists to use dead time, and a single static line uses about ten seconds of it. Safe to pace *because* nothing on the surface is actionable — see D37. |
+| Where does it render? | **Both views, at two sizes, from one module** | `chain.ts`'s precedent exactly: the bar and the focus surface disagree about size and agree about content, so the content is a pure function and the disagreement is CSS. |
+
+| Change | Why |
+|---|---|
+| D37 added: dead time is a reading surface, never a control surface | The rule that makes pacing safe rather than a loosening of D36. D36 forbids ambient contact ending a hold because ending a hold *writes a number* into the series §7 asks the owner to read; a card that cannot be tapped and writes nothing has no equivalent failure. So the asymmetry is stated once: content that cannot be acted on may advance on its own, content that can, never does. It also fences the obvious next request — a "log it from here" button on the report card — which would be a second write path (D35) on the one surface designed to be read rather than operated. |
+| D38 added: the app teaches from the catalog, never from the plan file | `docs/training-plan.md` is not bundled and does not become so here. T25 owns in-app plan text, and answering "what is the plan doing in the app" twice, in two tasks, with two mechanisms, is how a codebase grows a second source of truth. The catalog already *is* the plan — transcribed once at T2 under D6's no-invention rule — and its `safetyNotes` already carry their citations inline ("…plan §7"), so D23's *report and cite* is satisfied by content that was cited when it was written. This task authors no training copy at all. |
+| The index is elapsed time, not a stored cursor | D18 applied to a reading position: `floor(elapsedRest / 60s)` clamped to the deck. A backgrounded rest returns on the card the clock says rather than the one it left, `+30s` appends a card instead of reordering the deck, and nothing has to be cleaned up when the rest ends. |
+| Rotation is keyed on the logged set count | T19's rule reused: the protocol pool is walked from an offset of (sets logged × cards per rest), so five rests cover the whole protocol instead of five copies of cue #1 — and deleting a set moves the *next* rest back with it, because there is no cursor to fall out of sync. |
+| T21 AC6 amended, not quietly overridden | The static wall card yields to the deck **for the duration of a running rest only**. The deck is a superset of what it replaces, and rendering both would put the same cue on screen twice. Recorded in T22's Amendments section. |
+
+**Net effect on scope:** one task, two decisions, one new pure module, one new component, one new reading on `timer.ts`. No new dependencies, no new object store, no `DB_VERSION` or `BACKUP_SCHEMA_VERSION` movement, no new field on any stored type, and no reversal of D6, D16, D18, D19, D22, D23, D35 or D36.
+
+**Built the same day; every prediction above held, including the version numbers.** See T22's amendment for the verification pass, which drove the rest clock rather than waiting out four three-minute intervals.
+
+---
+
+**2026-07-25 — T23 specced, D39 and D40 added. Three owner decisions, and the second one is the first deliberate exception to a safety rule this spec has made.**
+
+The warm-up is the largest gap between what the plan asks for and what the app provides. §7 names cold pulleys "the #1 cause of finger injuries in exactly your grade range"; §4A gives the warm-up 10–15 minutes and four ordered stages; the app gives `finger-warmup-progression` a "+ Add set" button and a checkbox, with the four stages buried in `howTo` prose. The other warm-up is worse in a different way: `abrahangs-no-hang` is `10s on / 50s off` for ~10 minutes, which is ten rounds and ten taps on a control that scrolls under the timer bar — the exact shape T10 looked at and declined to build a cadence runner for.
+
+| Question | Answer | What follows |
+|---|---|---|
+| The plan gives four stages but one duration. How is a stage timed? | **It isn't — tap to advance, elapsed against the 10–15 min** | D40. §4A withheld per-stage durations, and a countdown reads as a prescription no matter how it is captioned. |
+| Ten rounds of 10s/50s — does the runner repeat without a tap? | **Yes, for the warm-up only** | D39. The ergonomic problem *is* the ten taps, and this is the one protocol in the app where an unattended round costs nothing. |
+| Where does it live? | **A full-screen surface, opened from the card** | T21's shape reused wholesale: one big control, board-legible text, the exit small and cornered. It serves Day 1 and §4E's battery from the same code. |
+
+| Change | Why |
+|---|---|
+| D39 added: a warm-up round may start itself; a working set never may | The first carve-out from T19 AC5, and it is written as a rule so it cannot be widened by analogy later. The justification is not "a warm-up is easy" — it is that an abrahang **authors nothing**: the entry declares no `metrics`, the runner writes no set, and a round nobody performed leaves the log byte-identical. That is D37's asymmetry (content that cannot author a number may act on its own) applied to starting instead of reading. Fenced twice: the runner is gated on `category === 'warmup'` in the catalog, so no max protocol can reach the path whatever is built on top of this; and a transition the app slept through **ends** the cycle rather than starting a round, exactly as T20 AC9 drops a count-in it slept through. §4B's rep-structured PIMA cadence is explicitly *not* covered — it is a max-effort protocol, and re-proposing it needs its own decision. |
+| D40 added: the runner paces what the plan paces and reports what it does not | The general form of the answer to question one, and the rule that stops a later task quietly adding "stage 1: 3 minutes". Where the plan states an interval (10s, 50s) the app runs it; where it states only a total (10–15 min) the app reports elapsed and lets the owner advance. D6's no-invention rule applied to *time* rather than to copy. |
+| No count-in on a cycle round | D33's count exists so `holdSec` measures the effort rather than the tap offset. A warm-up round records no `holdSec`, so the count buys nothing and spends three seconds of a prescribed sixty-second cadence. |
+| The cycle drives the session's one timer | Which means the hold-end and rest-end cues are the ones T13 and T20 already paid for, through `useTimerCues`, with exactly one view mounted. No new audio path is the point: the beep that survives the iOS ringer switch took a whole task to get right. |
+
+**Net effect on scope:** one task, two decisions, one new pure module, one new component. No new dependencies, no new object store, no catalog field, no stored field, no `DB_VERSION` or `BACKUP_SCHEMA_VERSION` movement, and no reversal of D6, D16, D18, D19, D23, D35, D36 or D37. **T19 AC5 is narrowed rather than reversed** — it continues to govern every exercise the plan progresses, which is every exercise except the two warm-ups.
+
+**Built the same day; every prediction above held, including the version numbers.** See T23's amendment for the verification pass, in which **the D39 fence was hit three times before the cycle could be demonstrated at all** — twice by a harness stepping the clock faster than the render loop samples it, once by a preview pane that honestly reports itself hidden. Three ways of not being watched, three refusals to auto-start, which is a better argument for the carve-out's safety than the spec made for it. One thing the spec did not anticipate, found by watching a clock sit at 0:00 through four stages: this surface has an elapsed clock of its own and a staged warm-up leaves the session timer idle from beginning to end, so it ticks unconditionally where the other two views tick only while the timer runs. **T21 AC1 is amended** — a warm-up's full-screen surface is the runner rather than focus, because two of them would be two answers to one question. **Wave 2 continues**: T24 (block position derived from the first session) and T25 (in-app training-plan search) remain, and T17 is still available in Wave 1. One prediction did **not** hold, and it was in an acceptance criterion rather than a decision: the spec promised that `+30s` could never reorder the deck and the build implemented only half of the mechanism, so extending a rest swapped the card already on screen. Found in a browser, fixed by striding the pool on the *prescribed* rest instead of the running one, and now tested across every rotation rather than the one that happened to be visible. **Wave 2 is open**; T23 (warm-up runner), T24 (block position derived from the first session) and T25 (in-app training-plan search) remain in it, and T17 is still available in Wave 1 in full or in its cheap half.
 

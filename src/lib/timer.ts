@@ -27,7 +27,14 @@ export function isOpenHold(hold: HoldSpec): boolean {
   return hold.max === null;
 }
 
-export type TimerPhase = 'idle' | 'holding' | 'resting';
+/**
+ * `counting` is T20's lead-in: the seconds between the tap and "pull".
+ *
+ * It is a phase here rather than a `setTimeout` in a component for D18's reason
+ * — it is read as `(now - startedAt)` like every other interval in this module,
+ * so a throttled tick costs a stale frame and never a drifted count.
+ */
+export type TimerPhase = 'idle' | 'counting' | 'holding' | 'resting';
 
 export interface TimerState {
   phase: TimerPhase;
@@ -35,6 +42,8 @@ export interface TimerState {
   exerciseId: string | null;
   /** Epoch ms the current phase began. Meaningless when idle. */
   startedAt: number;
+  /** Counting only: the full lead-in, in ms (T20). */
+  leadInMs: number;
   /** Resting only: the full prescribed rest, in ms. */
   restMs: number;
   /** Measured duration of the hold that just finished, in ms; null once logged or cleared. */
@@ -53,6 +62,7 @@ export const IDLE_TIMER: TimerState = {
   phase: 'idle',
   exerciseId: null,
   startedAt: 0,
+  leadInMs: 0,
   restMs: 0,
   heldMs: null,
   heldAuto: false,
@@ -80,11 +90,108 @@ export function isTimerVisible(state: TimerState): boolean {
 // running rest and any unlogged result: there is one timer because there is one
 // owner with two hands, and the thing they just tapped is the thing they mean.
 export function startHold(exerciseId: string, now: number): TimerState {
-  return { phase: 'holding', exerciseId, startedAt: now, restMs: 0, heldMs: null, heldAuto: false };
+  return {
+    phase: 'holding',
+    exerciseId,
+    startedAt: now,
+    leadInMs: 0,
+    restMs: 0,
+    heldMs: null,
+    heldAuto: false,
+  };
 }
 
 export function startRest(exerciseId: string, restMs: number, now: number): TimerState {
-  return { phase: 'resting', exerciseId, startedAt: now, restMs, heldMs: null, heldAuto: false };
+  return {
+    phase: 'resting',
+    exerciseId,
+    startedAt: now,
+    leadInMs: 0,
+    restMs,
+    heldMs: null,
+    heldAuto: false,
+  };
+}
+
+// ─── Lead-in (T20) ───────────────────────────────────────────────────────────
+
+/**
+ * Begins the count that ends in "pull" (D33).
+ *
+ * Takes over the timer slot exactly as `startHold` does — starting a hold while
+ * a count runs restarts the count rather than stacking two, because there is one
+ * timer and the thing the owner just tapped is the thing they mean.
+ */
+export function startLeadIn(exerciseId: string, leadInMs: number, now: number): TimerState {
+  return {
+    phase: 'counting',
+    exerciseId,
+    startedAt: now,
+    leadInMs,
+    restMs: 0,
+    heldMs: null,
+    heldAuto: false,
+  };
+}
+
+/**
+ * Remaining lead-in in ms; 0 unless a count is running.
+ *
+ * Clamped at *both* ends, and the upper one is not theoretical: the bar's clock
+ * is a 100ms interval, so a count started while the bar is already on screen is
+ * first rendered against a `now` read up to a tick *before* it began — which
+ * reports 3100ms left of a 3 second count and makes it say "four". A count can
+ * never have more left than its own length.
+ */
+export function leadInRemainingMs(state: TimerState, now: number): number {
+  if (state.phase !== 'counting') return 0;
+  return Math.min(state.leadInMs, Math.max(0, state.startedAt + state.leadInMs - now));
+}
+
+/** Whole seconds still to be counted: 3, 2, 1, then 0 — which is "pull". */
+export function leadInSecondsLeft(state: TimerState, now: number): number {
+  return Math.ceil(leadInRemainingMs(state, now) / 1000);
+}
+
+/** True the instant a running count reaches zero. */
+export function isLeadInComplete(state: TimerState, now: number): boolean {
+  return state.phase === 'counting' && leadInRemainingMs(state, now) === 0;
+}
+
+/**
+ * How late the app is in noticing a finished count.
+ *
+ * A backgrounded PWA is suspended: a count started and then backgrounded can
+ * come back long after "pull" would have sounded, and starting a hold there
+ * would begin (and, at the maximum, auto-finish) a hang nobody heard begin. Past
+ * this grace the count is cancelled instead — the one thing the app must never
+ * do is invent a measurement.
+ */
+export const LEAD_IN_GRACE_MS = 2000;
+
+export function isLeadInStale(state: TimerState, now: number): boolean {
+  if (state.phase !== 'counting') return false;
+  return now - (state.startedAt + state.leadInMs) > LEAD_IN_GRACE_MS;
+}
+
+/**
+ * "Pull" — the count becomes the hold.
+ *
+ * The hold is back-dated to the instant the count actually ended rather than to
+ * the tick that noticed it, the same correction `autoStopHold` makes at the other
+ * end: a late tick must not lengthen a count or shorten a hold.
+ */
+export function holdFromLeadIn(state: TimerState): TimerState {
+  if (state.phase !== 'counting' || state.exerciseId === null) return state;
+  return {
+    phase: 'holding',
+    exerciseId: state.exerciseId,
+    startedAt: state.startedAt + state.leadInMs,
+    leadInMs: 0,
+    restMs: 0,
+    heldMs: null,
+    heldAuto: false,
+  };
 }
 
 /**
@@ -105,6 +212,7 @@ export function stopHold(state: TimerState, now: number, restMs: number | null):
     phase: 'resting',
     exerciseId: state.exerciseId,
     startedAt: now,
+    leadInMs: 0,
     restMs,
     heldMs,
     heldAuto: false,
@@ -143,6 +251,7 @@ export function autoStopHold(
     phase: 'resting',
     exerciseId: state.exerciseId,
     startedAt: state.startedAt + heldMs,
+    leadInMs: 0,
     restMs,
     heldMs,
     heldAuto: true,
@@ -170,6 +279,18 @@ export function clearTimer(): TimerState {
 /** Elapsed hold time in ms; 0 unless a hold is running. Never negative. */
 export function elapsedMs(state: TimerState, now: number): number {
   if (state.phase !== 'holding') return 0;
+  return Math.max(0, now - state.startedAt);
+}
+
+/**
+ * Elapsed rest in ms; 0 unless a rest is running. Never negative.
+ *
+ * The counterpart to `restRemainingMs`, and the one T22's reading position is
+ * built on: how far *into* the interval the owner is does not change when the
+ * rest is extended, where how far from the end of it does.
+ */
+export function restElapsedMs(state: TimerState, now: number): number {
+  if (state.phase !== 'resting') return 0;
   return Math.max(0, now - state.startedAt);
 }
 

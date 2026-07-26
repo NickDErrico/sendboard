@@ -1,5 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
-import { beepHoldEnd, beepRestEnd, resumeAudio } from '../lib/beep';
 import {
   elapsedMs,
   formatClock,
@@ -10,42 +8,15 @@ import {
   holdStatus,
   isOpenHold,
   isRestComplete,
+  leadInSecondsLeft,
+  restElapsedMs,
   restRemainingMs,
-  shouldAutoStop,
   type HoldSpec,
   type TimerState,
 } from '../lib/timer';
-
-/**
- * A ticking clock reading, at the resolution the display needs.
- *
- * The interval only drives *re-renders* — every value shown is recomputed from
- * the phase's absolute start instant (D18), so a throttled or skipped interval
- * costs a stale frame, never a drifted timer.
- */
-function useNow(active: boolean): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!active) return;
-    setNow(Date.now());
-    const id = window.setInterval(() => setNow(Date.now()), 100);
-    // A backgrounded tab throttles intervals, so re-read on the way back in
-    // rather than waiting up to a full tick for the next one. iOS also suspends
-    // the audio context while backgrounded, so re-arm it here too (T13 AC9).
-    const onVisible = () => {
-      setNow(Date.now());
-      resumeAudio();
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', onVisible);
-    return () => {
-      window.clearInterval(id);
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('focus', onVisible);
-    };
-  }, [active]);
-  return now;
-}
+import { restCardIndex, type RestReading } from '../lib/rest';
+import { useNow, useTimerCues } from '../lib/timerCues';
+import { RestCardView } from './RestCard';
 
 const STATUS_STYLE = {
   under: { fill: 'bg-sky-400', text: 'text-sky-300', label: 'building' },
@@ -58,11 +29,15 @@ export function SessionTimer({
   exerciseName,
   hold,
   chainLabel = null,
+  chainSpoken = null,
+  reading = null,
+  voice = true,
   onStop,
   onSkip,
   onExtend,
   onLogHeld,
   onStartNext,
+  onCountEnd,
 }: {
   state: TimerState;
   exerciseName: string;
@@ -74,6 +49,16 @@ export function SessionTimer({
    * where it was; the "Log …" button that would advance it is on this same bar.
    */
   chainLabel?: string | null;
+  /** T20: the same position, said out loud when a rest completes (`speakChain`). */
+  chainSpoken?: string | null;
+  /**
+   * T22: what the rest has to read — the deck, and the numbers its report card
+   * shows. Resolved for the *timer's* exercise by the session, so it stays
+   * correct wherever the bar happens to be rendered. Null outside a rest.
+   */
+  reading?: RestReading | null;
+  /** T20/D34: whether the *words* are on. Every tone fires either way. */
+  voice?: boolean;
   /** `auto` distinguishes the timer ending the hold from the owner ending it — the
       first records the prescription, the second records real elapsed time. */
   onStop: (auto?: boolean) => void;
@@ -86,40 +71,32 @@ export function SessionTimer({
    * thing that gets skipped is the rest. Absent where the exercise has no hold.
    */
   onStartNext?: () => void;
+  /**
+   * T20: the count reached zero — become the hold (or, if the app was asleep
+   * through it, drop it). The caller owns that choice; this bar only sounds it.
+   */
+  onCountEnd?: () => void;
 }) {
   const now = useNow(state.phase !== 'idle');
   const restDone = isRestComplete(state, now);
+  const counting = state.phase === 'counting';
+  const secondsLeft = leadInSecondsLeft(state, now);
 
-  // T13 AC4: the hold ends itself at the prescribed maximum. Keyed on the hold's
-  // start instant so it fires once per hold rather than on every tick past the
-  // threshold, and it sounds *before* the state change so the cue is not waiting
-  // on a render — the owner is mid-hang and listening, not watching.
-  const autoStoppedAt = useRef<number | null>(null);
-  const autoStop = shouldAutoStop(state, now, hold);
-  useEffect(() => {
-    if (!autoStop) return;
-    if (autoStoppedAt.current === state.startedAt) return;
-    autoStoppedAt.current = state.startedAt;
-    beepHoldEnd();
-    onStop(true);
-  }, [autoStop, state.startedAt, onStop]);
-
-  // One cue per rest, keyed on the phase's start instant so an extend (+30s)
-  // re-arms it and a re-render never re-fires it.
-  const beepedFor = useRef<number | null>(null);
-  useEffect(() => {
-    if (!restDone) return;
-    if (beepedFor.current === state.startedAt) return;
-    beepedFor.current = state.startedAt;
-    beepRestEnd();
-  }, [restDone, state.startedAt]);
-  useEffect(() => {
-    if (!restDone) beepedFor.current = null;
-  }, [restDone, state.restMs]);
+  useTimerCues({ state, now, hold, voice, chainSpoken, onStop, onCountEnd });
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-700 bg-slate-900/95 px-4 pt-3 backdrop-blur-sm [padding-bottom:calc(0.75rem+env(safe-area-inset-bottom))]">
       <div className="mx-auto max-w-md">
+        {counting && (
+          <CountView
+            secondsLeft={secondsLeft}
+            name={exerciseName}
+            chainLabel={chainLabel}
+            holdTarget={hold ? formatHoldTarget(hold) : null}
+            onCancel={onSkip}
+          />
+        )}
+
         {state.phase === 'holding' && hold && (
           <HoldView
             elapsed={elapsedMs(state, now)}
@@ -141,16 +118,71 @@ export function SessionTimer({
         {state.phase === 'resting' && (
           <RestView
             remaining={restRemainingMs(state, now)}
+            elapsed={restElapsedMs(state, now)}
             fraction={state.restMs > 0 ? restRemainingMs(state, now) / state.restMs : 0}
             done={restDone}
             name={exerciseName}
             chainLabel={chainLabel}
             holdTarget={hold ? formatHoldTarget(hold) : null}
+            reading={reading}
             onSkip={onSkip}
             onExtend={onExtend}
             onStartNext={onStartNext}
           />
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The seconds between the tap and "pull" (T20, D33).
+ *
+ * Deliberately the loudest thing on the bar for three seconds: the owner taps
+ * this and then looks up at the board, so the number's job is to be readable at
+ * a glance on the way up — and the tick underneath it is what they actually
+ * count on. Cancel is the only control, because the count exists to be trusted,
+ * not managed.
+ */
+function CountView({
+  secondsLeft,
+  name,
+  chainLabel,
+  holdTarget,
+  onCancel,
+}: {
+  secondsLeft: number;
+  name: string;
+  chainLabel: string | null;
+  holdTarget: string | null;
+  onCancel: () => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Get ready · <span className="text-slate-300">{name}</span>
+        </p>
+        <p className="shrink-0 text-xs text-slate-500">
+          {chainLabel && <span className="text-slate-400">{chainLabel} · </span>}
+          {holdTarget ? `target ${holdTarget}` : 'hold'}
+        </p>
+      </div>
+
+      <div className="mt-1 flex items-center gap-3">
+        <span
+          className="font-mono text-4xl font-bold tabular-nums text-amber-300"
+          aria-live="assertive"
+        >
+          {secondsLeft}
+        </span>
+        <span className="text-sm font-semibold text-amber-200">counting in…</span>
+        <button
+          onClick={onCancel}
+          className="ml-auto shrink-0 rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-300"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   );
@@ -265,25 +297,39 @@ function HeldResult({
 
 function RestView({
   remaining,
+  elapsed,
   fraction,
   done,
   name,
   chainLabel,
   holdTarget,
+  reading,
   onSkip,
   onExtend,
   onStartNext,
 }: {
   remaining: number;
+  elapsed: number;
   fraction: number;
   done: boolean;
   name: string;
   chainLabel: string | null;
   holdTarget: string | null;
+  reading: RestReading | null;
   onSkip: () => void;
   onExtend: (seconds: number) => void;
   onStartNext?: () => void;
 }) {
+  // T22: two lines of reading under the clock, and no more — the card underneath
+  // this bar is where the owner is entering the load for the set they just
+  // logged, and a rest surface that covers it would take the three minutes it
+  // was meant to fill. The board-legible version of the same card is focus
+  // mode's job. Gone the moment the rest is over: at that point the surface has
+  // one thing to say, and it is "start the next one".
+  const deck = reading?.deck ?? [];
+  const cardIndex = restCardIndex(elapsed, deck.length);
+  const card = done ? undefined : deck[cardIndex];
+
   return (
     <div>
       <div className="flex items-baseline justify-between gap-2">
@@ -330,6 +376,16 @@ function RestView({
           style={{ width: `${Math.min(1, Math.max(0, fraction)) * 100}%` }}
         />
       </div>
+
+      {card && (
+        <RestCardView
+          card={card}
+          report={reading?.report ?? null}
+          index={cardIndex}
+          total={deck.length}
+          compact
+        />
+      )}
 
       {/* T19 AC4: the next hold, from here, once the rest is actually over. The
           bar covers the card, so without this the next set costs a scroll — and

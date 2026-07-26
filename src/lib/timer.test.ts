@@ -12,15 +12,23 @@ import {
   formatHoldTarget,
   holdBandStart,
   holdFraction,
+  holdFromLeadIn,
   holdSpecOf,
   holdStatus,
+  isLeadInComplete,
+  isLeadInStale,
   isOpenHold,
   isRestComplete,
   isTimerVisible,
+  LEAD_IN_GRACE_MS,
+  leadInRemainingMs,
+  leadInSecondsLeft,
+  restElapsedMs,
   restMsOf,
   restRemainingMs,
   shouldAutoStop,
   startHold,
+  startLeadIn,
   startRest,
   stopHold,
   type HoldSpec,
@@ -249,6 +257,19 @@ describe('rest countdown (AC4, AC5)', () => {
     const holding = startHold('x', T0);
     expect(extendRest(holding, 30)).toBe(holding);
   });
+
+  it('reads elapsed rest independently of how long the rest is (T22)', () => {
+    const s = startRest('max-hang', MIN_3, T0);
+    expect(restElapsedMs(s, T0)).toBe(0);
+    expect(restElapsedMs(s, T0 + 65_000)).toBe(65_000);
+    // The reading position must not move when the interval is extended — this is
+    // what lets +30s append a card rather than reorder the deck (T22 AC3).
+    expect(restElapsedMs(extendRest(s, 30), T0 + 65_000)).toBe(65_000);
+    // Past the end it keeps counting; the deck clamps, not the clock.
+    expect(restElapsedMs(s, T0 + MIN_3 + 20_000)).toBe(MIN_3 + 20_000);
+    expect(restElapsedMs(s, T0 - 5_000)).toBe(0);
+    expect(restElapsedMs(startHold('x', T0), T0 + 5_000)).toBe(0);
+  });
 });
 
 describe('backgrounding (AC7)', () => {
@@ -411,5 +432,90 @@ describe('open hold', () => {
     expect(formatHoldTarget(OPEN)).toBe('max');
     expect(formatHoldTarget({ min: 7, max: 10 })).toBe('7–10s');
     expect(formatHoldTarget({ min: 5, max: 5 })).toBe('5s');
+  });
+});
+
+// ─── The lead-in (T20, D33) ──────────────────────────────────────────────────
+
+describe('the count that ends in "pull"', () => {
+  const LEAD = 3000;
+
+  it('runs down whole seconds, then reaches zero', () => {
+    const counting = startLeadIn('max-hang-half-crimp', LEAD, T0);
+    expect(counting.phase).toBe('counting');
+    expect(leadInSecondsLeft(counting, T0)).toBe(3);
+    expect(leadInSecondsLeft(counting, T0 + 1000)).toBe(2);
+    expect(leadInSecondsLeft(counting, T0 + 2500)).toBe(1);
+    expect(leadInSecondsLeft(counting, T0 + 3000)).toBe(0);
+    expect(isLeadInComplete(counting, T0 + 2999)).toBe(false);
+    expect(isLeadInComplete(counting, T0 + 3000)).toBe(true);
+  });
+
+  it('never has more left than its own length, however stale the clock reading is', () => {
+    // The bar's clock ticks every 100ms, so a count started while the bar is
+    // already on screen is first rendered against a `now` from before it began.
+    // Unclamped that reads 3100ms and the count says "four".
+    const counting = startLeadIn('max-hang-half-crimp', LEAD, T0);
+    expect(leadInRemainingMs(counting, T0 - 100)).toBe(LEAD);
+    expect(leadInSecondsLeft(counting, T0 - 100)).toBe(3);
+    expect(leadInSecondsLeft(counting, T0)).toBe(3);
+  });
+
+  it('is visible on the bar and measures no hold while it runs', () => {
+    const counting = startLeadIn('max-hang-half-crimp', LEAD, T0);
+    expect(isTimerVisible(counting)).toBe(true);
+    expect(elapsedMs(counting, T0 + 2000)).toBe(0);
+    expect(restRemainingMs(counting, T0 + 2000)).toBe(0);
+    expect(counting.heldMs).toBeNull();
+  });
+
+  it('back-dates the hold to when the count actually ended, not to the tick that noticed', () => {
+    const counting = startLeadIn('max-hang-half-crimp', LEAD, T0);
+    const holding = holdFromLeadIn(counting);
+    expect(holding.phase).toBe('holding');
+    expect(holding.startedAt).toBe(T0 + LEAD);
+    // A tick 400ms late still measures the hold from "pull".
+    expect(elapsedMs(holding, T0 + LEAD + 400)).toBe(400);
+    expect(holding.leadInMs).toBe(0);
+  });
+
+  it('is stale once the app slept through it — a hold nobody heard begin must not begin', () => {
+    const counting = startLeadIn('max-hang-half-crimp', LEAD, T0);
+    expect(isLeadInStale(counting, T0 + LEAD)).toBe(false);
+    expect(isLeadInStale(counting, T0 + LEAD + LEAD_IN_GRACE_MS)).toBe(false);
+    expect(isLeadInStale(counting, T0 + LEAD + LEAD_IN_GRACE_MS + 1)).toBe(true);
+    expect(isLeadInStale(counting, T0 + 60_000)).toBe(true);
+    // Never stale when no count is running.
+    expect(isLeadInStale(startHold('x', T0), T0 + 60_000)).toBe(false);
+  });
+
+  it('restarts rather than stacking when a second hold is started mid-count', () => {
+    const first = startLeadIn('max-hang-half-crimp', LEAD, T0);
+    const second = startLeadIn('max-hang-open-hand', LEAD, T0 + 1200);
+    expect(second.exerciseId).toBe('max-hang-open-hand');
+    expect(leadInSecondsLeft(second, T0 + 1200)).toBe(3);
+    expect(first.startedAt).toBe(T0); // the old state is untouched, not mutated
+  });
+
+  it('is cancellable, leaving nothing behind', () => {
+    const cleared = clearTimer();
+    expect(cleared).toEqual(IDLE_TIMER);
+    expect(cleared.heldMs).toBeNull();
+    expect(isTimerVisible(cleared)).toBe(false);
+  });
+
+  it('ignores the transitions that belong to other phases', () => {
+    const counting = startLeadIn('max-hang-half-crimp', LEAD, T0);
+    expect(stopHold(counting, T0 + 1000, MIN_3)).toBe(counting);
+    expect(autoStopHold(counting, HANG, MIN_3)).toBe(counting);
+    expect(extendRest(counting, 30)).toBe(counting);
+    expect(holdFromLeadIn(startHold('x', T0)).phase).toBe('holding');
+  });
+
+  it('leaves no count on any state that did not start one', () => {
+    expect(startHold('x', T0).leadInMs).toBe(0);
+    expect(startRest('x', MIN_3, T0).leadInMs).toBe(0);
+    expect(stopHold(startHold('x', T0), T0 + 5000, MIN_3).leadInMs).toBe(0);
+    expect(leadInRemainingMs(startRest('x', MIN_3, T0), T0)).toBe(0);
   });
 });

@@ -35,21 +35,30 @@ import {
   formatClock,
   formatHold,
   formatHoldTarget,
+  holdFromLeadIn,
   holdSpecOf,
+  isLeadInStale,
   isTimerVisible,
   restMsOf,
   startHold,
+  startLeadIn,
   startRest,
   stopHold,
   type TimerState,
 } from '../lib/timer';
 import { reasonApplies, reasonsFor } from '../lib/setReason';
 import { gearOf, type Gear } from '../lib/gear';
-import { chainPosition, formatChain, setSpecOf } from '../lib/chain';
+import { chainPosition, formatChain, setSpecOf, speakChain } from '../lib/chain';
+import { restReading } from '../lib/rest';
+import { warmupPlanOf } from '../lib/warmup';
+import { leadInMsOf, voiceEnabled } from '../lib/cues';
 import { primeAudio } from '../lib/beep';
+import { hush, primeSpeech } from '../lib/speech';
 import { useWakeLock } from '../lib/wakeLock';
 import { SetLogger } from '../components/SetLogger';
 import { SessionTimer } from '../components/SessionTimer';
+import { FocusHold } from '../components/FocusHold';
+import { WarmupRunner } from '../components/WarmupRunner';
 import { ExerciseDetail } from './ExerciseDetail';
 
 export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: () => void }) {
@@ -58,6 +67,11 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   const [exercisesById, setExercisesById] = useState<Map<string, Exercise>>(new Map());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [detailId, setDetailId] = useState<string | null>(null);
+  // T21: which exercise the eyes-shut surface is showing, or null. View state
+  // only — never persisted, never restored on reload (D18).
+  const [focusId, setFocusId] = useState<string | null>(null);
+  // T23: which warm-up the runner is on, or null. Same rule, same lifetime.
+  const [warmupId, setWarmupId] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   // T10: exactly one timer for the whole session, held here rather than per card
   // so it survives opening an exercise's detail view. Never persisted (D18).
@@ -72,6 +86,12 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   // taps. Read from the same settings fetch — it configures inputs only, so an
   // empty gear object is a working session, not a degraded one (D31).
   const [gear, setGear] = useState<Gear>({});
+  // T20/D33/D34: how long the count runs before "pull", and whether the cues are
+  // spoken as well as sounded. Read from the same settings fetch; both have
+  // defaults, so an install that has never opened Settings counts in from 3 and
+  // talks (D34 — the tones are unconditional either way).
+  const [leadInMs, setLeadInMs] = useState(0);
+  const [voice, setVoice] = useState(true);
   // Ref mirrors the latest log so rapid taps build from current state, never a
   // stale closure — otherwise concurrent "Add set" taps would drop entries.
   const logRef = useRef<WorkoutLog | null>(null);
@@ -101,6 +121,8 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
       setRoutine(r ?? null);
       setStandardEdgeMm(settings.standardEdgeMm);
       setGear(gearOf(settings));
+      setLeadInMs(leadInMsOf(settings));
+      setVoice(voiceEnabled(settings));
       setExercisesById(new Map(all.map((e) => [e.id, e])));
       // This log is excluded, so an exercise can never cite itself (T11).
       setLastByExercise(lastPerformanceMap(logs, r?.exerciseIds ?? [], new Date(), logId));
@@ -141,14 +163,54 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   // primeAudio runs on these taps because they are the user gesture iOS requires
   // before an AudioContext will make any sound at all.
 
+  // T20/D33: with a count-in configured this starts the *count*, and the hold
+  // begins on "pull" — so `holdSec` measures the effort rather than the effort
+  // plus however long it took to step up and load. With none it is the T13
+  // behaviour exactly: the hold starts on the tap. Either way it starts only
+  // from a tap (T19 AC5): nothing here is ever called by a completing rest.
   function beginHold(exerciseId: string) {
     primeAudio();
+    primeSpeech();
+    setTimer(
+      leadInMs > 0
+        ? startLeadIn(exerciseId, leadInMs, Date.now())
+        : startHold(exerciseId, Date.now()),
+    );
+  }
+
+  // T23/D39: a warm-up round starts its hold *directly*, with no count-in. D33's
+  // count exists so `holdSec` measures the effort rather than the tap offset, and
+  // a warm-up round records no `holdSec` — so the count would buy nothing and
+  // spend three seconds of a prescribed sixty-second cadence. Reachable only from
+  // the runner, which the catalog's `category === 'warmup'` gates.
+  function beginWarmupRound(exerciseId: string) {
+    primeAudio();
+    primeSpeech();
     setTimer(startHold(exerciseId, Date.now()));
   }
 
   function beginRest(exerciseId: string, restMs: number) {
     primeAudio();
+    primeSpeech();
     setTimer(startRest(exerciseId, restMs, Date.now()));
+  }
+
+  /**
+   * The count reached zero: become the hold — unless the app slept through it.
+   *
+   * A backgrounded PWA is suspended, so a count can finish while nothing is
+   * running and be noticed on the way back. Starting a hold there would begin
+   * (and, at the prescribed maximum, auto-finish and offer to log) a hang that
+   * never happened, which is the one thing the app must never do.
+   */
+  function handleCountEnd() {
+    setTimer((t) => (isLeadInStale(t, Date.now()) ? clearTimer() : holdFromLeadIn(t)));
+  }
+
+  /** Skip / Cancel / dismiss — and stop the voice mid-word if it is counting. */
+  function dismissTimer() {
+    hush();
+    setTimer(clearTimer());
   }
 
   // `auto` means the timer reached the prescribed maximum rather than the owner
@@ -238,6 +300,13 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
     return formatChain(chainPosition(getSets(log as WorkoutLog, exerciseId).length, spec));
   }
 
+  /** The same position said out loud (T20) — spoken once, when a rest completes. */
+  function chainSpokenFor(exerciseId: string): string | null {
+    const spec = setSpecOf(exercisesById.get(exerciseId));
+    if (spec === null) return null;
+    return speakChain(chainPosition(getSets(log as WorkoutLog, exerciseId).length, spec));
+  }
+
   const timerExercise = timer.exerciseId ? exercisesById.get(timer.exerciseId) : undefined;
   // T19: one value serves both views, because "the set that is next to be logged"
   // *is* the set being held while a hold runs, and the one after a rest. It moves
@@ -246,16 +315,34 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   const timerChainLabel = timer.exerciseId
     ? chainLabelFor(timer.exerciseId)
     : null;
+  const timerChainSpoken = timer.exerciseId ? chainSpokenFor(timer.exerciseId) : null;
+  // T22: what the prescribed rest has to read. Resolved once, here, for the
+  // exercise the *timer* belongs to — so it is the same deck whichever view is
+  // mounted, and a rest running on one exercise still reports that one while
+  // focus sits on another (the rule the cues already follow).
+  const timerReading =
+    timer.phase === 'resting' && timer.exerciseId
+      ? restReading({
+          exercise: timerExercise,
+          sets: getSets(log, timer.exerciseId),
+          last: lastByExercise.get(timer.exerciseId) ?? null,
+          restMs: timer.restMs,
+        })
+      : null;
   const timerBar = isTimerVisible(timer) ? (
     <SessionTimer
       state={timer}
       exerciseName={timerExercise?.name ?? timer.exerciseId ?? ''}
       hold={holdSpecOf(timerExercise)}
       chainLabel={timerChainLabel}
+      chainSpoken={timerChainSpoken}
+      reading={timerReading}
+      voice={voice}
       onStop={handleStop}
-      onSkip={() => setTimer(clearTimer())}
+      onSkip={dismissTimer}
       onExtend={(seconds) => setTimer((t) => extendRest(t, seconds))}
       onLogHeld={handleLogHeld}
+      onCountEnd={handleCountEnd}
       onStartNext={
         timer.exerciseId && holdSpecOf(timerExercise)
           ? () => beginHold(timer.exerciseId as string)
@@ -263,6 +350,79 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
       }
     />
   ) : null;
+
+  // T23: the warm-up runner. Rendered instead of the session for the same reason
+  // focus is — two views of one timer would double every cue — and it drives the
+  // session's timer, so its hold-end and rest-end tones are the ones T13 and T20
+  // already paid for. It writes nothing on its own (AC6): the only thing it can
+  // change about the log is the completion mark, and only on a tap (D16).
+  const warmupExercise = warmupId === null ? undefined : exercisesById.get(warmupId);
+  const warmupPlan = warmupPlanOf(warmupExercise);
+  if (warmupExercise && warmupPlan) {
+    return (
+      <WarmupRunner
+        exercise={warmupExercise}
+        plan={warmupPlan}
+        state={timer}
+        timerHold={holdSpecOf(timerExercise)}
+        completed={isExerciseCompleted(log, warmupExercise.id)}
+        voice={voice}
+        onExit={() => setWarmupId(null)}
+        onStartRound={() => beginWarmupRound(warmupExercise.id)}
+        onStop={handleStop}
+        onSkip={dismissTimer}
+        onComplete={() =>
+          mutate((l) =>
+            setExerciseCompleted(l, warmupExercise.id, !isExerciseCompleted(l, warmupExercise.id)),
+          )
+        }
+        onFinish={() => {
+          mutate((l) => setExerciseCompleted(l, warmupExercise.id, true));
+          dismissTimer();
+          setWarmupId(null);
+        }}
+      />
+    );
+  }
+
+  // T21: eyes-shut mode. Rendered *instead of* the session (and instead of the
+  // bar), never alongside it — two views of one timer would double every cue,
+  // which is why `useTimerCues` moved out of `SessionTimer` and why exactly one
+  // of them is mounted. Every control below is the same handler the card uses
+  // (D35): a set logged here is byte-identical to one logged there.
+  const focusExercise = focusId === null ? undefined : exercisesById.get(focusId);
+  const focusHold = holdSpecOf(focusExercise);
+  if (focusExercise && focusHold) {
+    const last = lastByExercise.get(focusExercise.id) ?? null;
+    return (
+      <FocusHold
+        exercise={focusExercise}
+        state={timer}
+        hold={focusHold}
+        // The cues read the *timer's* exercise, not the focused one, so leaving
+        // a rest running on one exercise and opening focus on another still
+        // sounds correctly (AC5, AC9).
+        timerHold={holdSpecOf(timerExercise)}
+        chainLabel={chainLabelFor(focusExercise.id)}
+        chainSpoken={timerChainSpoken}
+        lastSummary={last ? `${describeWhen(last.daysAgo)} · ${summarizeSets(last.sets)}` : null}
+        reading={timerReading}
+        voice={voice}
+        timerExerciseName={
+          timer.exerciseId && timer.exerciseId !== focusExercise.id
+            ? (timerExercise?.name ?? timer.exerciseId)
+            : null
+        }
+        onExit={() => setFocusId(null)}
+        onStart={() => beginHold(focusExercise.id)}
+        onStop={handleStop}
+        onSkip={dismissTimer}
+        onExtend={(seconds) => setTimer((t) => extendRest(t, seconds))}
+        onLogHeld={handleLogHeld}
+        onCountEnd={handleCountEnd}
+      />
+    );
+  }
 
   // T9 AC6: full protocol without leaving the session. Rendered over the session
   // rather than routed to, so back returns here with every set intact — and
@@ -356,19 +516,45 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
                 </p>
               )}
 
-              {/* T10: a hold if the plan prescribes a duration, otherwise a bare
-                  rest if it prescribes only that. Untimed movements (rows,
-                  squats, get-ups, prehab) get neither and read exactly as before. */}
-              {holdSpec ? (
+              {/* T23: a warm-up's full-screen surface is the runner, not focus —
+                  it starts the same holds, runs §4A's cadence without a tap per
+                  round, and paces the stages an untimed warm-up has instead. So
+                  it takes the place of both controls rather than sitting beside
+                  them (T21 AC1 amended, see T23's Amendments). */}
+              {warmupPlanOf(exercise) ? (
                 <button
-                  onClick={() => beginHold(exId)}
-                  disabled={isTiming}
-                  className="mt-2 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-semibold text-slate-200 disabled:opacity-40"
+                  onClick={() => setWarmupId(exId)}
+                  className="mt-2 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-semibold text-slate-200"
                 >
-                  {isTiming
-                    ? 'Timing…'
-                    : `▶ Start ${chainLabel ?? 'hold'} · ${formatHoldTarget(holdSpec)}`}
+                  ▶ Run warm-up
                 </button>
+              ) : /* T10: a hold if the plan prescribes a duration, otherwise a bare
+                  rest if it prescribes only that. Untimed movements (rows,
+                  squats, get-ups, prehab) get neither and read exactly as before. */
+              holdSpec ? (
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() => beginHold(exId)}
+                    disabled={isTiming}
+                    className="min-w-0 flex-1 truncate rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-semibold text-slate-200 disabled:opacity-40"
+                  >
+                    {isTiming
+                      ? timer.phase === 'counting'
+                        ? 'Counting in…'
+                        : 'Timing…'
+                      : `▶ Start ${chainLabel ?? 'hold'} · ${formatHoldTarget(holdSpec)}`}
+                  </button>
+                  {/* T21: the eyes-shut surface for this exercise. Only where the
+                      plan declares a hold — an exercise with no clock has no
+                      loop to run blind. */}
+                  <button
+                    onClick={() => setFocusId(exId)}
+                    aria-label={`Focus mode for ${exercise?.name ?? exId}`}
+                    className="shrink-0 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-semibold text-slate-400"
+                  >
+                    ⤢ Focus
+                  </button>
+                </div>
               ) : (
                 restMs !== null && (
                   <button

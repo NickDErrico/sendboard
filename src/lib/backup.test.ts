@@ -10,6 +10,7 @@ import {
   parseBackup,
   serializeBackup,
 } from './backup';
+import { DEFAULT_LEAD_IN_SEC, leadInSecOf, voiceEnabled } from './cues';
 import type { Check, Settings, WorkoutLog } from '../types';
 
 beforeEach(async () => {
@@ -149,6 +150,37 @@ describe('collect → import round trip through storage (AC2)', () => {
     const restored = await storage.getSettings();
     expect(restored.edgesMm).toBeUndefined();
     expect(restored.loadStepLb).toBeUndefined();
+  });
+
+  // T20 AC11. Same property, third task running: the voice and the count-in are
+  // optional fields on an object the backup already carries whole, so a file
+  // written before T20 restores as voice-on / count-in 3 with no migration.
+  it('round-trips the voice and the count-in, and a pre-T20 settings object reads as the defaults', async () => {
+    await storage.saveSettings({ installGuideDismissed: true, voiceCues: false, leadInSec: 0 });
+
+    const backup = await collectBackup('2026-07-25T07:09:08.123Z');
+    expect(backup.schemaVersion).toBe(BACKUP_SCHEMA_VERSION);
+
+    await storage._resetForTests();
+    await importBackup(backup);
+    const settings = await storage.getSettings();
+    expect(settings.voiceCues).toBe(false);
+    expect(settings.leadInSec).toBe(0);
+    expect(voiceEnabled(settings)).toBe(false);
+    expect(leadInSecOf(settings)).toBe(0);
+
+    await storage._resetForTests();
+    await importBackup(
+      buildBackup(
+        { logs: [], checks: [], settings: { installGuideDismissed: true }, bodyweight: [] },
+        '2026-07-25T07:09:08.123Z',
+      ),
+    );
+    const older = await storage.getSettings();
+    expect(older.voiceCues).toBeUndefined();
+    expect(older.leadInSec).toBeUndefined();
+    expect(voiceEnabled(older)).toBe(true);
+    expect(leadInSecOf(older)).toBe(DEFAULT_LEAD_IN_SEC);
   });
 
   it('replaces existing data rather than merging (AC4 semantics)', async () => {

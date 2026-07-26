@@ -121,6 +121,33 @@ export function beepRestEnd(): void {
   ]);
 }
 
+/**
+ * One second of the count-in gone (T20).
+ *
+ * Short and low, because it fires three times in three seconds and the sound
+ * that matters is the one after it. D34: this tick is the count — the spoken
+ * "three, two, one" rides on top of it and is allowed to be absent.
+ */
+export function beepCountTick(): void {
+  play([{ frequency: 440, seconds: 0.07, gap: 0 }]);
+}
+
+/** "Pull" — the count is over and the hold clock is running (T20, D33). */
+export function beepGo(): void {
+  play([{ frequency: 990, seconds: 0.2, gap: 0 }]);
+}
+
+/**
+ * One whole second inside the target band, pitched by where in the band it is.
+ *
+ * Rising across the window so "am I at 7 yet" and "how much is left" are one
+ * sound — the owner is looking at the board, not at the bar. Deliberately unlike
+ * `beepHoldEnd`, which is long and low and means the opposite thing.
+ */
+export function beepBandPip(frequency: number): void {
+  play([{ frequency, seconds: 0.09, gap: 0 }]);
+}
+
 /** Settings' "Test sound" (AC8) — the rest cue, on demand, off the training floor. */
 export function beepTest(): void {
   primeAudio();

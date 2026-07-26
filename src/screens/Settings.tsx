@@ -20,6 +20,8 @@ import {
 import { parseBodyweight } from '../lib/bodyweight';
 import { parseEdgeMm } from '../lib/retest';
 import { parseEdgeList, parseLoadStep } from '../lib/gear';
+import { DEFAULT_LEAD_IN_SEC, leadInSecOf, parseLeadIn, voiceEnabled } from '../lib/cues';
+import { primeSpeech, say } from '../lib/speech';
 import type { BodyweightEntry } from '../types';
 import { PERSISTENCE_COPY, checkPersistence, type PersistenceState } from '../lib/persistence';
 import { beepTest } from '../lib/beep';
@@ -237,20 +239,9 @@ export function Settings({
         </section>
 
         {/* T13 AC8: audio is the one thing that cannot be checked by looking, and
-            checking it mid-session means abandoning a hang to find out. */}
-        <section className="rounded-xl border border-slate-700 bg-brand-surface p-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sound</h2>
-          <p className="mt-2 text-sm text-slate-400">
-            The timer plays a tone when a hold ends and when a rest is up. It only sounds while
-            Sendboard is on screen — iOS suspends a backgrounded web app.
-          </p>
-          <button
-            onClick={beepTest}
-            className="mt-3 w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 font-semibold text-slate-200"
-          >
-            Test sound
-          </button>
-        </section>
+            checking it mid-session means abandoning a hang to find out. T20 adds
+            the voice and the count-in to the same section, for the same reason. */}
+        <SoundSettings reloadKey={bwReloadKey} />
 
         <section className="rounded-xl border border-slate-700 bg-brand-surface p-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Reminders</h2>
@@ -425,6 +416,124 @@ function GearSettings({ reloadKey }: { reloadKey: number }) {
           The smallest weight you can actually add. It sets the size of the − / + step on added load
           — §4F asks for increments of 1–3%, and whether to take one is yours.
         </p>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The tones, the voice, and the count that starts a hold (T13 AC8, T20).
+ *
+ * D34 is visible in the copy on purpose: the toggle turns off the *words*, never
+ * the tones, because the tones are the channel the session actually depends on
+ * and the voice is the one that is allowed to be missing. Both testable here,
+ * off the training floor — mid-session, finding out costs a hang.
+ *
+ * The count-in is the one setting in this section that changes a *number*: with
+ * it on, a hold is measured from "pull" rather than from the tap (D33).
+ */
+function SoundSettings({ reloadKey }: { reloadKey: number }) {
+  const [voice, setVoice] = useState(true);
+  const [leadIn, setLeadIn] = useState<number>(DEFAULT_LEAD_IN_SEC);
+  // Bumped on every read so the field remounts against what is actually stored.
+  // Without it a *refused* edit leaves the junk sitting in the box — the stored
+  // count is unchanged, so the value-keyed remount never happens and the refusal
+  // is invisible, which is the one thing a refusal must not be.
+  const [readCount, setReadCount] = useState(0);
+
+  const refresh = useCallback(async () => {
+    const settings = await getSettings();
+    setVoice(voiceEnabled(settings));
+    setLeadIn(leadInSecOf(settings));
+    setReadCount((n) => n + 1);
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh, reloadKey]);
+
+  async function toggleVoice() {
+    const settings = await getSettings();
+    await saveSettings({ ...settings, voiceCues: !voiceEnabled(settings) });
+    await refresh();
+  }
+
+  async function saveLeadIn(raw: string) {
+    const parsed = parseLeadIn(raw);
+    // Junk leaves the stored count alone — the same refusal every other field in
+    // this screen makes. 0 is a real answer, not an empty one.
+    if (parsed === null) {
+      await refresh();
+      return;
+    }
+    const settings = await getSettings();
+    await saveSettings({ ...settings, leadInSec: parsed });
+    await refresh();
+  }
+
+  return (
+    <section className="space-y-3 rounded-xl border border-slate-700 bg-brand-surface p-4">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sound</h2>
+      <p className="text-sm text-slate-400">
+        The timer plays a tone when a hold ends and when a rest is up, and pips through the target
+        window of a hang so you can hear where you are without looking. It only sounds while
+        Sendboard is on screen — iOS suspends a backgrounded web app.
+      </p>
+
+      <button
+        onClick={() => void toggleVoice()}
+        aria-pressed={voice}
+        className={`flex w-full items-center justify-between rounded-lg px-4 py-2 text-sm font-semibold ${
+          voice ? 'bg-emerald-500/20 text-emerald-200' : 'border border-slate-700 text-slate-300'
+        }`}
+      >
+        <span>Spoken cues</span>
+        <span aria-hidden>{voice ? 'On ✓' : 'Off'}</span>
+      </button>
+      <p className="text-xs text-slate-500">
+        Counts you in and says which set is next when a rest ends. Turning it off silences the words
+        only — every tone still plays.
+      </p>
+
+      <div className="space-y-1">
+        <label className="text-sm text-slate-300" htmlFor="lead-in">
+          Count-in
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            id="lead-in"
+            key={`lead-${leadIn}-${readCount}`}
+            defaultValue={String(leadIn)}
+            onBlur={(e) => void saveLeadIn(e.target.value)}
+            inputMode="decimal"
+            placeholder="3"
+            aria-label="Count-in before a hold, seconds"
+            className="w-20 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-right text-sm text-slate-100 focus:border-brand-accent focus:outline-none"
+          />
+          <span className="text-xs text-slate-500">seconds</span>
+        </div>
+        <p className="text-xs text-slate-500">
+          “3, 2, 1, pull” — the hold clock starts on <em>pull</em>, so the recorded time is the
+          effort and not the time it took to get loaded. Set 0 to start on the tap instead.
+        </p>
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={beepTest}
+          className="flex-1 rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 font-semibold text-slate-200"
+        >
+          Test sound
+        </button>
+        <button
+          onClick={() => {
+            primeSpeech();
+            say('Rest done. Set 3 of 5.');
+          }}
+          className="flex-1 rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 font-semibold text-slate-200"
+        >
+          Test voice
+        </button>
       </div>
     </section>
   );

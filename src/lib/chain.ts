@@ -77,3 +77,20 @@ export function formatChain(position: ChainPosition): string | null {
   if (beyond) return `set ${current} (${formatSetTarget(spec)} prescribed)`;
   return `set ${current} of ${formatSetTarget(spec)}`;
 }
+
+/**
+ * The same position, said out loud (T20).
+ *
+ * Two differences from the printed form, both because a voice cannot punctuate:
+ * a range is spoken "4 to 6" rather than "4–6", and past the prescription the
+ * parenthetical is dropped — "set 6" — rather than read as a sentence the owner
+ * has to unpack mid-session. The screen still carries both numbers, and D23's
+ * rule is unchanged either way: it is a position, never a verdict.
+ */
+export function speakChain(position: ChainPosition): string | null {
+  const { current, spec, beyond } = position;
+  if (spec === null) return null;
+  if (beyond) return `set ${current}`;
+  const target = spec.min === spec.max ? `${spec.max}` : `${spec.min} to ${spec.max}`;
+  return `set ${current} of ${target}`;
+}

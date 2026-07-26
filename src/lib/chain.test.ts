@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chainPosition, formatChain, formatSetTarget, setSpecOf } from './chain';
+import { chainPosition, formatChain, formatSetTarget, setSpecOf, speakChain } from './chain';
 import { EXERCISES } from '../data/exercises';
 import type { Exercise } from '../types';
 
@@ -137,5 +137,28 @@ describe('the seeded catalog', () => {
       expect(spec.min).toBeGreaterThan(0);
       expect(spec.max).toBeGreaterThanOrEqual(spec.min);
     }
+  });
+});
+
+// T20: the same position, said out loud. A voice cannot punctuate, so a range
+// becomes "4 to 6" and the parenthetical past the prescription is dropped —
+// the screen still carries both numbers.
+describe('speakChain', () => {
+  it('speaks a fixed count as "of N"', () => {
+    expect(speakChain(chainPosition(2, { min: 5, max: 5 }))).toBe('set 3 of 5');
+  });
+
+  it('speaks a range as a range, not a dash', () => {
+    expect(speakChain(chainPosition(2, { min: 4, max: 6 }))).toBe('set 3 of 4 to 6');
+  });
+
+  it('drops the parenthetical past the prescription rather than reading it aloud', () => {
+    const beyond = chainPosition(5, { min: 5, max: 5 });
+    expect(formatChain(beyond)).toBe('set 6 (5 prescribed)');
+    expect(speakChain(beyond)).toBe('set 6');
+  });
+
+  it('says nothing where the plan declares no count', () => {
+    expect(speakChain(chainPosition(3, null))).toBeNull();
   });
 });

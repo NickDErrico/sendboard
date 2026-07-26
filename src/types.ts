@@ -183,4 +183,22 @@ export interface Settings {
    * proposes taking a step, and no chip is ever marked recommended.
    */
   loadStepLb?: number;
+  /**
+   * Whether the app speaks its cues (T20, D34).
+   *
+   * **Absent means on** — the owner asked for the voice, and every cue is
+   * foreground-only (D2a is untouched: this is Web Speech while the app is on
+   * screen, never a notification). Turning it off silences the *words*; every
+   * tone still fires, because the tone carries the event and the voice only
+   * carries the words.
+   */
+  voiceCues?: boolean;
+  /**
+   * Seconds counted off before a hold's clock starts (T20, D33).
+   *
+   * **Absent means 3; 0 turns the count off.** The count owns the clock: the
+   * hold is measured from "pull", not from the tap, so `holdSec` is the effort
+   * rather than the effort plus the time it took to step up and load.
+   */
+  leadInSec?: number;
 }
