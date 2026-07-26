@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Routine, WorkoutLog } from '../types';
 import { createLog } from '../lib/session';
-import { getAllLogs, getAllRoutines, saveLog } from '../lib/storage';
+import { getAllLogs, getAllRoutines, getSettings, saveLog } from '../lib/storage';
 import {
   describeLastCompleted,
   rotates,
@@ -9,6 +9,8 @@ import {
   type RoutineStatus,
 } from '../lib/rotation';
 import { batteryOccasions, type Occasion } from '../lib/retest';
+import { blockPosition, formatPhaseWeeks, phaseFor, type BlockPosition } from '../lib/block';
+import { LIGHTER_WEEK_CAVEAT } from '../data/blockPhases';
 import { go } from '../lib/routes';
 import { WeekStatus } from '../components/WeekStatus';
 import { DailyGtgStatus } from '../components/DailyGtgStatus';
@@ -29,19 +31,29 @@ export function Home() {
   const [lastCompleted, setLastCompleted] = useState<WorkoutLog | null>(null);
   const [rotation, setRotation] = useState<RoutineStatus[]>([]);
   const [occasions, setOccasions] = useState<Occasion[]>([]);
+  // T24/D25: derived, never scheduled — and null until a training session has been
+  // completed, which the card states rather than papering over with week 1.
+  const [block, setBlock] = useState<BlockPosition | null>(null);
 
   // Reloads on mount and refocus, so a session finished elsewhere (or a resume
   // after force-close) is reflected — and so "days ago" rolls over at midnight
   // without a reload, the same way T5b's daily status does.
   useEffect(() => {
     const load = async () => {
-      const [rs, logs] = await Promise.all([getAllRoutines(), getAllLogs()]);
+      const [rs, logs, settings] = await Promise.all([
+        getAllRoutines(),
+        getAllLogs(),
+        getSettings(),
+      ]);
       setRoutines(rs);
       // getAllLogs is sorted by startedAt descending.
       setInProgress(logs.find((l) => l.completedAt === null) ?? null);
       setLastCompleted(logs.find((l) => l.completedAt !== null) ?? null);
       setRotation(routineRotation(rs, logs, new Date()));
       setOccasions(batteryOccasions(logs));
+      // No `liveLog`: an abandoned session must not advance a count, the same rule
+      // `routineRotation` follows. The session screen numbers the live one.
+      setBlock(blockPosition({ logs, routines: rs, settings, today: new Date() }));
     };
     void load();
     const onFocus = () => void load();
@@ -107,6 +119,43 @@ export function Home() {
           <p className="mt-1 font-semibold text-slate-100">{routineName(inProgress.routineId)}</p>
         </button>
       )}
+
+      {/* T24: where the 8-week block stands, counted from the owner's own log
+          (D25). Not a button and not a schedule: there is nothing to tap, nothing
+          is due, and past week 8 it reads "week 8+" rather than late (D2a, D23).
+          §4F's row for the week is quoted with its reference, alongside §4F's own
+          caveat that a lighter week beats the table — which is the sentence that
+          makes the app's silence about adherence the plan's position, not just a
+          design preference. */}
+      <section className="rounded-xl border border-slate-700 bg-brand-surface p-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Block</h2>
+        {block === null ? (
+          <p className="mt-1 text-sm text-slate-400">
+            Not started — the block begins at your first logged session.
+          </p>
+        ) : (
+          <>
+            <p className="mt-0.5 text-sm font-semibold text-slate-100">{block.label}</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              {block.derived ? 'Counted from your first session, ' : 'You started this block '}
+              {new Date(`${block.startKey}T00:00`).toLocaleDateString()}
+            </p>
+            {(() => {
+              const phase = phaseFor(block.week);
+              if (!phase) return null;
+              return (
+                <p className="mt-2 text-xs leading-snug text-slate-400">
+                  <span className="font-semibold uppercase tracking-wide text-slate-500">
+                    {formatPhaseWeeks(phase)}
+                  </span>{' '}
+                  <span className="text-slate-300">{phase.focus}</span> — {phase.note} (plan §4F)
+                </p>
+              );
+            })()}
+            <p className="mt-1.5 text-xs leading-snug text-slate-500">{LIGHTER_WEEK_CAVEAT}</p>
+          </>
+        )}
+      </section>
 
       {/* Sorted up-next first (D15). Both stay startable in one tap — "up next" is
           a suggestion from rotation order, never a lock, and there is deliberately

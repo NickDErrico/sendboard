@@ -45,6 +45,7 @@ export function FocusHold({
   chainLabel,
   chainSpoken,
   lastSummary,
+  prescriptionLine,
   reading,
   voice,
   timerExerciseName,
@@ -66,6 +67,13 @@ export function FocusHold({
   chainSpoken: string | null;
   /** T11's one-line summary of last time, or null when there is no record. */
   lastSummary: string | null;
+  /**
+   * The one protocol line to read from the board (T24).
+   *
+   * This week's variant where §4B declares two, otherwise `exercise.prescription`
+   * unchanged — resolved by the session, because the derived week lives there.
+   */
+  prescriptionLine: string;
   /** T22: the running rest's reading list, resolved for the *timer's* exercise. */
   reading: RestReading | null;
   voice: boolean;
@@ -160,7 +168,7 @@ export function FocusHold({
                     <span className="text-slate-300">{lastSummary}</span>
                   </p>
                 )}
-                <p className="text-base leading-snug text-slate-200">{exercise.prescription}</p>
+                <p className="text-base leading-snug text-slate-200">{prescriptionLine}</p>
                 {exercise.cues.length > 0 && (
                   <ul className="list-disc space-y-1.5 pl-5 text-base leading-snug text-slate-400 marker:text-slate-600">
                     {exercise.cues.map((c, i) => (

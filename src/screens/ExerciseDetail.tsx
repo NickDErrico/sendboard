@@ -1,6 +1,9 @@
 import type { Exercise, IsoType } from '../types';
 import { EquipmentBadge, GtgBadge } from '../components/EquipmentBadge';
 import { ExerciseProgress } from '../components/ExerciseProgress';
+import { PlanRefLinks } from '../components/PlanRefLinks';
+import { PrescriptionVariants } from '../components/PrescriptionVariants';
+import { useBlockWeek } from '../lib/useBlockWeek';
 
 // Only overcoming/yielding are required to be labelled (AC6); dynamic is shown
 // too as useful context, 'none' is omitted.
@@ -13,11 +16,21 @@ const ISO_LABELS: Partial<Record<IsoType, string>> = {
 export function ExerciseDetail({
   exercise,
   onBack,
+  onOpenPlan,
 }: {
   exercise: Exercise;
   onBack: () => void;
+  /**
+   * T25: how this screen opens a cited plan section. Supplied mid-session, where
+   * routing away would unmount the running timer (D18); absent elsewhere, and the
+   * link then navigates to the Plan tab.
+   */
+  onOpenPlan?: (ref: string) => void;
 }) {
   const isoLabel = ISO_LABELS[exercise.isoType];
+  // T24: which of §4B's two protocols this week is, where the exercise declares
+  // both. Null — nothing logged, or still loading — renders both unemphasised.
+  const blockWeek = useBlockWeek();
 
   return (
     <div className="mx-auto max-w-md p-4 pb-24">
@@ -42,16 +55,23 @@ export function ExerciseDetail({
         ))}
       </div>
 
+      {/* T25: the entry's own citations, now that the plan is in the app (D42).
+          Renders nothing where an entry cites nothing. */}
+      <PlanRefLinks refs={exercise.planRefs} onOpen={onOpenPlan} className="mt-3" />
+
       {/* T12: renders nothing unless the exercise declares metrics (D20) — only
           the three the training plan actually progresses. */}
       <ExerciseProgress exerciseId={exercise.id} metrics={exercise.metrics} />
 
-      {/* Prescription — must wrap, never scroll horizontally at 390px (AC5). */}
+      {/* Prescription — must wrap, never scroll horizontally at 390px (AC5).
+          T24: where §4B carries two week-scoped protocols, this week's leads and
+          the other stays fully readable here — the detail screen is precisely
+          where D25 requires the whole plan to remain legible. */}
       <section className="mt-5">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Prescription</h2>
-        <p className="mt-1 break-words text-sm leading-relaxed text-slate-200">
-          {exercise.prescription}
-        </p>
+        <div className="mt-1">
+          <PrescriptionVariants exercise={exercise} week={blockWeek} />
+        </div>
       </section>
 
       <section className="mt-5">

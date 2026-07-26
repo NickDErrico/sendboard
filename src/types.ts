@@ -58,8 +58,36 @@ export interface Exercise {
   // three exercises. Absent means no numeric fields and no chart. Order matters:
   // it is the chart toggle's order and its default selection.
   metrics?: ProgressMetric[];
+  /**
+   * Week-scoped protocols carried by one `prescription` string (T24, D41).
+   *
+   * §4B is the only case: a rep-structured ~90% variant for weeks 1–4 and a
+   * single-max-effort variant for weeks 5–8, with "use this variant for weeks
+   * 1–4, then the single-max-effort version above for weeks 5–8" living in the
+   * plan and, until T24, nowhere in the app. Typed rather than parsed for D17's
+   * reason, and each `text` is the substring already present in `prescription` —
+   * split, never authored (D6). `prescription` itself is unchanged and is still
+   * what every surface falls back to.
+   *
+   * Absent on every other entry, which therefore renders exactly as before.
+   */
+  variants?: PrescriptionVariant[];
   cues: string[]; // form/technique reminders
   safetyNotes: string[]; // may be empty; rendered visually distinct
+  /**
+   * The plan sections this entry was transcribed from (T25, D42) — `['4B']`,
+   * `['5D', '8']`.
+   *
+   * Typed rather than regexed out of the prose beside it, for the reason every
+   * other declaration in this interface is typed: a citation that resolves to the
+   * *wrong* section is worse than one that does not resolve at all. Absent is a
+   * supported state — the catalog is not required to cite, and an entry without
+   * refs simply shows no link.
+   *
+   * This is an address, never a source: no prescription, duration, set count or
+   * any other value is ever read out of the section it names (D42, D6).
+   */
+  planRefs?: string[];
   gtgEligible: boolean; // true = suitable for greasing-the-groove use; drives a badge in T3
 }
 
@@ -72,6 +100,31 @@ export interface Routine {
   // ordinary logs, but it is a test, not a training day — completing it must not
   // change which of the two strength routines is up next (D15).
   inRotation?: boolean;
+}
+
+/**
+ * One of an exercise's week-scoped protocols (D41).
+ *
+ * `weeks` is inclusive on both ends and is read against the *derived* block week
+ * (T24) — never against a calendar. Ranges are declared in order and are not
+ * required to cover every week: past the last one the final variant stays live,
+ * because a block that runs long is a training decision (§4F) and a protocol does
+ * not expire.
+ */
+export interface PrescriptionVariant {
+  weeks: [min: number, max: number];
+  label: string; // "Weeks 1–4 · tendon variant"
+  text: string; // transcribed from `prescription`, never reworded (D6)
+  /**
+   * True on the one variant that `holdSeconds` and `prescribedSets` describe.
+   *
+   * The whole reason this flag is typed on the declaration rather than assumed by
+   * a component: during weeks 1–4 the live variant is *not* the one the clock
+   * runs, T23 fenced a cadence runner for that variant off as needing its own
+   * decision, and so the app has to say which variant the timer follows instead
+   * of switching timings behind the owner's back (D41).
+   */
+  timed?: boolean;
 }
 
 // D20: what an exercise progresses by. Declaration order on `Exercise.metrics`
@@ -193,6 +246,18 @@ export interface Settings {
    * carries the words.
    */
   voiceCues?: boolean;
+  /**
+   * The local day a new block was deliberately started (T24, D25).
+   *
+   * `yyyy-mm-dd`, the same date-key shape as `BodyweightEntry.date`. This is the
+   * *only* block state the app stores: absent means the position is derived from
+   * the first completed rotating session, which is D15's derive-don't-store
+   * applied a fourth time. Present means weeks and sessions are counted from this
+   * day instead, so beginning a second block does not read as week 14 of the
+   * first. Optional → a pre-T24 database and every exported backup read as
+   * "derived" with no migration and no BACKUP_SCHEMA_VERSION bump.
+   */
+  blockStartedAt?: string;
   /**
    * Seconds counted off before a hold's clock starts (T20, D33).
    *

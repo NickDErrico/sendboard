@@ -19,6 +19,7 @@ export type Route =
   | { name: 'retest' }
   | { name: 'checks' }
   | { name: 'checklog' }
+  | { name: 'plan'; sectionRef: string | null }
   | { name: 'settings' }
   | { name: 'install' }
   | { name: 'notFound'; path: string };
@@ -47,6 +48,10 @@ export function parseHash(hash: string): Route {
       return { name: 'checks' };
     case 'checklog':
       return { name: 'checklog' };
+    case 'plan':
+      // `#/plan` is the whole document; `#/plan/4B` opens a section, which is how
+      // an exercise's typed citation resolves (T25 AC8).
+      return { name: 'plan', sectionRef: segments[1] ?? null };
     case 'settings':
       return { name: 'settings' };
     case 'install':
@@ -63,6 +68,8 @@ export function hashFor(route: Route): string {
       return '#/';
     case 'routine':
       return `#/routine/${route.routineId}`;
+    case 'plan':
+      return route.sectionRef === null ? '#/plan' : `#/plan/${route.sectionRef}`;
     case 'notFound':
       return '#/';
     default:

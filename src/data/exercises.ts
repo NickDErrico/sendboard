@@ -26,6 +26,7 @@ export const EXERCISES: Exercise[] = [
     ],
     safetyNotes: ['Warm fingers thoroughly before any hangboard work (plan §7).'],
     gtgEligible: false,
+    planRefs: ['4A'], // T25/D42
   },
   {
     id: 'abrahangs-no-hang',
@@ -49,6 +50,7 @@ export const EXERCISES: Exercise[] = [
     ],
     safetyNotes: [],
     gtgEligible: false,
+    planRefs: ['4A', '8'], // T25/D42
   },
   {
     id: 'bodyweight-pullups',
@@ -72,6 +74,7 @@ export const EXERCISES: Exercise[] = [
       'Pull-ups load the same elbows, shoulders, and finger flexors as climbing and hangboarding. Daily pull-up volume on top of that is a known path into medial elbow tendinopathy — keep them trivial and be first to cut them (plan §8).',
     ],
     gtgEligible: true,
+    planRefs: ['8'], // T25/D42
   },
   {
     id: 'pima-finger-pull-half-crimp',
@@ -94,6 +97,26 @@ export const EXERCISES: Exercise[] = [
     // does not build a cadence runner for it — the 3s rep is inside this range.
     holdSeconds: [3, 5],
     restSeconds: 180,
+    // T24/D41: the two protocols the one string above carries, split at the week
+    // the plan splits them ("use this variant for weeks 1–4, then the
+    // single-max-effort version above for weeks 5–8", §4B). Each `text` is that
+    // string's own wording; the prefixes become labels. `timed` marks the peak
+    // variant because `holdSeconds` and `prescribedSets` describe it — so weeks
+    // 1–4 emphasise a protocol the clock does not run, and the app says so
+    // rather than switching timings (T23's fence).
+    variants: [
+      {
+        weeks: [1, 4],
+        label: 'Weeks 1–4 · tendon variant',
+        text: '5 sets x 4 reps x 3s @ ~90%, ~10s between reps, 3 min between sets.',
+      },
+      {
+        weeks: [5, 8],
+        label: 'Weeks 5–8 · peak',
+        text: '4–6 sets x 3–5s @ 100% effort, 3 min rest.',
+        timed: true,
+      },
+    ],
     cues: [
       'Progress by feel, not by adding weight — this is neural recruitment and rate of force.',
       'Keep your feet planted; nothing should actually move.',
@@ -104,6 +127,7 @@ export const EXERCISES: Exercise[] = [
       'This rep-structured isometric, not GtG, is the primary tendon-strengthening dose (D14, plan §4B).',
     ],
     gtgEligible: false,
+    planRefs: ['4B'], // T25/D42
   },
   {
     id: 'pima-finger-pull-open-hand',
@@ -123,12 +147,28 @@ export const EXERCISES: Exercise[] = [
     prescribedSets: [4, 6], // T19
     holdSeconds: [3, 5],
     restSeconds: 180,
+    // Same two protocols as the half-crimp entry — §4B states them once for both
+    // grips, so both entries declare them (T24, D41).
+    variants: [
+      {
+        weeks: [1, 4],
+        label: 'Weeks 1–4 · tendon variant',
+        text: '5 sets x 4 reps x 3s @ ~90%, ~10s between reps, 3 min between sets.',
+      },
+      {
+        weeks: [5, 8],
+        label: 'Weeks 5–8 · peak',
+        text: '4–6 sets x 3–5s @ 100% effort, 3 min rest.',
+        timed: true,
+      },
+    ],
     cues: [
       'Rotate to open-hand every other session to protect the A2 pulleys.',
       'Progress by feel, not by adding weight.',
     ],
     safetyNotes: ['A Day 1 max protocol — never grease-the-groove this (plan §8).'],
     gtgEligible: false,
+    planRefs: ['4B'], // T25/D42
   },
   {
     id: 'max-hang-half-crimp',
@@ -159,6 +199,7 @@ export const EXERCISES: Exercise[] = [
       'Never grease-the-groove weighted max hangs (plan §8).',
     ],
     gtgEligible: false,
+    planRefs: ['4C', '4F', '7'], // T25/D42
   },
   {
     id: 'max-hang-open-hand',
@@ -184,6 +225,7 @@ export const EXERCISES: Exercise[] = [
     ],
     safetyNotes: ['Never grease-the-groove weighted max hangs (plan §8).'],
     gtgEligible: false,
+    planRefs: ['4C', '4F'], // T25/D42
   },
   {
     id: 'oi-bar-pull-extended',
@@ -208,6 +250,7 @@ export const EXERCISES: Exercise[] = [
     ],
     safetyNotes: [],
     gtgEligible: false,
+    planRefs: ['5A'], // T25/D42
   },
   {
     id: 'oi-bar-pull-90',
@@ -229,6 +272,7 @@ export const EXERCISES: Exercise[] = [
     cues: ["Start at the angle you're weakest at — usually 90° for climbers."],
     safetyNotes: [],
     gtgEligible: false,
+    planRefs: ['5A'], // T25/D42
   },
   {
     id: 'oi-bar-pull-top',
@@ -250,6 +294,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Third of the three session angles: extended, 90°, near-top.'],
     safetyNotes: [],
     gtgEligible: false,
+    planRefs: ['5A'], // T25/D42
   },
   {
     id: 'weighted-lockoff-hold',
@@ -274,6 +319,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Complements the overcoming bar pulls — same angle, yielding instead of overcoming.'],
     safetyNotes: ['Never grease-the-groove weighted lock-offs (plan §8).'],
     gtgEligible: false,
+    planRefs: ['5B'], // T25/D42
   },
   {
     id: 'kb-single-arm-row',
@@ -293,6 +339,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Focus on scapular control, not just moving the weight.'],
     safetyNotes: [],
     gtgEligible: false,
+    planRefs: ['5C'], // T25/D42
   },
   {
     id: 'kb-goblet-squat',
@@ -315,6 +362,7 @@ export const EXERCISES: Exercise[] = [
     ],
     safetyNotes: [],
     gtgEligible: true,
+    planRefs: ['5C', '8'], // T25/D42
   },
   {
     id: 'kb-turkish-getup',
@@ -333,6 +381,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Keep it light — this is shoulder stability and control, not a strength max.'],
     safetyNotes: [],
     gtgEligible: false,
+    planRefs: ['5C'], // T25/D42
   },
   {
     id: 'pushups-or-dips',
@@ -355,6 +404,7 @@ export const EXERCISES: Exercise[] = [
     ],
     safetyNotes: [],
     gtgEligible: true,
+    planRefs: ['5D', '8'], // T25/D42
   },
   {
     id: 'oi-wall-press',
@@ -381,6 +431,7 @@ export const EXERCISES: Exercise[] = [
     ],
     safetyNotes: [],
     gtgEligible: true,
+    planRefs: ['5D', '8'], // T25/D42
   },
   {
     id: 'external-rotations',
@@ -400,6 +451,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Light load, strict form — this is prehab, not a strength lift.'],
     safetyNotes: [],
     gtgEligible: true,
+    planRefs: ['5D', '8'], // T25/D42
   },
   {
     id: 'wrist-extensor-work',
@@ -419,6 +471,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Directly offsets the finger-flexor load from Day 1 — protects the elbow.'],
     safetyNotes: [],
     gtgEligible: true,
+    planRefs: ['5D', '8'], // T25/D42
   },
   {
     id: 'climbing-volume-technique',
@@ -437,6 +490,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Below your limit on purpose — a technique day, not a send day.'],
     safetyNotes: [],
     gtgEligible: false,
+    planRefs: ['6'], // T25/D42
   },
   {
     id: 'climbing-limit-boulder',
@@ -457,6 +511,7 @@ export const EXERCISES: Exercise[] = [
       'Stop at any sharp or pulley-specific pain (as opposed to normal fatigue) — that is the difference between a plateau and a torn A2 (plan §7).',
     ],
     gtgEligible: false,
+    planRefs: ['6'], // T25/D42
   },
 
   // ─── §4E baseline / retest battery (T16) ───────────────────────────────────
@@ -501,6 +556,7 @@ export const EXERCISES: Exercise[] = [
       'Stop at the first failed attempt rather than grinding out one more (plan §4E).',
     ],
     gtgEligible: false,
+    planRefs: ['4E'], // T25/D42
   },
   {
     id: 'test-max-hang-open-hand',
@@ -528,6 +584,7 @@ export const EXERCISES: Exercise[] = [
       'A true max attempt on cold or fatigued fingers is how pulleys tear — test rested (plan §7).',
     ],
     gtgEligible: false,
+    planRefs: ['4E'], // T25/D42
   },
   {
     id: 'test-max-pullup-load',
@@ -551,6 +608,7 @@ export const EXERCISES: Exercise[] = [
       'Stop at any elbow or shoulder pain; §5D lists antagonist work as the reason this stays healthy, and a max single is not worth an injury (plan §7).',
     ],
     gtgEligible: false,
+    planRefs: ['4E'], // T25/D42
   },
   {
     id: 'test-lockoff-90-left',
@@ -576,6 +634,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['One attempt per side — a second try after a rest is a different test.'],
     safetyNotes: ['Come off before the elbow takes over from the back; §7 names pulling volume as the first thing to cut at any elbow symptom.'],
     gtgEligible: false,
+    planRefs: ['4E'], // T25/D42
   },
   {
     id: 'test-lockoff-90-right',
@@ -597,5 +656,6 @@ export const EXERCISES: Exercise[] = [
     cues: ['One attempt per side — a second try after a rest is a different test.'],
     safetyNotes: ['Come off before the elbow takes over from the back; §7 names pulling volume as the first thing to cut at any elbow symptom.'],
     gtgEligible: false,
+    planRefs: ['4E'], // T25/D42
   },
 ];

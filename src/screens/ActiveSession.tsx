@@ -3,6 +3,7 @@ import type { Exercise, Routine, SetEntry, WorkoutLog } from '../types';
 import {
   getAllExercises,
   getAllLogs,
+  getAllRoutines,
   getLog,
   getRoutine,
   getSettings,
@@ -51,15 +52,19 @@ import { gearOf, type Gear } from '../lib/gear';
 import { chainPosition, formatChain, setSpecOf, speakChain } from '../lib/chain';
 import { restReading } from '../lib/rest';
 import { warmupPlanOf } from '../lib/warmup';
+import { blockPosition, livePrescription, type BlockPosition } from '../lib/block';
 import { leadInMsOf, voiceEnabled } from '../lib/cues';
 import { primeAudio } from '../lib/beep';
 import { hush, primeSpeech } from '../lib/speech';
 import { useWakeLock } from '../lib/wakeLock';
+import { PlanRefLinks } from '../components/PlanRefLinks';
+import { PrescriptionVariants } from '../components/PrescriptionVariants';
 import { SetLogger } from '../components/SetLogger';
 import { SessionTimer } from '../components/SessionTimer';
 import { FocusHold } from '../components/FocusHold';
 import { WarmupRunner } from '../components/WarmupRunner';
 import { ExerciseDetail } from './ExerciseDetail';
+import { Plan } from './Plan';
 
 export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: () => void }) {
   const [log, setLog] = useState<WorkoutLog | null>(null);
@@ -72,6 +77,10 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   const [focusId, setFocusId] = useState<string | null>(null);
   // T23: which warm-up the runner is on, or null. Same rule, same lifetime.
   const [warmupId, setWarmupId] = useState<string | null>(null);
+  // T25: which plan section is open over the session, or null. Rendered here
+  // rather than routed to, because a route change would unmount the timer this
+  // component holds (D18) — and reading the plan must cost nothing (D37).
+  const [planRef, setPlanRef] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   // T10: exactly one timer for the whole session, held here rather than per card
   // so it survives opening an exercise's detail view. Never persisted (D18).
@@ -92,6 +101,11 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   // talks (D34 — the tones are unconditional either way).
   const [leadInMs, setLeadInMs] = useState(0);
   const [voice, setVoice] = useState(true);
+  // T24/D25: where this session sits in the 8-week block, derived from the log and
+  // resolved once on load. It numbers *this* session (so the ordinal describes the
+  // one on screen) and supplies the week §4B's variants are chosen against. Read
+  // only — nothing here is written back to the log.
+  const [block, setBlock] = useState<BlockPosition | null>(null);
   // Ref mirrors the latest log so rapid taps build from current state, never a
   // stale closure — otherwise concurrent "Add set" taps would drop entries.
   const logRef = useRef<WorkoutLog | null>(null);
@@ -111,14 +125,22 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
       }
       logRef.current = loaded;
       setLog(loaded);
-      const [r, all, logs, settings] = await Promise.all([
+      const [r, all, logs, settings, routines] = await Promise.all([
         getRoutine(loaded.routineId),
         getAllExercises(),
         getAllLogs(),
         getSettings(),
+        getAllRoutines(),
       ]);
       if (cancelled) return;
       setRoutine(r ?? null);
+      // `liveLog` is this session: it makes the label read "Session 11" for the
+      // one on screen, and — on a first-ever session — is the only thing available
+      // to anchor the block to. A battery is excluded by `blockPosition` itself
+      // (D29), so running a test shows the week without an ordinal.
+      setBlock(
+        blockPosition({ logs, routines, settings, today: new Date(), liveLog: loaded }),
+      );
       setStandardEdgeMm(settings.standardEdgeMm);
       setGear(gearOf(settings));
       setLeadInMs(leadInMsOf(settings));
@@ -405,6 +427,11 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
         timerHold={holdSpecOf(timerExercise)}
         chainLabel={chainLabelFor(focusExercise.id)}
         chainSpoken={timerChainSpoken}
+        // T24: one line at board-legible size, so it is this week's protocol
+        // rather than both of §4B's in a paragraph nobody reads mid-set. Falls
+        // back to the full prescription wherever no variant is declared or no
+        // week is known.
+        prescriptionLine={livePrescription(focusExercise, block?.week ?? null)}
         lastSummary={last ? `${describeWhen(last.daysAgo)} · ${summarizeSets(last.sets)}` : null}
         reading={timerReading}
         voice={voice}
@@ -424,6 +451,18 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
     );
   }
 
+  // T25: the plan, over the session, with the timer bar still on screen and
+  // still running. Nothing here can write to the log — it is reading, in dead
+  // time, which is exactly what D37 permits at any moment (AC7).
+  if (planRef !== null) {
+    return (
+      <>
+        <Plan initialRef={planRef} onExit={() => setPlanRef(null)} exitLabel="Back to session" />
+        {timerBar}
+      </>
+    );
+  }
+
   // T9 AC6: full protocol without leaving the session. Rendered over the session
   // rather than routed to, so back returns here with every set intact — and
   // auto-persist (T4) means nothing is riding on component state anyway.
@@ -431,7 +470,11 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   if (detailExercise) {
     return (
       <>
-        <ExerciseDetail exercise={detailExercise} onBack={() => setDetailId(null)} />
+        <ExerciseDetail
+          exercise={detailExercise}
+          onBack={() => setDetailId(null)}
+          onOpenPlan={(ref) => setPlanRef(ref)}
+        />
         {timerBar}
       </>
     );
@@ -447,6 +490,9 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
           {routine.exerciseIds.filter((id) => isExerciseCompleted(log, id)).length} of{' '}
           {routine.exerciseIds.length} done
         </p>
+        {/* T24: the block position, derived (D25). A statement of where this
+            session falls — never a target, a quota, or a "you're behind" (D23). */}
+        {block && <p className="mt-0.5 text-xs text-slate-400">{block.label}</p>}
       </header>
 
       <div className="space-y-3">
@@ -493,7 +539,11 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
 
               {isOpen && exercise && (
                 <div className="mt-2 rounded-lg bg-slate-800/60 p-2 text-sm">
-                  <p className="break-words text-slate-200">{exercise.prescription}</p>
+                  {/* T24: this week's variant leads where §4B declares two, and the
+                      other stays on the card rather than moving to the detail
+                      screen — mid-session is exactly when the owner needs to see
+                      that a choice exists (D25). */}
+                  <PrescriptionVariants exercise={exercise} week={block?.week ?? null} compact />
                   {exercise.cues.length > 0 && (
                     <ul className="mt-1.5 list-disc space-y-1 pl-4 text-xs text-slate-400 marker:text-slate-600">
                       {exercise.cues.map((c, i) => (
@@ -501,6 +551,13 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
                       ))}
                     </ul>
                   )}
+                  {/* T25: the section this entry was transcribed from, one tap
+                      away and readable during the rest that follows (D42, D37). */}
+                  <PlanRefLinks
+                    refs={exercise.planRefs}
+                    onOpen={(ref) => setPlanRef(ref)}
+                    className="mt-2"
+                  />
                 </div>
               )}
 

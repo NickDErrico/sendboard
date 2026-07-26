@@ -9,15 +9,18 @@ import {
   type BackupFile,
 } from '../lib/backup';
 import {
+  dateKey,
   deleteBodyweight,
   getAllBodyweights,
   getAllChecks,
   getAllLogs,
+  getAllRoutines,
   getSettings,
   saveBodyweight,
   saveSettings,
 } from '../lib/storage';
 import { parseBodyweight } from '../lib/bodyweight';
+import { blockPosition, type BlockPosition } from '../lib/block';
 import { parseEdgeMm } from '../lib/retest';
 import { parseEdgeList, parseLoadStep } from '../lib/gear';
 import { DEFAULT_LEAD_IN_SEC, leadInSecOf, parseLeadIn, voiceEnabled } from '../lib/cues';
@@ -175,6 +178,8 @@ export function Settings({
           <span className="text-slate-500">→</span>
         </button>
 
+        <BlockStart reloadKey={bwReloadKey} />
+
         <StandardEdge reloadKey={bwReloadKey} />
 
         <GearSettings reloadKey={bwReloadKey} />
@@ -259,6 +264,101 @@ export function Settings({
 // T13 AC1/AC3: replaces T0's temporary write-a-timestamp probe, which could not
 // survive the owner's update workflow anyway (deleting the app deleted the
 // probe). This reports the browser's actual answer instead of inferring it.
+/**
+ * Where the 8-week block is counted from (T24, D25).
+ *
+ * The app derives this from the first completed training session and says so, so
+ * this section is empty of input in the normal case — it reports the derived
+ * position and offers the one thing that cannot be derived: *this is a new block,
+ * start counting here.* That marker is the only block state stored anywhere.
+ *
+ * Both controls confirm first, because they change what every week label in the
+ * app means. Neither deletes a session: clearing the marker returns to the derived
+ * position exactly, which is why "Use my first session" is safe to offer at all.
+ */
+function BlockStart({ reloadKey }: { reloadKey: number }) {
+  const [block, setBlock] = useState<BlockPosition | null>(null);
+  const [marker, setMarker] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    const [logs, routines, settings] = await Promise.all([
+      getAllLogs(),
+      getAllRoutines(),
+      getSettings(),
+    ]);
+    setMarker(settings.blockStartedAt ?? null);
+    setBlock(blockPosition({ logs, routines, settings, today: new Date() }));
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh, reloadKey]);
+
+  async function startNewBlock() {
+    const today = dateKey(new Date());
+    if (
+      !window.confirm(
+        `Start a new block from today (${new Date(`${today}T00:00`).toLocaleDateString()})? Weeks and session counts restart here. Nothing you have logged is deleted.`,
+      )
+    ) {
+      return;
+    }
+    const settings = await getSettings();
+    await saveSettings({ ...settings, blockStartedAt: today });
+    await refresh();
+  }
+
+  async function clearMarker() {
+    if (!window.confirm('Go back to counting from your first logged session?')) return;
+    const settings = await getSettings();
+    const { blockStartedAt: _dropped, ...rest } = settings;
+    void _dropped;
+    await saveSettings(rest);
+    await refresh();
+  }
+
+  return (
+    <section className="space-y-3 rounded-xl border border-slate-700 bg-brand-surface p-4">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Block</h2>
+
+      {block === null ? (
+        <p className="text-sm text-slate-400">
+          Not started — the block begins at your first logged session.
+        </p>
+      ) : (
+        <p className="text-sm text-slate-300">
+          {block.label} ·{' '}
+          <span className="text-slate-500">
+            {block.derived ? 'counted from your first session, ' : 'started '}
+            {new Date(`${block.startKey}T00:00`).toLocaleDateString()}
+          </span>
+        </p>
+      )}
+
+      <button
+        onClick={() => void startNewBlock()}
+        className="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200"
+      >
+        Start a new block today
+      </button>
+      {marker !== null && (
+        <button
+          onClick={() => void clearMarker()}
+          className="w-full rounded-lg px-4 py-2 text-sm text-slate-400"
+        >
+          Use my first session instead
+        </button>
+      )}
+
+      <p className="text-xs text-slate-500">
+        The week comes from your log, not a schedule — nothing here is ever due, and past week 8 it
+        just reads “week 8+”. Set this only when you deliberately begin a new block; §4F’s weeks are
+        counted from it.
+      </p>
+    </section>
+  );
+}
+
 /**
  * The one standard edge the block is tested on (T16 AC4, D30).
  *
