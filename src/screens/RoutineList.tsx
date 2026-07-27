@@ -4,6 +4,7 @@ import { deleteLog, getAllLogs, getAllRoutines, saveLog } from '../lib/storage';
 import { createLog } from '../lib/session';
 import { rotates } from '../lib/rotation';
 import { go } from '../lib/routes';
+import { btnPrimary } from '../components/ui';
 
 export function RoutineList({
   onOpenSession,
@@ -54,26 +55,26 @@ export function RoutineList({
   }
 
   return (
-    <div className="mx-auto max-w-md p-4 pb-24">
+    <div className="mx-auto max-w-md px-4 pb-24 pt-[54px]">
       <header className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight text-slate-100">Start a session</h1>
+        <h1 className="text-[15px] font-medium tracking-[-0.01em]">Start a session</h1>
         {onExit && (
-          <button onClick={onExit} className="rounded px-1 py-1 text-sm text-slate-400 hover:text-slate-200">
+          <button onClick={onExit} className="rounded-md px-1 py-1 text-[13px] font-medium text-accent hover:bg-accent/10">
             Done
           </button>
         )}
       </header>
 
       {inProgress && (
-        <div className="mb-5 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
-          <p className="text-sm font-semibold text-amber-200">Unfinished session</p>
-          <p className="mt-0.5 text-xs text-amber-100/80">
+        <div className="mb-5 rounded-md border border-accent/40 bg-accent/[.08] p-3">
+          <p className="text-[13px] font-medium text-accent-200">Unfinished session</p>
+          <p className="mt-0.5 text-xs text-accent-200/80">
             {routineName(inProgress.routineId)} · started{' '}
             {new Date(inProgress.startedAt).toLocaleString()}
           </p>
           <button
             onClick={() => onOpenSession(inProgress.id)}
-            className="mt-2 rounded-lg bg-brand-accent px-3 py-1.5 text-sm font-semibold text-brand-bg"
+            className={`${btnPrimary} mt-2`}
           >
             Resume
           </button>
@@ -81,21 +82,21 @@ export function RoutineList({
       )}
 
       {startable === null ? (
-        <p className="text-sm text-slate-400">Loading…</p>
+        <p className="text-[13px] text-neutral-400">Loading…</p>
       ) : (
         <ul className="space-y-3">
           {startable.map((routine) => (
             <li
               key={routine.id}
-              className="flex items-center justify-between gap-3 rounded-xl border border-slate-700 bg-brand-surface p-3"
+              className="flex items-center justify-between gap-3 rounded-md bg-surface shadow-edge p-3"
             >
               <div className="min-w-0">
-                <p className="font-semibold text-slate-100">{routine.name}</p>
-                <p className="text-xs text-slate-500">{routine.exerciseIds.length} exercises</p>
+                <p className="font-medium text-ink">{routine.name}</p>
+                <p className="text-xs text-neutral-500">{routine.exerciseIds.length} exercises</p>
               </div>
               <button
                 onClick={() => handleStart(routine.id)}
-                className="shrink-0 rounded-lg bg-brand-accent px-4 py-2 font-semibold text-brand-bg"
+                className={`${btnPrimary} shrink-0 py-2`}
               >
                 Start
               </button>
@@ -106,19 +107,19 @@ export function RoutineList({
 
       <button
         onClick={() => go({ name: 'retest' })}
-        className="mt-3 flex w-full items-center justify-between rounded-xl border border-slate-700 bg-brand-surface p-3 text-left"
+        className="mt-3 flex w-full items-center justify-between rounded-md bg-surface shadow-edge p-3 text-left"
       >
-        <span className="text-sm text-slate-300">§4E baseline / retest battery</span>
-        <span aria-hidden className="text-slate-500">
+        <span className="text-[13px] text-neutral-300">§4E baseline / retest battery</span>
+        <span aria-hidden className="text-neutral-500">
           &rsaquo;
         </span>
       </button>
 
       {confirmRoutineId && (
         <div className="fixed inset-0 z-10 flex items-end justify-center bg-black/60 p-4 sm:items-center">
-          <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-brand-surface p-5">
-            <h2 className="text-base font-semibold text-slate-100">You already have a session going</h2>
-            <p className="mt-1 text-sm text-slate-400">
+          <div className="w-full max-w-sm rounded-md bg-surface shadow-edge p-5">
+            <h2 className="text-base font-medium text-ink">You already have a session going</h2>
+            <p className="mt-1 text-[13px] text-neutral-400">
               {routineName(inProgress?.routineId ?? '')}, started{' '}
               {inProgress ? new Date(inProgress.startedAt).toLocaleString() : ''}. Resume it, or
               discard it and start {routineName(confirmRoutineId)}?
@@ -126,19 +127,19 @@ export function RoutineList({
             <div className="mt-4 space-y-2">
               <button
                 onClick={() => inProgress && onOpenSession(inProgress.id)}
-                className="w-full rounded-lg bg-brand-accent px-4 py-2 font-semibold text-brand-bg"
+                className={`${btnPrimary} w-full py-2`}
               >
                 Resume current session
               </button>
               <button
                 onClick={() => void discardAndStart()}
-                className="w-full rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-2 font-medium text-red-200"
+                className="w-full rounded-lg border border-warn/50 bg-warn/10 px-4 py-2 font-medium text-warn"
               >
                 Discard &amp; start new
               </button>
               <button
                 onClick={() => setConfirmRoutineId(null)}
-                className="w-full rounded-lg px-4 py-2 text-sm text-slate-400"
+                className="w-full rounded-lg px-4 py-2 text-sm text-neutral-400"
               >
                 Cancel
               </button>

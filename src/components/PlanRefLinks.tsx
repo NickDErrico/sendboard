@@ -1,5 +1,6 @@
 import { go } from '../lib/routes';
 import { sectionsForRef } from '../lib/plan';
+import { Icon, btnSecondary } from './ui';
 
 /**
  * An exercise's citations, as controls that open the section (T25, D42).
@@ -28,7 +29,7 @@ export function PlanRefLinks({
 
   return (
     <div className={`flex flex-wrap items-center gap-1.5 ${className}`}>
-      <span className="text-xs uppercase tracking-wide text-slate-500">In the plan</span>
+      <span className="text-xs uppercase tracking-wide text-neutral-500">In the plan</span>
       {resolvable.map((ref) => {
         const section = sectionsForRef(ref)[0];
         return (
@@ -36,9 +37,10 @@ export function PlanRefLinks({
             key={ref}
             onClick={() => (onOpen ? onOpen(ref) : go({ name: 'plan', sectionRef: ref }))}
             title={section.title}
-            className="rounded-lg border border-slate-700 px-2 py-1 text-xs font-semibold text-brand-accent"
+            className={`${btnSecondary} gap-1 px-2 py-1 text-xs !text-accent`}
           >
-            §{ref} ›
+            §{ref}
+            <Icon name="caret-right" className="text-[11px]" />
           </button>
         );
       })}

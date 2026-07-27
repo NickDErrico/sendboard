@@ -8,6 +8,8 @@ import {
   type PlanSection as Section,
 } from '../lib/plan';
 import { PlanSection } from '../components/PlanSection';
+import { Icon, input } from '../components/ui';
+import { RowRule, readList } from '../components/ReadList';
 
 /**
  * The training plan, searchable, inside the app (T25).
@@ -53,7 +55,7 @@ export function Plan({
 
   if (open.length > 0) {
     return (
-      <div className="mx-auto max-w-md p-4 pb-24">
+      <div className="mx-auto max-w-md px-4 pb-24 pt-[54px]">
         {/* Two ways out, because a section can be arrived at two ways: from the
             list (← goes back to it) or straight from an exercise's citation, where
             the useful exit is the session that is still running behind this
@@ -64,14 +66,14 @@ export function Plan({
               setOpenRef(null);
               setOpenTitle(null);
             }}
-            className="-ml-1 flex items-center gap-1 rounded px-1 py-1 text-sm text-slate-400 hover:text-slate-200"
+            className="-ml-1 flex items-center gap-1 rounded-md px-1 py-1 text-[13px] font-medium text-accent hover:bg-accent/10"
           >
-            <span aria-hidden>←</span> {terms.length > 0 ? 'Back to results' : 'All sections'}
+            <Icon name="caret-left" className="text-[13px]" />{terms.length > 0 ? 'Back to results' : 'All sections'}
           </button>
           {onExit && (
             <button
               onClick={onExit}
-              className="shrink-0 rounded px-1 py-1 text-sm text-slate-400 hover:text-slate-200"
+              className="shrink-0 rounded-md px-1 py-1 text-[13px] font-medium text-accent hover:bg-accent/10"
             >
               {exitLabel}
             </button>
@@ -87,13 +89,13 @@ export function Plan({
   }
 
   return (
-    <div className="mx-auto max-w-md p-4 pb-24">
+    <div className="mx-auto max-w-md px-4 pb-24 pt-[54px]">
       <header className="mb-3 flex items-center justify-between gap-3">
-        <h1 className="text-xl font-bold tracking-tight text-slate-100">Training plan</h1>
+        <h1 className="text-[15px] font-medium tracking-[-0.01em]">Training plan</h1>
         {onExit && (
           <button
             onClick={onExit}
-            className="shrink-0 rounded px-1 py-1 text-sm text-slate-400 hover:text-slate-200"
+            className="shrink-0 rounded-md px-1 py-1 text-[13px] font-medium text-accent hover:bg-accent/10"
           >
             {exitLabel}
           </button>
@@ -106,7 +108,7 @@ export function Plan({
         type="search"
         placeholder="Search the plan — “elbow”, “edge size”…"
         aria-label="Search the training plan"
-        className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-brand-accent focus:outline-none"
+        className={input}
       />
 
       {terms.length === 0 ? (
@@ -114,26 +116,28 @@ export function Plan({
           {/* No typing required: the whole document, one tap per section, in the
               plan's order. This is the mid-session path — a search box is no use
               to chalked hands (AC5). */}
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs text-neutral-500">
             Your plan, in the app and offline. Tap a section, or search it.
           </p>
-          <ul className="mt-2 space-y-1.5">
-            {PLAN_SECTIONS.map((section) => (
+          {/* One card of rows, not one card per section: this is a table of
+              contents, and twenty separate surfaces made the document look like
+              twenty documents. */}
+          <ul className={`${readList} mt-2`}>
+            {PLAN_SECTIONS.map((section, i) => (
               <li key={`${section.ref}-${section.title}`}>
+                {i > 0 && <RowRule />}
                 <button
                   onClick={() => {
                     setOpenRef(section.ref);
                     setOpenTitle(section.title);
                   }}
-                  className="flex w-full items-center gap-3 rounded-xl border border-slate-700 bg-brand-surface px-3 py-2.5 text-left"
+                  className="flex w-full items-center gap-3 rounded-md px-1 py-2.5 text-left transition-colors hover:bg-white/5"
                 >
-                  <span className="w-12 shrink-0 text-xs font-semibold uppercase tracking-wide text-brand-accent">
+                  <span className="w-11 shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-accent">
                     {section.label}
                   </span>
-                  <span className="min-w-0 flex-1 text-sm text-slate-200">{section.title}</span>
-                  <span aria-hidden className="shrink-0 text-slate-500">
-                    ›
-                  </span>
+                  <span className="min-w-0 flex-1 text-[13px] text-neutral-200">{section.title}</span>
+                  <Icon name="caret-right" className="shrink-0 text-[13px] text-neutral-600" />
                 </button>
               </li>
             ))}
@@ -142,13 +146,13 @@ export function Plan({
       ) : hits.length === 0 ? (
         // Plainly, with no suggestion and no correction: the section list is one
         // clear of the box (AC11).
-        <p className="mt-4 text-sm text-slate-400">
+        <p className="mt-4 text-[13px] text-neutral-400">
           No section of the plan contains that. Clear the search to browse all{' '}
           {PLAN_SECTIONS.length} sections.
         </p>
       ) : (
         <>
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs text-neutral-500">
             {hits.length} section{hits.length === 1 ? '' : 's'}, in the plan’s order
           </p>
           <ul className="mt-2 space-y-2">
@@ -159,23 +163,23 @@ export function Plan({
                     setOpenRef(hit.section.ref);
                     setOpenTitle(hit.section.title);
                   }}
-                  className="w-full rounded-xl border border-slate-700 bg-brand-surface p-3 text-left"
+                  className="w-full rounded-md bg-surface shadow-edge p-3 text-left"
                 >
                   <span className="flex items-baseline gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-brand-accent">
+                    <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-accent">
                       {hit.section.label}
                     </span>
-                    <span className="min-w-0 flex-1 text-sm font-semibold text-slate-100">
+                    <span className="min-w-0 flex-1 text-sm font-medium text-ink">
                       {hit.section.title}
                     </span>
                   </span>
                   {hit.section.parentTitle && (
-                    <span className="mt-0.5 block text-xs text-slate-500">
+                    <span className="mt-0.5 block text-xs text-neutral-500">
                       {hit.section.parentTitle}
                     </span>
                   )}
                   {hit.snippets.map((snippet, i) => (
-                    <span key={i} className="mt-1.5 block text-xs leading-snug text-slate-400">
+                    <span key={i} className="mt-1.5 block text-xs leading-snug text-neutral-400">
                       <Snippet text={snippet} terms={terms} />
                     </span>
                   ))}
@@ -198,11 +202,11 @@ function Snippet({ text, terms }: { text: string; terms: string[] }) {
     <>
       {inlineSpans(trimmed, terms).map((span, i) =>
         span.hit ? (
-          <span key={i} className="rounded bg-brand-accent/25 text-brand-accent">
+          <span key={i} className="rounded-sm bg-accent/25 text-accent-100">
             {span.text}
           </span>
         ) : (
-          <span key={i} className={span.bold ? 'text-slate-300' : undefined}>
+          <span key={i} className={span.bold ? 'text-neutral-300' : undefined}>
             {span.text}
           </span>
         ),

@@ -53,7 +53,7 @@ export function ExerciseProgress({
 
   return (
     <section className="mt-6">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Progress</h2>
+      <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">Progress</h2>
 
       {kinds.length > 1 && (
         <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Progress metric">
@@ -62,10 +62,10 @@ export function ExerciseProgress({
               key={k}
               onClick={() => setSelected(k)}
               aria-pressed={k === kind}
-              className={`rounded-lg px-3 py-1 text-xs font-semibold ${
+              className={`rounded-lg px-3 py-1 text-xs font-medium ${
                 k === kind
-                  ? 'bg-brand-accent text-brand-bg'
-                  : 'border border-slate-700 text-slate-300'
+                  ? 'border-accent bg-accent/[.12] text-accent'
+                  : 'border border-neutral-800 text-neutral-300'
               }`}
             >
               {SERIES_CONFIG[k].label}
@@ -74,11 +74,11 @@ export function ExerciseProgress({
         </div>
       )}
 
-      <div className="mt-3 rounded-xl border border-slate-700 bg-brand-surface p-3">
+      <div className="mt-3 rounded-md bg-surface shadow-edge p-3">
         {logs === null ? (
-          <p className="text-xs text-slate-500">Loading…</p>
+          <p className="text-xs text-neutral-500">Loading…</p>
         ) : series === null ? (
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-neutral-400">
             {kind === 'addedPctBw'
               ? // Distinct from "nothing logged": the load is there, the
                 // denominator is not, and saying which is missing is the
@@ -89,7 +89,7 @@ export function ExerciseProgress({
         ) : series.pointCount < 2 ? (
           // AC9: one point is a reading, not a line. Say so rather than drawing
           // a chart that implies a trend from a single session.
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-neutral-400">
             One session so far — {SERIES_CONFIG[kind].format(series.max)}. A line appears from the
             second.
           </p>

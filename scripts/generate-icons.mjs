@@ -1,5 +1,6 @@
 // Generates Sendboard app icons as PNGs using only Node built-ins (zlib).
-// Mark: an upward double-chevron (ascending / "send") in amber on a slate field.
+// Mark: an upward double-chevron (ascending / "send") in the Nocturne accent on
+// the Nocturne ground, so the home-screen icon matches the app it opens.
 // Run: node scripts/generate-icons.mjs
 import { deflateSync } from 'node:zlib';
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -9,8 +10,8 @@ import { dirname, join } from 'node:path';
 const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'icons');
 mkdirSync(OUT, { recursive: true });
 
-const BG = [15, 23, 42]; // #0f172a slate-900
-const FG = [245, 158, 11]; // #f59e0b amber-500
+const BG = [22, 24, 38]; // #161826 Nocturne ground
+const FG = [145, 132, 217]; // #9184d9 Nocturne accent
 
 // --- PNG encoding (RGBA, color type 6) ---
 const crcTable = (() => {

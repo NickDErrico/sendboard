@@ -6,6 +6,7 @@ import { describeSessionFacts, groupByStory, sessionFacts, type StoryGroup } fro
 import { rotates } from '../lib/rotation';
 import { SessionSigil } from '../components/SessionSigil';
 import { LogDetail } from './LogDetail';
+import { Icon } from '../components/ui';
 
 // The block's story (T27), which is what T5's flat list becomes once there is a
 // block to tell it against.
@@ -67,22 +68,22 @@ export function History({
   const groups = groupByStory(logs ?? [], position);
 
   return (
-    <div className="mx-auto max-w-md p-4 pb-24">
+    <div className="mx-auto max-w-md px-4 pb-24 pt-[54px]">
       <header className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight text-slate-100">History</h1>
+        <h1 className="text-[15px] font-medium tracking-[-0.01em]">History</h1>
         {onExit && (
-          <button onClick={onExit} className="rounded px-1 py-1 text-sm text-slate-400 hover:text-slate-200">
+          <button onClick={onExit} className="rounded-md px-1 py-1 text-[13px] font-medium text-accent hover:bg-accent/10">
             Done
           </button>
         )}
       </header>
 
       {logs === null ? (
-        <p className="text-sm text-slate-400">Loading…</p>
+        <p className="text-[13px] text-neutral-400">Loading…</p>
       ) : logs.length === 0 ? (
-        <div className="rounded-xl border border-slate-700 bg-brand-surface p-6 text-center">
-          <p className="text-sm text-slate-300">No sessions yet.</p>
-          <p className="mt-1 text-xs text-slate-500">
+        <div className="rounded-md bg-surface shadow-edge p-6 text-center">
+          <p className="text-[13px] text-neutral-300">No sessions yet.</p>
+          <p className="mt-1 text-xs text-neutral-500">
             Start one from the home screen to begin building your log.
           </p>
         </div>
@@ -96,16 +97,19 @@ export function History({
                 <button
                   key={l.id}
                   onClick={() => onResume(l.id)}
-                  className="w-full rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-left"
+                  className="w-full rounded-md border border-accent/40 bg-accent/[.08] p-3 text-left"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-amber-300">
+                    <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-accent-300">
                       In progress
                     </span>
-                    <span className="text-xs font-medium text-amber-200">Tap to resume →</span>
+                    <span className="flex items-center gap-1 text-xs font-medium text-accent-200">
+                      Tap to resume
+                      <Icon name="caret-right" className="text-[11px]" />
+                    </span>
                   </div>
-                  <p className="mt-1 font-semibold text-slate-100">{routineName(l.routineId)}</p>
-                  <p className="text-xs text-slate-400">
+                  <p className="mt-1 font-medium text-ink">{routineName(l.routineId)}</p>
+                  <p className="text-xs text-neutral-400">
                     Started {new Date(l.startedAt).toLocaleString()}
                   </p>
                 </button>
@@ -147,12 +151,12 @@ export function History({
 function WeekHeading({ group }: { group: StoryGroup }) {
   if (group.label === '') return null;
   return (
-    <div className="flex flex-wrap items-baseline gap-x-2 border-b border-slate-800 pb-1">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+    <div className="flex flex-wrap items-baseline gap-x-2 border-b border-neutral-900 pb-1">
+      <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-400">
         {group.label}
       </h2>
       {group.phase && (
-        <p className="min-w-0 flex-1 text-xs leading-snug text-slate-600">
+        <p className="min-w-0 flex-1 text-xs leading-snug text-neutral-600">
           {formatPhaseWeeks(group.phase)}: {group.phase.focus} (plan §4F)
         </p>
       )}
@@ -177,23 +181,23 @@ function SessionRow({
   return (
     <button
       onClick={onOpen}
-      className="flex w-full items-center gap-3 rounded-xl border border-slate-700 bg-brand-surface p-3 text-left transition-colors hover:border-slate-600"
+      className="flex w-full items-center gap-3 rounded-md bg-surface shadow-edge p-3 text-left transition-colors hover:bg-white/5"
     >
       <SessionSigil log={log} exercises={exercises} size={30} />
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline justify-between gap-2">
-          <span className="truncate font-semibold text-slate-100">{name}</span>
-          <span className="shrink-0 text-xs text-slate-500">
+          <span className="truncate font-medium text-ink">{name}</span>
+          <span className="shrink-0 text-xs text-neutral-500">
             {new Date(log.completedAt ?? log.startedAt).toLocaleDateString()}
           </span>
         </span>
         {/* AC11: what the session held, not how many catalog entries it touched. */}
-        <span className="mt-0.5 block truncate text-xs tabular-nums text-slate-400">
+        <span className="mt-0.5 block truncate text-xs tabular-nums text-neutral-400">
           {describeSessionFacts(facts)}
         </span>
         {/* AC12: present in its week, and named as what it is (D29). */}
         {battery && (
-          <span className="mt-0.5 block text-xs text-slate-600">
+          <span className="mt-0.5 block text-xs text-neutral-600">
             §4E battery — not counted as a block session
           </span>
         )}

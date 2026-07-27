@@ -58,18 +58,18 @@ export function Poster({ onExit }: { onExit: () => void }) {
   }, []);
 
   return (
-    <div className="mx-auto max-w-md space-y-4 p-4 pb-24">
+    <div className="mx-auto max-w-md space-y-4 px-4 pb-24 pt-[54px]">
       <header className="flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight text-slate-100">The block</h1>
-        <button onClick={onExit} className="rounded px-1 py-1 text-sm text-slate-400 hover:text-slate-200">
+        <h1 className="text-[15px] font-medium tracking-[-0.01em]">The block</h1>
+        <button onClick={onExit} className="rounded-md px-1 py-1 text-[13px] font-medium text-accent hover:bg-accent/10">
           Done
         </button>
       </header>
 
       {data === undefined ? (
-        <p className="text-sm text-slate-400">Loading…</p>
+        <p className="text-[13px] text-neutral-400">Loading…</p>
       ) : data === null ? (
-        <p className="rounded-xl border border-slate-700 bg-brand-surface p-6 text-center text-sm text-slate-300">
+        <p className="rounded-md bg-surface shadow-edge p-6 text-center text-[13px] text-neutral-300">
           Not started — the block begins at your first logged session.
         </p>
       ) : (
@@ -77,21 +77,21 @@ export function Poster({ onExit }: { onExit: () => void }) {
           {/* AC1/AC2: the span and the label, both T24's. No "of 8 weeks", no
               progress toward eight, and nothing that reads as a finish line —
               §4F's lighter week is why there is no moment to call the end (D45b). */}
-          <section className="rounded-xl border border-slate-700 bg-brand-surface p-3">
-            <p className="text-lg font-semibold tabular-nums text-slate-100">
+          <section className="rounded-md bg-surface shadow-edge p-3">
+            <p className="text-lg font-medium tabular-nums text-ink">
               {describeTension(data.grid.total)}
             </p>
-            <p className="mt-0.5 text-sm text-slate-300">{data.grid.position.label}</p>
+            <p className="mt-0.5 text-[13px] text-neutral-300">{data.grid.position.label}</p>
             {formatSpan(data.firstAt, data.lastAt) && (
-              <p className="mt-0.5 text-xs text-slate-500">{formatSpan(data.firstAt, data.lastAt)}</p>
+              <p className="mt-0.5 text-xs text-neutral-500">{formatSpan(data.firstAt, data.lastAt)}</p>
             )}
             {data.edges.length > 0 && (
-              <p className="mt-1.5 text-xs text-slate-400">
+              <p className="mt-1.5 text-xs text-neutral-400">
                 Edges worked: {data.edges.map(formatEdge).join(' · ')}
               </p>
             )}
             {describeUntimed(data.grid.total) && (
-              <p className="mt-1 text-xs text-amber-200/80">
+              <p className="mt-1 text-xs text-neutral-500">
                 {describeUntimed(data.grid.total)}.
               </p>
             )}
@@ -101,17 +101,17 @@ export function Poster({ onExit }: { onExit: () => void }) {
               block. Nothing here is sized, ordered or highlighted by comparison
               with another mark — they are laid out in time, and that is all. */}
           <section className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">
               Session by session
             </h2>
             {data.weeks.map((week) => (
-              <div key={week.week} className="rounded-xl border border-slate-700 bg-brand-surface p-3">
+              <div key={week.week} className="rounded-md bg-surface shadow-edge p-3">
                 <div className="flex flex-wrap items-baseline gap-x-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                  <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-300">
                     Week {week.week}
                   </h3>
                   {week.phase && (
-                    <p className="min-w-0 flex-1 text-xs leading-snug text-slate-600">
+                    <p className="min-w-0 flex-1 text-xs leading-snug text-neutral-600">
                       {formatPhaseWeeks(week.phase)}: {week.phase.focus} (plan §4F)
                     </p>
                   )}
@@ -120,7 +120,7 @@ export function Poster({ onExit }: { onExit: () => void }) {
                 {week.logs.length === 0 ? (
                   // AC6: a gap is part of the block's shape. Stated as an absence
                   // of records, never as a lapse (D23).
-                  <p className="mt-2 text-xs text-slate-600">No sessions logged this week.</p>
+                  <p className="mt-2 text-xs text-neutral-600">No sessions logged this week.</p>
                 ) : (
                   <ul className="mt-2 space-y-2">
                     {week.logs.map((log) => (
@@ -128,20 +128,20 @@ export function Poster({ onExit }: { onExit: () => void }) {
                         <SessionSigil log={log} exercises={exercises} size={34} />
                         <span className="min-w-0 flex-1">
                           <span className="flex items-baseline justify-between gap-2">
-                            <span className="truncate text-sm text-slate-200">
+                            <span className="truncate text-[13px] text-neutral-200">
                               {routineNames.get(log.routineId) ?? log.routineId}
                             </span>
-                            <span className="shrink-0 text-xs text-slate-500">
+                            <span className="shrink-0 text-xs text-neutral-500">
                               {new Date(log.completedAt as string).toLocaleDateString()}
                             </span>
                           </span>
-                          <span className="mt-0.5 block truncate text-xs tabular-nums text-slate-400">
+                          <span className="mt-0.5 block truncate text-xs tabular-nums text-neutral-400">
                             {describeSessionFacts(sessionFacts(log, exercises))}
                           </span>
                           {/* AC7's other half: present in the block's story, and
                               counted in none of its volume (D29, D43). */}
                           {data.batteryLogIds.has(log.id) && (
-                            <span className="mt-0.5 block text-xs text-slate-600">
+                            <span className="mt-0.5 block text-xs text-neutral-600">
                               §4E battery — not counted as a block session
                             </span>
                           )}
@@ -161,7 +161,7 @@ export function Poster({ onExit }: { onExit: () => void }) {
           {/* AC7/AC8: the one comparison the plan itself asks for, rendered by
               T16's component with §4E's rubric quoted and never applied. */}
           <section className="space-y-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">
               §4E — compare to week 1
             </h2>
             {data.occasions.length >= 2 ? (
@@ -170,7 +170,7 @@ export function Poster({ onExit }: { onExit: () => void }) {
                 latest={data.occasions[data.occasions.length - 1]}
               />
             ) : (
-              <p className="rounded-xl border border-slate-700 bg-brand-surface p-3 text-xs leading-snug text-slate-400">
+              <p className="rounded-md bg-surface shadow-edge p-3 text-xs leading-snug text-neutral-400">
                 {describeOccasions(data.occasions)}
               </p>
             )}
@@ -179,8 +179,8 @@ export function Poster({ onExit }: { onExit: () => void }) {
           {/* §4F's own caveat, in full, on the surface most likely to be read as a
               verdict. It is the sentence that makes the app's silence the plan's
               position rather than a design preference (D23). */}
-          <section className="rounded-xl border border-slate-700 bg-slate-900/60 p-3">
-            <p className="text-xs leading-snug text-slate-500">{LIGHTER_WEEK_CAVEAT}</p>
+          <section className="rounded-md border border-neutral-800 bg-bg/60 p-3">
+            <p className="text-xs leading-snug text-neutral-500">{LIGHTER_WEEK_CAVEAT}</p>
             <PlanRefLinks refs={['4E', '4F']} className="mt-2" />
           </section>
         </>

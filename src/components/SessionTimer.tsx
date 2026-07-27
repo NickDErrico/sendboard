@@ -17,12 +17,16 @@ import {
 import { restCardIndex, type RestReading } from '../lib/rest';
 import { useNow, useTimerCues } from '../lib/timerCues';
 import { RestCardView } from './RestCard';
+import { HOLD_STATUS, Icon, btnGhost, btnPrimary, btnSecondary, btnStop, kicker } from './ui';
 
-const STATUS_STYLE = {
-  under: { fill: 'bg-sky-400', text: 'text-sky-300', label: 'building' },
-  in: { fill: 'bg-emerald-400', text: 'text-emerald-300', label: '✓ in range' },
-  over: { fill: 'bg-amber-400', text: 'text-amber-300', label: 'past target' },
-} as const;
+// The bar is `#1c1e2a` rather than the card ground: it sits *over* the cards, and
+// a surface that lifts above the page in Nocturne does it with an edge and
+// ambient darkness, not a lighter fill.
+const BAR =
+  'fixed inset-x-0 bottom-0 z-40 px-4 pt-3 backdrop-blur-[14px] ' +
+  '[background:color-mix(in_srgb,#1c1e2a_96%,transparent)] ' +
+  'shadow-[0_-1px_0_#595d6c,0_-14px_34px_rgba(0,0,0,.5)] ' +
+  '[padding-bottom:calc(24px+env(safe-area-inset-bottom))]';
 
 export function SessionTimer({
   state,
@@ -85,7 +89,7 @@ export function SessionTimer({
   useTimerCues({ state, now, hold, voice, chainSpoken, onStop, onCountEnd });
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-700 bg-slate-900/95 px-4 pt-3 backdrop-blur-sm [padding-bottom:calc(0.75rem+env(safe-area-inset-bottom))]">
+    <div className={BAR}>
       <div className="mx-auto max-w-md">
         {counting && (
           <CountView
@@ -135,6 +139,33 @@ export function SessionTimer({
   );
 }
 
+/** The line above every reading: what is running, and where in the set chain it is. */
+function BarHead({
+  label,
+  name,
+  right,
+  rightClass = 'text-neutral-600',
+}: {
+  label: string;
+  name: string;
+  right: string;
+  rightClass?: string;
+}) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <p className={`${kicker} min-w-0 truncate`}>
+        {label} · <span className="text-neutral-300">{name}</span>
+      </p>
+      <p className={`ml-auto shrink-0 text-[11px] ${rightClass}`}>{right}</p>
+    </div>
+  );
+}
+
+/** The 42px reading. Tabular by default (index.css), so it does not jitter. */
+// Weight 600 is the one place Nocturne goes past 500, and only here: a numeral
+// is not a heading, and this one is read at arm's length off the floor.
+const NUMERAL = 'text-[42px] font-semibold leading-none tracking-[-0.03em] tabular-nums';
+
 /**
  * The seconds between the tap and "pull" (T20, D33).
  *
@@ -159,28 +190,17 @@ function CountView({
 }) {
   return (
     <div>
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Get ready · <span className="text-slate-300">{name}</span>
-        </p>
-        <p className="shrink-0 text-xs text-slate-500">
-          {chainLabel && <span className="text-slate-400">{chainLabel} · </span>}
-          {holdTarget ? `target ${holdTarget}` : 'hold'}
-        </p>
-      </div>
-
+      <BarHead
+        label="Get ready"
+        name={name}
+        right={`${chainLabel ? `${chainLabel} · ` : ''}${holdTarget ? `target ${holdTarget}` : 'hold'}`}
+      />
       <div className="mt-1 flex items-center gap-3">
-        <span
-          className="font-mono text-4xl font-bold tabular-nums text-amber-300"
-          aria-live="assertive"
-        >
+        <span className={`${NUMERAL} text-accent-300`} aria-live="assertive">
           {secondsLeft}
         </span>
-        <span className="text-sm font-semibold text-amber-200">counting in…</span>
-        <button
-          onClick={onCancel}
-          className="ml-auto shrink-0 rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-300"
-        >
+        <span className="text-[13px] font-medium text-accent-300">counting in…</span>
+        <button onClick={onCancel} className={`${btnSecondary} ml-auto shrink-0 !rounded-[10px] px-4 py-2`}>
           Cancel
         </button>
       </div>
@@ -202,30 +222,24 @@ function HoldView({
   onStop: (auto?: boolean) => void;
 }) {
   const status = holdStatus(elapsed, hold);
-  const style = STATUS_STYLE[status];
+  const style = HOLD_STATUS[status];
   // "in range" is meaningless without a range: an open hold is simply running,
   // and every second of it counts (T16).
   const label = isOpenHold(hold) ? 'holding' : style.label;
 
   return (
     <div>
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Hold · <span className="text-slate-300">{name}</span>
-        </p>
-        {/* T19: the position rides beside the target, where the eye already goes
-            for "how long" — mid-hang is not the moment to count logged rows. */}
-        <p className="shrink-0 text-xs text-slate-500">
-          {chainLabel && <span className="text-slate-400">{chainLabel} · </span>}
-          target {formatHoldTarget(hold)}
-        </p>
-      </div>
+      {/* T19: the position rides beside the target, where the eye already goes
+          for "how long" — mid-hang is not the moment to count logged rows. */}
+      <BarHead
+        label="Hold"
+        name={name}
+        right={`${chainLabel ? `${chainLabel} · ` : ''}target ${formatHoldTarget(hold)}`}
+      />
 
       <div className="mt-1 flex items-baseline gap-3">
-        <span className="font-mono text-4xl font-bold tabular-nums text-slate-100">
-          {formatHold(elapsed)}
-        </span>
-        <span className={`text-sm font-semibold ${style.text}`} aria-live="polite">
+        <span className={`${NUMERAL} ${style.text}`}>{formatHold(elapsed)}</span>
+        <span className={`text-[13px] font-medium ${style.text}`} aria-live="polite">
           {label}
         </span>
       </div>
@@ -235,18 +249,18 @@ function HoldView({
           deliberately does not prescribe. The count itself is the measurement. */}
       {hold.max !== null && (
         <>
-          <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-slate-700">
+          <div className="relative mt-2.5 h-1.5 overflow-hidden rounded-sm bg-neutral-900">
             {/* The target band: everything from min to the top of the range. */}
             <div
-              className="absolute inset-y-0 right-0 bg-slate-600"
+              className="absolute inset-y-0 right-0 bg-neutral-800"
               style={{ left: `${holdBandStart(hold) * 100}%` }}
             />
             <div
-              className={`absolute inset-y-0 left-0 ${style.fill}`}
+              className={`absolute inset-y-0 left-0 transition-[width] duration-100 ease-linear ${style.fill}`}
               style={{ width: `${holdFraction(elapsed, hold) * 100}%` }}
             />
           </div>
-          <div className="mt-0.5 flex justify-between text-[10px] tabular-nums text-slate-600">
+          <div className="mt-[3px] flex justify-between text-[9.5px] tabular-nums text-neutral-700">
             <span>0</span>
             {hold.min !== hold.max && <span>{hold.min}s</span>}
             <span>{hold.max}s</span>
@@ -254,10 +268,7 @@ function HoldView({
         </>
       )}
 
-      <button
-        onClick={() => onStop(false)}
-        className="mt-2 w-full rounded-lg bg-slate-100 px-4 py-3 text-base font-bold text-slate-900"
-      >
+      <button onClick={() => onStop(false)} className={`${btnStop} mt-2.5 w-full !rounded-[10px] py-[13px] text-[15px]`}>
         Stop
       </button>
     </div>
@@ -274,21 +285,15 @@ function HeldResult({
   onDismiss?: () => void;
 }) {
   return (
-    <div className="mb-2 flex items-center gap-2">
-      <p className="shrink-0 text-sm font-semibold text-emerald-300">✓ Held {formatHold(heldMs)}</p>
-      <button
-        onClick={onLog}
-        className="min-w-0 flex-1 truncate rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-3 py-1.5 text-sm font-semibold text-emerald-200"
-      >
+    <div className="mb-2 flex items-center gap-2.5">
+      <Icon name="check-circle" weight="fill" className="shrink-0 text-[18px] text-accent-400" />
+      <p className="shrink-0 text-[13px] font-medium text-accent-300">Held {formatHold(heldMs)}</p>
+      <button onClick={onLog} className={`${btnPrimary} min-w-0 flex-1 truncate !rounded-[10px] py-2.5 text-[13px]`}>
         Log {formatHold(heldMs)} as a set
       </button>
       {onDismiss && (
-        <button
-          onClick={onDismiss}
-          aria-label="Dismiss timer"
-          className="shrink-0 rounded-lg px-2 py-1.5 text-sm text-slate-400"
-        >
-          ✕
+        <button onClick={onDismiss} aria-label="Dismiss timer" className={`${btnGhost} shrink-0 px-2`}>
+          <Icon name="x" className="text-sm" />
         </button>
       )}
     </div>
@@ -332,47 +337,30 @@ function RestView({
 
   return (
     <div>
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Rest · <span className="text-slate-300">{name}</span>
-        </p>
-        <p
-          className={`shrink-0 text-xs font-semibold ${done ? 'text-emerald-300' : 'text-slate-500'}`}
-          aria-live="polite"
-        >
-          {done ? 'Rest complete — go' : chainLabel ? `next · ${chainLabel}` : 'resting'}
-        </p>
-      </div>
+      <BarHead
+        label="Rest"
+        name={name}
+        right={done ? 'Rest complete — go' : chainLabel ? `next · ${chainLabel}` : 'resting'}
+        rightClass={done ? 'text-accent-300' : 'text-neutral-600'}
+      />
 
       <div className="mt-1 flex items-center gap-3">
-        <span
-          className={`font-mono text-4xl font-bold tabular-nums ${
-            done ? 'text-emerald-300' : 'text-slate-100'
-          }`}
-        >
+        <span className={`${NUMERAL} ${done ? 'text-accent-300' : 'text-accent'}`}>
           {formatClock(remaining)}
         </span>
-        <div className="flex flex-1 justify-end gap-2">
-          <button
-            onClick={() => onExtend(30)}
-            className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-300"
-          >
+        <div className="ml-auto flex gap-2">
+          <button onClick={() => onExtend(30)} className={`${btnSecondary} !rounded-[10px] px-3 py-2.5 text-[13px]`}>
             +30s
           </button>
-          <button
-            onClick={onSkip}
-            className={`rounded-lg px-4 py-2 text-sm font-bold ${
-              done ? 'bg-emerald-400 text-slate-900' : 'bg-slate-700 text-slate-100'
-            }`}
-          >
+          <button onClick={onSkip} className={`${btnPrimary} !rounded-[10px] px-4 py-2.5 text-[13px]`}>
             {done ? 'Done' : 'Skip'}
           </button>
         </div>
       </div>
 
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-700">
+      <div className="mt-2.5 h-1.5 overflow-hidden rounded-sm bg-neutral-900">
         <div
-          className={`h-full ${done ? 'bg-emerald-400' : 'bg-brand-accent'}`}
+          className={`h-full transition-[width] duration-100 ease-linear ${done ? 'bg-accent-300' : 'bg-accent'}`}
           style={{ width: `${Math.min(1, Math.max(0, fraction)) * 100}%` }}
         />
       </div>
@@ -395,11 +383,9 @@ function RestView({
           3 minute interval is how a prescribed rest erodes. It never starts by
           itself either (AC5) — the owner has to be on the board first. */}
       {done && onStartNext && (
-        <button
-          onClick={onStartNext}
-          className="mt-2 w-full rounded-lg bg-emerald-400 px-4 py-3 text-base font-bold text-slate-900"
-        >
-          ▶ Start {chainLabel ?? 'next hold'}
+        <button onClick={onStartNext} className={`${btnPrimary} mt-2.5 w-full !rounded-[10px] py-[13px] text-[15px]`}>
+          <Icon name="play" weight="fill" className="text-[13px]" />
+          Start {chainLabel ?? 'next hold'}
           {holdTarget ? ` · ${holdTarget}` : ''}
         </button>
       )}

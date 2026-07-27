@@ -5,6 +5,8 @@ import {
   formatClock,
   formatHold,
   formatHoldTarget,
+  holdBandStart,
+  holdFraction,
   holdStatus,
   isOpenHold,
   isRestComplete,
@@ -17,6 +19,7 @@ import {
 import { restCardIndex, type RestReading } from '../lib/rest';
 import { useNow, useTimerCues } from '../lib/timerCues';
 import { RestCardView } from './RestCard';
+import { HOLD_STATUS, Icon, btnGhost, btnPrimary, btnSecondary, btnStop, tagNeutral } from './ui';
 
 /**
  * Eyes-shut hold mode (T21): one exercise, one screen, one control at a time.
@@ -36,6 +39,10 @@ import { RestCardView } from './RestCard';
  * - **D36: the screen is not a button.** Only the primary control ends a hold.
  *   Ending a hold *writes a number* into the series §7 asks the owner to read,
  *   and a knee or a brushed screen must not be able to author one.
+ *
+ * Nocturne gave it the one place in the app where the ground lifts — a radial
+ * wash behind the numeral — and the one place the accent is used as light rather
+ * than as a line: the reading throws a 60px glow in its own status colour.
  */
 export function FocusHold({
   exercise,
@@ -44,6 +51,7 @@ export function FocusHold({
   timerHold,
   chainLabel,
   chainSpoken,
+  edgeLabel,
   lastSummary,
   prescriptionLine,
   reading,
@@ -65,6 +73,17 @@ export function FocusHold({
   timerHold: HoldSpec | null;
   chainLabel: string | null;
   chainSpoken: string | null;
+  /**
+   * The edge the next set will be logged on ("20 mm"), or null where the
+   * exercise records none.
+   *
+   * It leads the meta row because it is the one setup value you can still get
+   * wrong after the phone is on the floor — the chain position and the target
+   * are the app's to know, but which rung you are standing under is yours.
+   * Resolved by the session from the same seed the set logger uses, so it is
+   * the number that will actually be written.
+   */
+  edgeLabel: string | null;
   /** T11's one-line summary of last time, or null when there is no record. */
   lastSummary: string | null;
   /**
@@ -105,107 +124,90 @@ export function FocusHold({
   const restCard = deck[cardIndex];
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-brand-bg [padding-bottom:env(safe-area-inset-bottom)]">
+    <div className="fixed inset-0 z-50 flex flex-col px-[22px] pb-[34px] pt-[54px] [background:radial-gradient(120%_70%_at_50%_12%,#1e2032_0%,#161826_70%)] [padding-bottom:calc(34px+env(safe-area-inset-bottom))]">
       {/* Small and cornered on purpose: the exit is the one control on this
           screen that must NOT be findable by feel. */}
-      <header className="flex items-center justify-between px-4 pt-3">
+      <header className="flex items-center">
         <button
           onClick={onExit}
           aria-label="Leave focus mode"
-          className="rounded-lg px-3 py-2 text-sm text-slate-500"
+          className={`${btnGhost} -ml-1.5 h-[34px] w-[34px] px-0`}
         >
-          ✕ Exit
+          <Icon name="x" className="text-[20px]" />
         </button>
-        {chainLabel && (
-          <span className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-            {chainLabel}
-          </span>
-        )}
+        <span className="ml-auto text-[11px] uppercase tracking-[0.1em] text-neutral-600">Focus</span>
       </header>
 
-      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4">
-        <h1 className="text-2xl font-bold leading-tight tracking-tight text-slate-100">
-          {exercise.name}
-        </h1>
-        <p className="mt-0.5 text-sm text-slate-500">
-          target {formatHoldTarget(hold)}
-          {exercise.restSeconds ? ` · rest ${formatClock(exercise.restSeconds * 1000)}` : ''}
+      <div className="mt-6 shrink-0">
+        <h1 className="text-[26px] font-medium leading-[1.1] tracking-[-0.02em]">{exercise.name}</h1>
+        {/* 14px, not the 13px body size: this line is read standing at the board
+            with the phone on the floor. */}
+        <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1.5 text-sm text-neutral-500">
+          {edgeLabel && <span className={tagNeutral}>{edgeLabel}</span>}
+          {chainLabel && <span>{chainLabel}</span>}
+          <span>target {formatHoldTarget(hold)}</span>
+          {exercise.restSeconds ? <span>rest {formatClock(exercise.restSeconds * 1000)}</span> : null}
         </p>
+      </div>
 
+      <main className="flex min-h-0 flex-1 flex-col justify-center overflow-y-auto py-4">
         <Readout state={state} now={now} hold={hold} mine={mine} restDone={restDone} />
-
-        {/* The wall card the owner declined to print: protocol, cues and last
-            time's numbers, at a size that reads from the board — but only while
-            standing still. A running hold gets the screen to itself.
-
-            T22 amends T21 AC6 here, and only here: while a rest is *running*,
-            this block yields to the paced deck, which carries the same material
-            plus `howTo` and `safetyNotes`, one piece at a time instead of all at
-            once. Rendering both would put the same cue on screen twice. The
-            moment the rest is over — and every other time no hold is running —
-            the wall card is exactly what T21 left. */}
-        {!holding && (
-          <div className="mt-auto space-y-3 pb-3 pt-4">
-            {otherRunning && timerExerciseName && (
-              <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-                A timer is still running on {timerExerciseName}. Starting here takes it over.
-              </p>
-            )}
-            {restCard ? (
-              <RestCardView
-                card={restCard}
-                report={reading?.report ?? null}
-                index={cardIndex}
-                total={deck.length}
-              />
-            ) : (
-              <>
-                {lastSummary && (
-                  <p className="text-base leading-snug text-slate-400">
-                    <span className="font-semibold uppercase tracking-wide text-slate-500">
-                      Last
-                    </span>{' '}
-                    <span className="text-slate-300">{lastSummary}</span>
-                  </p>
-                )}
-                <p className="text-base leading-snug text-slate-200">{prescriptionLine}</p>
-                {exercise.cues.length > 0 && (
-                  <ul className="list-disc space-y-1.5 pl-5 text-base leading-snug text-slate-400 marker:text-slate-600">
-                    {exercise.cues.map((c, i) => (
-                      <li key={i}>{c}</li>
-                    ))}
-                  </ul>
-                )}
-              </>
-            )}
-          </div>
-        )}
       </main>
 
-      <footer className="space-y-2 px-4 pb-4 pt-2">
+      {/* The wall card the owner declined to print: protocol, cues and last
+          time's numbers, at a size that reads from the board.
+
+          The two *lines* survive a running hold — they are what the owner glances
+          at between the hang and the log, and they cost the numeral nothing. The
+          cue list does not: a running hold gets the screen.
+
+          T22 amends T21 AC6 here, and only here: while a rest is *running*, this
+          block yields to the paced deck, which carries the same material plus
+          `howTo` and `safetyNotes`, one piece at a time instead of all at once.
+          Rendering both would put the same cue on screen twice. */}
+      <div className="mb-[18px] shrink-0 space-y-2 text-[12.5px] leading-relaxed">
+        {otherRunning && timerExerciseName && !holding && (
+          <p className="rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-warn">
+            A timer is still running on {timerExerciseName}. Starting here takes it over.
+          </p>
+        )}
+        {restCard && !holding ? (
+          <RestCardView
+            card={restCard}
+            report={reading?.report ?? null}
+            index={cardIndex}
+            total={deck.length}
+          />
+        ) : (
+          <>
+            <p className="text-neutral-300">{prescriptionLine}</p>
+            {lastSummary && <p className="text-neutral-500">Last {lastSummary}</p>}
+            {!holding && exercise.cues.length > 0 && (
+              <ul className="list-disc space-y-1 pl-5 text-neutral-500 marker:text-neutral-700">
+                {exercise.cues.map((c, i) => (
+                  <li key={i}>{c}</li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </div>
+
+      <footer className="shrink-0 space-y-2">
         {/* Secondary controls stay small deliberately: a giant button that ends
             §4C's 3 minutes early is how a prescribed rest erodes (T19). */}
         {mine && state.phase === 'resting' && (
           <div className="flex gap-2">
-            <button
-              onClick={() => onExtend(30)}
-              className="flex-1 rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-400"
-            >
+            <button onClick={() => onExtend(30)} className={`${btnSecondary} flex-1 py-2`}>
               +30s
             </button>
-            <button
-              onClick={onSkip}
-              className="flex-1 rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-400"
-            >
+            <button onClick={onSkip} className={`${btnSecondary} flex-1 py-2`}>
               Skip rest
             </button>
           </div>
         )}
         {mine && state.heldMs !== null && state.phase === 'idle' && (
-          <button
-            onClick={onSkip}
-            className="w-full rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-400"
-          >
+          <button onClick={onSkip} className={`${btnSecondary} w-full py-2`}>
             Discard this hold
           </button>
         )}
@@ -243,30 +245,57 @@ function Readout({
 
   if (state.phase === 'counting') {
     return (
-      <Big value={String(leadInSecondsLeft(state, now))} label="get ready" tone="text-amber-300" />
+      <Big
+        value={String(leadInSecondsLeft(state, now))}
+        label="get ready"
+        tone="text-accent-300"
+        glow="#d2cefd"
+      />
     );
   }
 
   if (state.phase === 'holding') {
     const elapsed = elapsedMs(state, now);
     const status = holdStatus(elapsed, hold);
+    const style = HOLD_STATUS[status];
     // An open hold (§4E) has no range to be under or over — it is simply running,
     // and every second counts. Anything else would be reporting a band the plan
-    // deliberately does not prescribe.
-    const label = isOpenHold(hold)
-      ? 'holding'
-      : status === 'in'
-        ? '✓ in range'
-        : status === 'under'
-          ? 'building'
-          : 'past target';
-    const tone =
-      status === 'in' ? 'text-emerald-300' : status === 'under' ? 'text-sky-300' : 'text-amber-300';
-    return <Big value={formatHold(elapsed)} label={label} tone={tone} />;
+    // deliberately does not prescribe, which is also why it draws no band.
+    const label = isOpenHold(hold) ? 'holding' : style.label;
+    return (
+      <Big value={formatHold(elapsed)} label={label} tone={style.text} glow={style.hex}>
+        {hold.max !== null && (
+          <>
+            <div className="relative h-2.5 w-full overflow-hidden rounded-[5px] bg-neutral-900">
+              <div
+                className="absolute inset-y-0 right-0 bg-neutral-800"
+                style={{ left: `${holdBandStart(hold) * 100}%` }}
+              />
+              <div
+                className={`absolute inset-y-0 left-0 transition-[width] duration-100 ease-linear ${style.fill}`}
+                style={{ width: `${holdFraction(elapsed, hold) * 100}%` }}
+              />
+            </div>
+            <div className="flex w-full justify-between text-[11px] tabular-nums text-neutral-700">
+              <span>0</span>
+              {hold.min !== hold.max && <span>{hold.min}s</span>}
+              <span>{hold.max}s</span>
+            </div>
+          </>
+        )}
+      </Big>
+    );
   }
 
   if (state.heldMs !== null) {
-    return <Big value={formatHold(state.heldMs)} label="held — record it" tone="text-emerald-300" />;
+    return (
+      <Big
+        value={formatHold(state.heldMs)}
+        label="held — record it"
+        tone="text-accent-300"
+        glow="#d2cefd"
+      />
+    );
   }
 
   if (state.phase === 'resting') {
@@ -274,7 +303,8 @@ function Readout({
       <Big
         value={formatClock(restRemainingMs(state, now))}
         label={restDone ? 'rest complete — go' : 'resting'}
-        tone={restDone ? 'text-emerald-300' : 'text-slate-100'}
+        tone={restDone ? 'text-accent-300' : 'text-accent'}
+        glow={restDone ? '#d2cefd' : '#9184d9'}
       />
     );
   }
@@ -284,13 +314,32 @@ function Readout({
   return null;
 }
 
-function Big({ value, label, tone }: { value: string; label: string; tone: string }) {
+function Big({
+  value,
+  label,
+  tone,
+  glow,
+  children,
+}: {
+  value: string;
+  label: string;
+  tone: string;
+  /** The status colour as a value, for the one glow in the system. */
+  glow: string;
+  children?: React.ReactNode;
+}) {
   return (
-    <div className="py-4">
-      <p className={`font-mono text-7xl font-bold leading-none tabular-nums ${tone}`}>{value}</p>
-      <p className={`mt-2 text-lg font-semibold ${tone}`} aria-live="polite">
+    <div className="flex flex-col items-center gap-5">
+      <p
+        className={`text-[108px] font-semibold leading-none tracking-[-0.05em] tabular-nums ${tone}`}
+        style={{ textShadow: `0 0 60px color-mix(in srgb, ${glow} 34%, transparent)` }}
+      >
+        {value}
+      </p>
+      <p className={`text-base font-medium tracking-[0.04em] ${tone}`} aria-live="polite">
         {label}
       </p>
+      {children}
     </div>
   );
 }
@@ -319,31 +368,27 @@ function PrimaryControl({
   onSkip: () => void;
   onLogHeld: (heldMs: number) => void;
 }) {
-  const base =
-    'flex min-h-[22vh] w-full items-center justify-center rounded-2xl px-4 text-center text-3xl font-bold leading-tight';
+  const base = 'w-full !rounded-[14px] px-4 py-5 text-center text-[19px] leading-tight';
 
   switch (action) {
     case 'stop':
       return (
-        <button onClick={() => onStop(false)} className={`${base} bg-slate-100 text-slate-900`}>
-          STOP
+        <button onClick={() => onStop(false)} className={`${btnStop} ${base}`}>
+          Stop
         </button>
       );
     case 'log':
       return (
         <button
           onClick={() => onLogHeld(state.heldMs as number)}
-          className={`${base} bg-emerald-400 text-slate-900`}
+          className={`${btnPrimary} ${base} text-[17px]`}
         >
-          Log {formatHold(state.heldMs as number)}
+          Log {formatHold(state.heldMs as number)} as a set
         </button>
       );
     case 'cancel':
       return (
-        <button
-          onClick={onSkip}
-          className={`${base} border-2 border-slate-700 bg-transparent text-slate-400`}
-        >
+        <button onClick={onSkip} className={`${btnSecondary} ${base}`}>
           Cancel
         </button>
       );
@@ -352,7 +397,7 @@ function PrimaryControl({
       // deliberate hand can find it and a hurried one will not.
       return (
         <div
-          className={`${base} border-2 border-dashed border-slate-800 text-lg font-semibold text-slate-600`}
+          className={`${base} border border-dashed border-neutral-800 text-base font-medium text-neutral-600`}
         >
           Rest — the app will tell you
         </div>
@@ -360,9 +405,10 @@ function PrimaryControl({
     case 'start-next':
     case 'start':
       return (
-        <button onClick={onStart} className={`${base} bg-brand-accent text-brand-bg`}>
-          ▶ Start {chainLabel ?? 'hold'}
-          <span className="ml-2 text-xl font-semibold opacity-70">{formatHoldTarget(hold)}</span>
+        <button onClick={onStart} className={`${btnPrimary} ${base} gap-2.5`}>
+          <Icon name="play" weight="fill" className="text-[17px]" />
+          Start {chainLabel ?? 'hold'}
+          <span className="text-base opacity-70">{formatHoldTarget(hold)}</span>
         </button>
       );
   }

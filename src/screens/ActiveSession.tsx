@@ -57,6 +57,17 @@ import { leadInMsOf, voiceEnabled } from '../lib/cues';
 import { primeAudio } from '../lib/beep';
 import { hush, primeSpeech } from '../lib/speech';
 import { useWakeLock } from '../lib/wakeLock';
+import { go } from '../lib/routes';
+import {
+  Icon,
+  btnGhost,
+  btnPrimary,
+  btnSecondary,
+  card as cardClass,
+  input as inputClass,
+  kicker,
+  tagAccent,
+} from '../components/ui';
 import { PlanRefLinks } from '../components/PlanRefLinks';
 import { PrescriptionVariants } from '../components/PrescriptionVariants';
 import { SetLogger } from '../components/SetLogger';
@@ -294,16 +305,16 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
 
   if (notFound) {
     return (
-      <div className="mx-auto max-w-md p-4">
-        <p className="text-sm text-slate-300">That session no longer exists.</p>
-        <button onClick={onFinish} className="mt-3 text-sm font-medium text-brand-accent">
+      <div className="mx-auto max-w-md p-4 pt-[54px]">
+        <p className="text-[13px] text-neutral-300">That session no longer exists.</p>
+        <button onClick={onFinish} className={`${btnGhost} mt-3`}>
           Back home
         </button>
       </div>
     );
   }
   if (!log || !routine) {
-    return <p className="mx-auto max-w-md p-4 text-sm text-slate-400">Loading session…</p>;
+    return <p className="mx-auto max-w-md p-4 pt-[54px] text-[13px] text-neutral-500">Loading session…</p>;
   }
 
   // The timer belongs to the session, not to a card, so it renders over the
@@ -427,6 +438,18 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
         timerHold={holdSpecOf(timerExercise)}
         chainLabel={chainLabelFor(focusExercise.id)}
         chainSpoken={timerChainSpoken}
+        // The edge the next set will carry, resolved through the same seed the
+        // set logger uses — so the tag on the board and the number that gets
+        // written can't disagree. Null on the exercises that record no edge.
+        edgeLabel={(() => {
+          if (!focusExercise.metrics?.includes('edgeMm')) return null;
+          const seed = seedForNextSet(
+            getSets(log, focusExercise.id),
+            last,
+            edgeSeedFor(focusExercise.id),
+          );
+          return typeof seed.edgeMm === 'number' ? `${seed.edgeMm} mm` : null;
+        })()}
         // T24: one line at board-legible size, so it is this week's protocol
         // rather than both of §4B's in a paragraph nobody reads mid-set. Falls
         // back to the full prescription wherever no variant is declared or no
@@ -480,22 +503,60 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
     );
   }
 
+  const doneCount = routine.exerciseIds.filter((id) => isExerciseCompleted(log, id)).length;
+
   return (
-    <div className={`mx-auto max-w-md p-4 ${timerBar ? 'pb-72' : 'pb-28'}`}>
-      <header className="mb-4">
-        <p className="text-xs uppercase tracking-wide text-slate-500">Session</p>
-        <h1 className="text-xl font-bold tracking-tight text-slate-100">{routine.name}</h1>
-        <p className="text-xs text-slate-500">
-          Started {new Date(log.startedAt).toLocaleString()} ·{' '}
-          {routine.exerciseIds.filter((id) => isExerciseCompleted(log, id)).length} of{' '}
-          {routine.exerciseIds.length} done
-        </p>
-        {/* T24: the block position, derived (D25). A statement of where this
-            session falls — never a target, a quota, or a "you're behind" (D23). */}
-        {block && <p className="mt-0.5 text-xs text-slate-400">{block.label}</p>}
+    <div className="mx-auto max-w-md">
+      {/* The header is a fixed frame around a scrolling list, not part of it:
+          the block position and the completion count are the two things you
+          glance at mid-session, and they should not scroll away. */}
+      <header className="flex items-center gap-2.5 px-4 pb-3 pt-[50px] shadow-[0_1px_0_#292b31]">
+        <button
+          onClick={() => go({ name: 'home' })}
+          aria-label="Back home"
+          className={`${btnGhost} h-[30px] w-[30px] shrink-0 px-0`}
+        >
+          <Icon name="caret-left" className="text-[18px]" />
+        </button>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-[15px] font-medium tracking-[-0.01em]">{routine.name}</h1>
+          {/* T24: the block position, derived (D25). A statement of where this
+              session falls — never a target, a quota, or a "you're behind"
+              (D23) — merged onto one line with what the session has covered so
+              far, because they are read in the same glance. */}
+          <p className="truncate text-[11px] text-neutral-500 first-letter:uppercase">
+            {block ? `${block.label} · ` : ''}
+            {doneCount} of {routine.exerciseIds.length} done
+          </p>
+        </div>
+        <button onClick={handleFinish} className={`${btnGhost} shrink-0 text-[13px]`}>
+          Finish
+        </button>
       </header>
 
-      <div className="space-y-3">
+      {/* One segment per exercise: done, the one the timer is on, and the rest.
+          It replaces nothing — it is the completion count above, drawn, so the
+          answer to "how much is left" costs no reading at all. */}
+      <div
+        className="grid gap-[3px] px-4 pt-2.5"
+        style={{ gridTemplateColumns: `repeat(${routine.exerciseIds.length}, minmax(0,1fr))` }}
+        aria-hidden
+      >
+        {routine.exerciseIds.map((exId) => (
+          <span
+            key={exId}
+            className={`h-[3px] rounded-sm ${
+              isExerciseCompleted(log, exId)
+                ? 'bg-accent'
+                : timer.exerciseId === exId && timer.phase !== 'idle'
+                  ? 'bg-accent-400'
+                  : 'bg-neutral-800'
+            }`}
+          />
+        ))}
+      </div>
+
+      <div className={`flex flex-col gap-2.5 px-4 pt-3 ${timerBar ? 'pb-[250px]' : 'pb-28'}`}>
         {routine.exerciseIds.map((exId) => {
           const exercise = exercisesById.get(exId);
           const sets = getSets(log, exId);
@@ -507,45 +568,97 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
           const restMs = restMsOf(exercise);
           const isTiming = timer.exerciseId === exId && timer.phase !== 'idle';
           const chainLabel = chainLabelFor(exId);
+          // T24: this week's protocol, at the top of the card rather than behind
+          // Info. It is the number the owner sets the board to, so it costs a tap
+          // to reach only if you would rather read the plan's alternatives — which
+          // is what Info is still for.
+          const prescription = exercise ? livePrescription(exercise, block?.week ?? null) : '';
+          const planRef = exercise?.planRefs?.[0];
           return (
             <section
               key={exId}
-              className={`rounded-xl border p-3 ${
-                done ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-slate-700 bg-brand-surface'
+              // The card's edge is its state: accent-tinted with an accent ring
+              // once it is done, a brighter neutral ring while its timer runs,
+              // and the ordinary edge otherwise. Three weights of one line.
+              className={`${cardClass} flex flex-col gap-2.5 ${
+                done
+                  ? 'bg-[color-mix(in_srgb,#9184d9_8%,#232532)] shadow-[0_0_0_1px_rgba(145,132,217,.3)]'
+                  : isTiming
+                    ? 'shadow-[0_0_0_1px_#595d6c]'
+                    : 'shadow-edge'
               }`}
             >
-              <div className="flex items-start justify-between gap-2">
-                {/* Missing catalog entry → fall back to the raw id, never crash. */}
-                {exercise ? (
+              <div className="flex items-start gap-2">
+                {done && (
+                  <Icon
+                    name="check-circle"
+                    weight="fill"
+                    className="mt-0.5 shrink-0 text-[17px] text-accent-400"
+                  />
+                )}
+                <div className="min-w-0 flex-1">
+                  {/* Missing catalog entry → fall back to the raw id, never crash. */}
+                  {exercise ? (
+                    <button
+                      onClick={() => setDetailId(exId)}
+                      className={`min-w-0 text-left font-medium ${done ? 'text-[15px]' : 'text-base'}`}
+                    >
+                      {exercise.name}
+                    </button>
+                  ) : (
+                    <h2 className="text-base font-medium">{exId}</h2>
+                  )}
+                  {prescription !== '' && !done && (
+                    <p className="mt-[3px] text-xs text-accent-300">
+                      {prescription}
+                      {planRef && <span className="text-neutral-600"> · plan §{planRef}</span>}
+                    </p>
+                  )}
+                </div>
+                {/* D16: explicit and independent of sets — several plan items
+                    (warm-up progression, get-ups, wall press) have nothing
+                    numeric worth typing, and adding a set never implies
+                    completion. Reads as the state it is in, and toggles. */}
+                {done ? (
                   <button
-                    onClick={() => setDetailId(exId)}
-                    className="min-w-0 text-left font-semibold text-slate-100"
+                    onClick={() => mutate((l) => setExerciseCompleted(l, exId, false))}
+                    aria-pressed
+                    className={`${tagAccent} shrink-0`}
                   >
-                    {exercise.name} <span aria-hidden className="text-slate-500">›</span>
+                    Completed
                   </button>
                 ) : (
-                  <h2 className="font-semibold text-slate-100">{exId}</h2>
-                )}
-                {exercise && (
-                  <button
-                    onClick={() => toggleExpanded(exId)}
-                    aria-expanded={isOpen}
-                    className="shrink-0 text-xs text-slate-400 hover:text-slate-200"
-                  >
-                    {isOpen ? 'Hide info ▾' : 'Info ▸'}
-                  </button>
+                  exercise && (
+                    <button
+                      onClick={() => toggleExpanded(exId)}
+                      aria-expanded={isOpen}
+                      className={`${btnGhost} shrink-0 px-1 text-[11px]`}
+                    >
+                      Info
+                      <Icon name={isOpen ? 'caret-up' : 'caret-down'} className="text-[11px]" />
+                    </button>
+                  )
                 )}
               </div>
 
+              {/* A completed card says what it was, once, and then gets out of the
+                  way — indented past the check so the line belongs to the name. */}
+              {done && prescription !== '' && (
+                <p className="-mt-1 pl-[25px] text-[11px] text-neutral-500">
+                  {prescription}
+                  {planRef && ` · plan §${planRef}`}
+                </p>
+              )}
+
               {isOpen && exercise && (
-                <div className="mt-2 rounded-lg bg-slate-800/60 p-2 text-sm">
+                <div className="rounded-md bg-black/20 p-2 text-[13px]">
                   {/* T24: this week's variant leads where §4B declares two, and the
                       other stays on the card rather than moving to the detail
                       screen — mid-session is exactly when the owner needs to see
                       that a choice exists (D25). */}
                   <PrescriptionVariants exercise={exercise} week={block?.week ?? null} compact />
                   {exercise.cues.length > 0 && (
-                    <ul className="mt-1.5 list-disc space-y-1 pl-4 text-xs text-slate-400 marker:text-slate-600">
+                    <ul className="mt-1.5 list-disc space-y-1 pl-4 text-xs text-neutral-400 marker:text-neutral-700">
                       {exercise.cues.map((c, i) => (
                         <li key={i}>{c}</li>
                       ))}
@@ -564,12 +677,12 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
               {/* T11: what this exercise looked like last time, where the
                   decision is made — §4F asks for small increments, which is not
                   possible against a number you have to leave the session to find. */}
-              {last && (
-                <p className="mt-2 text-xs leading-snug text-slate-400">
-                  <span className="font-semibold uppercase tracking-wide text-slate-500">
+              {last && !done && (
+                <p className="text-[11px] leading-relaxed text-neutral-500">
+                  <span className="text-[10px] uppercase tracking-[0.08em]">
                     Last {describeWhen(last.daysAgo)}
                   </span>{' '}
-                  <span className="text-slate-300">{summarizeSets(last.sets)}</span>
+                  <span className="text-neutral-300">{summarizeSets(last.sets)}</span>
                 </p>
               )}
 
@@ -579,27 +692,29 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
                   it takes the place of both controls rather than sitting beside
                   them (T21 AC1 amended, see T23's Amendments). */}
               {warmupPlanOf(exercise) ? (
-                <button
-                  onClick={() => setWarmupId(exId)}
-                  className="mt-2 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-semibold text-slate-200"
-                >
-                  ▶ Run warm-up
+                <button onClick={() => setWarmupId(exId)} className={`${btnSecondary} w-full !rounded-[10px] py-2.5`}>
+                  <Icon name="play" weight="fill" className="text-xs" />
+                  Run warm-up
                 </button>
               ) : /* T10: a hold if the plan prescribes a duration, otherwise a bare
                   rest if it prescribes only that. Untimed movements (rows,
                   squats, get-ups, prehab) get neither and read exactly as before. */
               holdSpec ? (
-                <div className="mt-2 flex gap-2">
+                <div className="flex gap-2">
+                  {/* The set the owner came to this card to start: Nocturne's
+                      primary, which is an outline. Nothing else on the card
+                      carries the accent as a border. */}
                   <button
                     onClick={() => beginHold(exId)}
                     disabled={isTiming}
-                    className="min-w-0 flex-1 truncate rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-semibold text-slate-200 disabled:opacity-40"
+                    className={`${btnPrimary} min-w-0 flex-1 truncate !rounded-[10px] py-2.5`}
                   >
+                    <Icon name="play" weight="fill" className="shrink-0 text-[13px]" />
                     {isTiming
                       ? timer.phase === 'counting'
                         ? 'Counting in…'
                         : 'Timing…'
-                      : `▶ Start ${chainLabel ?? 'hold'} · ${formatHoldTarget(holdSpec)}`}
+                      : `Start ${chainLabel ?? 'hold'} · ${formatHoldTarget(holdSpec)}`}
                   </button>
                   {/* T21: the eyes-shut surface for this exercise. Only where the
                       plan declares a hold — an exercise with no clock has no
@@ -607,9 +722,9 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
                   <button
                     onClick={() => setFocusId(exId)}
                     aria-label={`Focus mode for ${exercise?.name ?? exId}`}
-                    className="shrink-0 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-semibold text-slate-400"
+                    className={`${btnSecondary} h-auto w-[42px] shrink-0 !rounded-[10px] px-0`}
                   >
-                    ⤢ Focus
+                    <Icon name="arrows-out" className="text-[17px]" />
                   </button>
                 </div>
               ) : (
@@ -617,9 +732,10 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
                   <button
                     onClick={() => beginRest(exId, restMs)}
                     disabled={isTiming}
-                    className="mt-2 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-semibold text-slate-200 disabled:opacity-40"
+                    className={`${btnSecondary} w-full !rounded-[10px] py-2.5`}
                   >
-                    {isTiming ? 'Resting…' : `▶ Start rest · ${formatClock(restMs)}`}
+                    <Icon name="timer" className="text-[13px]" />
+                    {isTiming ? 'Resting…' : `Start rest · ${formatClock(restMs)}`}
                   </button>
                 )
               )}
@@ -647,48 +763,45 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
                 onChange={(e) => mutate((l) => setExerciseNotes(l, exId, e.target.value))}
                 placeholder="Notes (optional)"
                 aria-label={`${exercise?.name ?? exId} notes`}
-                className="mt-2 w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-slate-200 placeholder:text-slate-500 focus:border-brand-accent focus:outline-none"
+                className={`${inputClass} min-h-[32px] text-[12.5px]`}
               />
 
-              {/* D16: explicit and independent of sets — several plan items
-                  (warm-up progression, get-ups, wall press) have nothing numeric
-                  worth typing, and adding a set never implies completion. */}
-              <button
-                onClick={() => mutate((l) => setExerciseCompleted(l, exId, !done))}
-                aria-pressed={done}
-                className={`mt-2 flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold ${
-                  done
-                    ? 'bg-emerald-500/20 text-emerald-200'
-                    : 'border border-slate-700 text-slate-300'
-                }`}
-              >
-                <span aria-hidden>{done ? '✓' : '○'}</span>
-                {done ? 'Completed' : 'Mark done'}
-              </button>
+              {/* The other half of the completion toggle above: the tag in the
+                  header is the "on" state, and this is the "off" one. One
+                  control, two shapes, so a completed card never carries a
+                  full-width button restating what its own tint already says. */}
+              {!done && (
+                <button
+                  onClick={() => mutate((l) => setExerciseCompleted(l, exId, true))}
+                  aria-pressed={false}
+                  className={`${btnSecondary} w-full !rounded-[10px] py-2 text-[13px] !text-neutral-400`}
+                >
+                  <Icon name="circle" className="text-[13px]" />
+                  Mark done
+                </button>
+              )}
             </section>
           );
         })}
+
+        <section className="mt-0.5 flex flex-col gap-1.5">
+          <label className={kicker} htmlFor="session-notes">
+            Session notes
+          </label>
+          <textarea
+            id="session-notes"
+            value={log.sessionNotes}
+            onChange={(e) => mutate((l) => setSessionNotes(l, e.target.value))}
+            rows={2}
+            placeholder="How did it feel?"
+            className={`${inputClass} min-h-[58px] resize-y text-[12.5px]`}
+          />
+        </section>
+
+        <button onClick={handleFinish} className={`${btnPrimary} mt-1 w-full !rounded-[10px] py-[13px] text-[15px]`}>
+          Finish session
+        </button>
       </div>
-
-      <section className="mt-4">
-        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Session notes
-        </label>
-        <textarea
-          value={log.sessionNotes}
-          onChange={(e) => mutate((l) => setSessionNotes(l, e.target.value))}
-          rows={2}
-          placeholder="How did it feel?"
-          className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-brand-accent focus:outline-none"
-        />
-      </section>
-
-      <button
-        onClick={handleFinish}
-        className="mt-5 w-full rounded-lg bg-brand-accent px-4 py-3 font-semibold text-brand-bg"
-      >
-        Finish session
-      </button>
 
       {timerBar}
     </div>

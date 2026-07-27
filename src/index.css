@@ -17,8 +17,44 @@ body {
   /* Respect iOS safe-area insets (notch / home indicator) — T8 relies on this. */
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
     env(safe-area-inset-bottom) env(safe-area-inset-left);
-  background-color: theme('colors.brand.bg');
-  color: #e2e8f0;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background-color: theme('colors.bg');
+  color: theme('colors.ink');
+  font-family: theme('fontFamily.sans');
+  font-size: 15px;
+  line-height: 1.55;
+  /* Timer numerals and set tables line up column-wise without asking each of
+     them to opt in. */
+  font-feature-settings: 'tnum' 1;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Nocturne's focus ring, once, so no control is left with the browser default. */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid theme('colors.accent.DEFAULT');
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, theme('colors.accent.DEFAULT') 30%, transparent);
+}
+
+@layer components {
+  /* A divider that fades to transparent over 48px at each end, so a rule inside
+     a card never collides with the card's own edge. Box outlines and separators
+     *inside* a control stay solid — this is only for rules between subjects. */
+  .hr {
+    height: 1px;
+    border: 0;
+    background: linear-gradient(
+      to right,
+      transparent,
+      rgba(233, 233, 237, 0.16) 48px,
+      rgba(233, 233, 237, 0.16) calc(100% - 48px),
+      transparent
+    );
+  }
 }

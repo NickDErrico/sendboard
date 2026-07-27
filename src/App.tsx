@@ -17,9 +17,9 @@ import { Plan } from './screens/Plan';
 import { Settings } from './screens/Settings';
 import { InstallGuide } from './screens/InstallGuide';
 import { CheckLog } from './screens/CheckLog';
-import { WeekStatus } from './components/WeekStatus';
-import { DailyGtgStatus } from './components/DailyGtgStatus';
+import { CheckOffs } from './components/CheckOffs';
 import { TabBar } from './components/TabBar';
+import { btnGhost, btnPrimary, btnSecondary } from './components/ui';
 
 // The tab bar is hidden on immersive/transient screens (active logging, the
 // focused routine start, the install guide, and not-found), which carry their
@@ -44,7 +44,7 @@ export default function App() {
   // install guide once (AC3). Overlays the app so it can't be routed past.
   if (onboarding.show) {
     return (
-      <div className="fixed inset-0 z-50 overflow-y-auto bg-brand-bg">
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-bg">
         <InstallGuide ctaLabel="Got it" onCta={() => void onboarding.dismiss()} />
       </div>
     );
@@ -175,22 +175,15 @@ function RoutineStartRoute({ routineId }: { routineId: string }) {
 
 function ChecksRoute() {
   return (
-    <div className="mx-auto max-w-md space-y-3 p-4 pb-24">
+    <div className="mx-auto flex max-w-md flex-col gap-3 px-4 pb-24 pt-[54px]">
       <header className="flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight text-slate-100">Check-offs</h1>
-        <button
-          onClick={() => go({ name: 'home' })}
-          className="rounded px-1 py-1 text-sm text-slate-400 hover:text-slate-200"
-        >
+        <h1 className="text-[15px] font-medium tracking-[-0.01em]">Check-offs</h1>
+        <button onClick={() => go({ name: 'home' })} className={`${btnGhost} text-[13px]`}>
           Done
         </button>
       </header>
-      <WeekStatus />
-      <DailyGtgStatus />
-      <button
-        onClick={() => go({ name: 'checklog' })}
-        className="w-full rounded-lg border border-slate-700 bg-brand-surface px-4 py-2 text-sm font-semibold text-slate-200"
-      >
+      <CheckOffs />
+      <button onClick={() => go({ name: 'checklog' })} className={`${btnSecondary} w-full py-2.5`}>
         View check log
       </button>
     </div>
@@ -200,14 +193,11 @@ function ChecksRoute() {
 function NotFound({ path }: { path: string }) {
   return (
     <main className="mx-auto flex min-h-full max-w-md flex-col items-center justify-center gap-4 p-6 text-center">
-      <h1 className="text-2xl font-bold tracking-tight text-slate-100">Page not found</h1>
-      <p className="text-sm text-slate-400">
-        Nothing lives at <span className="font-mono text-slate-300">{path}</span>.
+      <h1 className="text-[22px] font-medium tracking-[-0.02em]">Page not found</h1>
+      <p className="text-[13px] text-neutral-500">
+        Nothing lives at <span className="text-neutral-300">{path}</span>.
       </p>
-      <button
-        onClick={() => go({ name: 'home' })}
-        className="rounded-lg bg-brand-accent px-4 py-2 font-semibold text-brand-bg"
-      >
+      <button onClick={() => go({ name: 'home' })} className={`${btnPrimary} px-4 py-2`}>
         Go home
       </button>
     </main>
@@ -217,7 +207,7 @@ function NotFound({ path }: { path: string }) {
 function CenteredNote({ children }: { children: ReactNode }) {
   return (
     <main className="mx-auto flex min-h-full max-w-md items-center justify-center p-6">
-      <p className="text-sm text-slate-400">{children}</p>
+      <p className="text-[13px] text-neutral-500">{children}</p>
     </main>
   );
 }

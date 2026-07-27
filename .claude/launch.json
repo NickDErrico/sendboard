@@ -106,6 +106,19 @@
       "port": 5198
     },
     {
+      "name": "dev-nocturne",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5199",
+        "--strictPort"
+      ],
+      "port": 5199
+    },
+    {
       "name": "preview-t25",
       "runtimeExecutable": "npm",
       "runtimeArgs": [
