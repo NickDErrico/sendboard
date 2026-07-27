@@ -489,7 +489,9 @@ function GearSettings({ reloadKey }: { reloadKey: number }) {
           key={`edges-${edges?.join(',')}`}
           defaultValue={edges?.join(', ') ?? ''}
           onBlur={(e) => void saveEdges(e.target.value)}
-          inputMode="decimal"
+          // No `inputMode="decimal"` here, unlike the single-number fields below:
+          // a decimal keypad has no comma and no space, so it would hide the very
+          // separators the placeholder asks for. A list needs the text keyboard.
           placeholder="20, 18, 15, 10"
           aria-label="Board edges, millimetres, comma separated"
           className={input}
