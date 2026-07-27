@@ -13,6 +13,66 @@ declare const process: { env: Record<string, string | undefined> };
 // it must match the Pages subpath or every asset URL and the service-worker scope 404s.
 const base = '/sendboard/';
 
+/**
+ * Keep only the woff2 source in Phosphor's `@font-face` rules.
+ *
+ * Each weight ships woff2 + woff + ttf + svg, and the two weights this app loads
+ * come to ~9 MB of which ~1.4 MB is ever fetched — every browser that can run an
+ * installed PWA takes the woff2. In an offline-first app the rest is not merely
+ * unused, it is actively in the way: the SVG fonts are 3 MB each, which is past
+ * workbox's precache ceiling, so the service worker refuses to build rather than
+ * silently shipping an app whose icons vanish offline.
+ */
+function phosphorWoff2Only() {
+  return {
+    name: 'phosphor-woff2-only',
+    enforce: 'pre' as const,
+    transform(code: string, id: string) {
+      if (!id.includes('@phosphor-icons') || !id.includes('.css')) return null;
+      return {
+        code: code.replace(
+          /src:[\s\S]*?;/,
+          (src: string) =>
+            src.match(/url\("([^"]+\.woff2)"\)/)
+              ? `src: url("${(src.match(/url\("([^"]+\.woff2)"\)/) as RegExpMatchArray)[1]}") format("woff2");`
+              : src,
+        ),
+        map: null,
+      };
+    },
+  };
+}
+
+/**
+ * Keep only the Latin subset of Inter.
+ *
+ * Fontsource splits the variable font across seven subsets — Cyrillic, Greek,
+ * Vietnamese, Latin-ext and Latin — and importing the stylesheet precaches all
+ * of them: 218 KB of an offline-first bundle to support alphabets this app has
+ * no copy in. Latin alone is 48 KB and covers everything the plan and the UI
+ * actually spell, including the em-dashes, curly quotes and § the copy is full
+ * of. (`≥`, `→` and `⚠` are outside *every* Inter subset and fall back to the
+ * system face either way — that was true of the Google Fonts build too.)
+ */
+function interLatinOnly() {
+  return {
+    name: 'inter-latin-only',
+    enforce: 'pre' as const,
+    transform(code: string, id: string) {
+      if (!id.includes('@fontsource-variable/inter') || !id.includes('.css')) return null;
+      // Each block is preceded by a `/* inter-<subset>-… */` comment, which is
+      // what identifies it — the `unicode-range` would be far more fragile to
+      // match on.
+      const kept = code
+        .split('/* inter-')
+        .filter((block) => block.startsWith('latin-wght') || block.startsWith('latin-opsz'))
+        .map((block) => `/* inter-${block}`)
+        .join('\n');
+      return { code: kept, map: null };
+    },
+  };
+}
+
 export default defineConfig({
   base,
   define: {
@@ -27,6 +87,8 @@ export default defineConfig({
     __COMMIT__: JSON.stringify((process.env.GITHUB_SHA ?? 'local').slice(0, 7)),
   },
   plugins: [
+    interLatinOnly(),
+    phosphorWoff2Only(),
     react(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -41,8 +103,8 @@ export default defineConfig({
         scope: '.',
         display: 'standalone',
         orientation: 'portrait',
-        background_color: '#0f172a',
-        theme_color: '#0f172a',
+        background_color: '#161826',
+        theme_color: '#161826',
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
@@ -50,7 +112,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        // woff2 is here because the icons are a font: without it an offline
+        // launch renders every glyph as a box.
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,woff2}'],
         navigateFallback: 'index.html',
       },
       devOptions: {

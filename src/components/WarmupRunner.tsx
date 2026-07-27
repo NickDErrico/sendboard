@@ -19,6 +19,7 @@ import {
   type WarmupPlan,
 } from '../lib/warmup';
 import { useNow, useTimerCues } from '../lib/timerCues';
+import { Icon, btnGhost, btnPrimary, btnSecondary, btnStop, kicker } from './ui';
 
 /**
  * The warm-up runner (T23).
@@ -130,30 +131,28 @@ export function WarmupRunner({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-brand-bg [padding-bottom:env(safe-area-inset-bottom)]">
+    <div className="fixed inset-0 z-50 flex flex-col px-[22px] pt-[54px] [background:radial-gradient(120%_70%_at_50%_12%,#1e2032_0%,#161826_70%)] [padding-bottom:calc(34px+env(safe-area-inset-bottom))]">
       {/* Small and cornered, exactly as T21 has it: the exit is the one control
           here that must not be findable by feel. */}
-      <header className="flex items-center justify-between px-4 pt-3">
+      <header className="flex items-center justify-between">
         <button
           onClick={onExit}
           aria-label="Leave the warm-up runner"
-          className="rounded-lg px-3 py-2 text-sm text-slate-500"
+          className={`${btnGhost} -ml-1.5 h-[34px] w-[34px] px-0`}
         >
-          ✕ Exit
+          <Icon name="x" className="text-[20px]" />
         </button>
-        <span className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+        <span className="text-[11px] uppercase tracking-[0.1em] text-neutral-600">
           Warm-up · {formatRun(now - runStartedAt)}
         </span>
       </header>
 
-      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4">
-        <h1 className="text-2xl font-bold leading-tight tracking-tight text-slate-100">
-          {exercise.name}
-        </h1>
+      <main className="mt-6 flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <h1 className="text-[26px] font-medium leading-[1.1] tracking-[-0.02em]">{exercise.name}</h1>
         {/* The plan's own number, reported beside the clock and never counted
             toward: §4A's range is a range, and a shorter warm-up on a lighter
             week is as correct as a longer one (D23, §4F). */}
-        <p className="mt-0.5 text-sm text-slate-500">{plan.prescription}</p>
+        <p className="mt-0.5 text-sm text-neutral-500">{plan.prescription}</p>
 
         {plan.form === 'staged' ? (
           <StagedBody plan={plan} stage={stage} />
@@ -171,7 +170,7 @@ export function WarmupRunner({
         {exercise.safetyNotes.length > 0 && (
           <div className="mt-auto space-y-1.5 pb-3 pt-4">
             {exercise.safetyNotes.map((note, i) => (
-              <p key={i} className="text-sm leading-snug text-amber-200/80">
+              <p key={i} className="text-[12.5px] leading-relaxed text-warn">
                 {note}
               </p>
             ))}
@@ -179,15 +178,13 @@ export function WarmupRunner({
         )}
       </main>
 
-      <footer className="space-y-2 px-4 pb-4 pt-2">
+      <footer className="space-y-2 pt-2">
         {/* Secondary controls stay small, T21's rule: the one that resumes a
             stopped cadence must not be the size of the one that ends it. */}
         {plan.form === 'cycle' && !armed && round > 0 && (
-          <button
-            onClick={beginCycle}
-            className="w-full rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-400"
-          >
-            ▶ More rounds
+          <button onClick={beginCycle} className={`${btnSecondary} w-full py-2 !text-neutral-400`}>
+            <Icon name="play" weight="fill" className="text-xs" />
+            More rounds
           </button>
         )}
 
@@ -199,11 +196,17 @@ export function WarmupRunner({
         <button
           onClick={onComplete}
           aria-pressed={completed}
-          className={`flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold ${
-            completed ? 'bg-emerald-500/20 text-emerald-200' : 'border border-slate-700 text-slate-400'
+          className={`flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2 text-[13px] font-medium transition-colors ${
+            completed
+              ? 'border-accent bg-accent/[.12] text-accent-200'
+              : 'border-neutral-800 text-neutral-400 hover:border-white/[.34]'
           }`}
         >
-          <span aria-hidden>{completed ? '✓' : '○'}</span>
+          <Icon
+            name={completed ? 'check-circle' : 'circle'}
+            weight={completed ? 'fill' : 'regular'}
+            className={`text-[15px] ${completed ? 'text-accent-400' : 'text-neutral-600'}`}
+          />
           {completed ? 'Warm-up marked done' : 'Mark warm-up done'}
         </button>
 
@@ -228,15 +231,15 @@ function StagedBody({ plan, stage }: { plan: { stages: string[] }; stage: number
   const total = plan.stages.length;
   return (
     <div className="py-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <p className={kicker}>
         Stage {Math.min(stage + 1, total)} of {total}
       </p>
-      <p className="mt-2 text-2xl font-semibold leading-snug text-slate-100">{plan.stages[stage]}</p>
+      <p className="mt-2 text-2xl font-medium leading-snug">{plan.stages[stage]}</p>
       <span aria-hidden className="mt-4 flex items-center gap-1.5">
         {plan.stages.map((_, i) => (
           <span
             key={i}
-            className={`h-2 w-2 rounded-full ${i === stage ? 'bg-brand-accent' : i < stage ? 'bg-slate-500' : 'bg-slate-700'}`}
+            className={`h-1.5 w-1.5 rounded-full ${i === stage ? 'bg-accent' : i < stage ? 'bg-neutral-600' : 'bg-neutral-800'}`}
           />
         ))}
       </span>
@@ -277,18 +280,20 @@ function CycleBody({
       : armed
         ? 'ready'
         : `${plan.holdSec}s on · ${plan.restSec}s off`;
-  const tone = holding ? 'text-brand-accent' : restDone ? 'text-emerald-300' : 'text-slate-100';
+  const tone = holding ? 'text-accent' : restDone ? 'text-accent-300' : 'text-ink';
 
   return (
     <div className="py-4">
       {/* A count of what has been run, never a target to reach: §4A says
           "~10 min at light intensity" and states no round count, so the app
           reports and the owner stops (D23, D40). */}
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {round > 0 ? roundLabel(round) : 'not started'}
+      <p className={kicker}>{round > 0 ? roundLabel(round) : 'not started'}</p>
+      <p
+        className={`mt-1 text-[72px] font-semibold leading-none tracking-[-0.04em] tabular-nums ${tone}`}
+      >
+        {value}
       </p>
-      <p className={`mt-1 font-mono text-7xl font-bold leading-none tabular-nums ${tone}`}>{value}</p>
-      <p className={`mt-2 text-lg font-semibold ${tone}`} aria-live="polite">
+      <p className={`mt-2 text-base font-medium tracking-[0.04em] ${tone}`} aria-live="polite">
         {label}
       </p>
     </div>
@@ -319,11 +324,11 @@ function PrimaryControl({
   onBeginCycle: () => void;
   onEndCycle: () => void;
 }) {
-  const base =
-    'flex min-h-[22vh] w-full items-center justify-center rounded-2xl px-4 text-center text-3xl font-bold leading-tight';
+  const base = 'w-full !rounded-[14px] px-4 py-5 text-center text-[19px] leading-tight';
   const finish = (
-    <button onClick={onFinish} className={`${base} bg-emerald-400 text-slate-900`}>
-      ✓ Warmed up
+    <button onClick={onFinish} className={`${btnPrimary} ${base}`}>
+      <Icon name="check" className="text-[17px]" />
+      Warmed up
     </button>
   );
 
@@ -331,7 +336,7 @@ function PrimaryControl({
     return isLastStage(stage, plan.stages.length) ? (
       finish
     ) : (
-      <button onClick={onAdvance} className={`${base} bg-brand-accent text-brand-bg`}>
+      <button onClick={onAdvance} className={`${btnPrimary} ${base}`}>
         Next stage
       </button>
     );
@@ -342,8 +347,8 @@ function PrimaryControl({
   // as ending the warm-up, and "More rounds" above is how a stopped one resumes.
   if (armed && mine && state.phase !== 'idle') {
     return (
-      <button onClick={onEndCycle} className={`${base} bg-slate-100 text-slate-900`}>
-        STOP
+      <button onClick={onEndCycle} className={`${btnStop} ${base}`}>
+        Stop
       </button>
     );
   }
@@ -351,8 +356,9 @@ function PrimaryControl({
   if (round > 0) return finish;
 
   return (
-    <button onClick={onBeginCycle} className={`${base} bg-brand-accent text-brand-bg`}>
-      ▶ Start {plan.holdSec}s / {plan.restSec}s
+    <button onClick={onBeginCycle} className={`${btnPrimary} ${base} gap-2.5`}>
+      <Icon name="play" weight="fill" className="text-[17px]" />
+      Start {plan.holdSec}s / {plan.restSec}s
     </button>
   );
 }

@@ -61,7 +61,7 @@ export function SigilMark({ sigil, size }: { sigil: Sigil; size: number }) {
         fill="none"
         stroke="currentColor"
         strokeWidth={stroke * 0.5}
-        className="text-slate-700"
+        className="text-neutral-700"
       />
       {sigil.spokes.map((spoke) => {
         const from = spokePoint(spoke.angleDeg, SIGIL_INNER * radius);
@@ -80,7 +80,7 @@ export function SigilMark({ sigil, size }: { sigil: Sigil; size: number }) {
                 fill="none"
                 stroke="currentColor"
                 strokeWidth={stroke * 0.45}
-                className="text-slate-500"
+                className="text-neutral-500"
               />
             ) : (
               <line
@@ -91,7 +91,7 @@ export function SigilMark({ sigil, size }: { sigil: Sigil; size: number }) {
                 stroke="currentColor"
                 strokeWidth={stroke}
                 strokeLinecap="round"
-                className="text-brand-accent"
+                className="text-accent"
               />
             )}
             {/* AC5: the two reasons a set summary already surfaces (D27). A mark,
@@ -101,7 +101,7 @@ export function SigilMark({ sigil, size }: { sigil: Sigil; size: number }) {
                 cx={CENTRE + to.x}
                 cy={CENTRE + to.y}
                 r={stroke * 0.85}
-                className="fill-amber-300"
+                className="fill-warn"
               />
             )}
           </g>
@@ -124,37 +124,37 @@ export function SigilLegend({ sigil }: { sigil: Sigil }) {
   const clamped = sigil.spokes.filter((s) => s.clamped).length;
 
   return (
-    <ul className="space-y-1 text-xs leading-snug text-slate-400">
+    <ul className="space-y-1 text-xs leading-snug text-neutral-400">
       <li>
-        <span className="text-slate-300">{sigil.spokes.length}</span> spokes — one per hold, in the
+        <span className="text-neutral-300">{sigil.spokes.length}</span> spokes — one per hold, in the
         order they were logged, clockwise from the top.
       </li>
       <li>
-        Spoke length is the <span className="text-slate-300">recorded seconds</span>, on the same
+        Spoke length is the <span className="text-neutral-300">recorded seconds</span>, on the same
         scale in every mark in the app: the rim is {SIGIL_MAX_SEC}s.
       </li>
       {sigil.groups > 1 && (
         <li>
-          The <span className="text-slate-300">{sigil.groups} gaps</span> are the boundaries between
+          The <span className="text-neutral-300">{sigil.groups} gaps</span> are the boundaries between
           this session's exercises.
         </li>
       )}
       {untimed > 0 && (
         <li>
-          <span className="text-slate-300">{untimed}</span> hollow tick
+          <span className="text-neutral-300">{untimed}</span> hollow tick
           {untimed === 1 ? '' : 's'} on the hub — a hold logged with no duration, which is not the
           same as a short one.
         </li>
       )}
       {signals > 0 && (
         <li>
-          <span className="text-amber-300">{signals}</span> amber tip
+          <span className="text-warn">{signals}</span> amber tip
           {signals === 1 ? '' : 's'} — a set that ended for pain or a form breakdown.
         </li>
       )}
       {clamped > 0 && (
         <li>
-          <span className="text-slate-300">{clamped}</span> spoke{clamped === 1 ? '' : 's'} reached
+          <span className="text-neutral-300">{clamped}</span> spoke{clamped === 1 ? '' : 's'} reached
           the rim: the hold ran past {SIGIL_MAX_SEC}s and is drawn at the scale's limit.
         </li>
       )}

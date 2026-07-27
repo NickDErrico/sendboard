@@ -4,6 +4,7 @@ import { buildEdgeWeekGrid, describeTension, describeUntimed, type EdgeWeekGrid 
 import { go } from '../lib/routes';
 import { EdgeWeekGrid } from '../components/EdgeWeekGrid';
 import { PlanRefLinks } from '../components/PlanRefLinks';
+import { Icon } from '../components/ui';
 
 // Where the block's work went (T26). A reading surface: it loads, aggregates and
 // renders, and writes nothing.
@@ -30,35 +31,35 @@ export function Block({ onExit }: { onExit: () => void }) {
   }, []);
 
   return (
-    <div className="mx-auto max-w-md space-y-4 p-4 pb-24">
+    <div className="mx-auto max-w-md space-y-4 px-4 pb-24 pt-[54px]">
       <header className="flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight text-slate-100">Block</h1>
-        <button onClick={onExit} className="rounded px-1 py-1 text-sm text-slate-400 hover:text-slate-200">
+        <h1 className="text-[15px] font-medium tracking-[-0.01em]">Block</h1>
+        <button onClick={onExit} className="rounded-md px-1 py-1 text-[13px] font-medium text-accent hover:bg-accent/10">
           Done
         </button>
       </header>
 
       {grid === undefined ? (
-        <p className="text-sm text-slate-400">Loading…</p>
+        <p className="text-[13px] text-neutral-400">Loading…</p>
       ) : grid === null ? (
         // AC10: the same words Home uses, because it is the same fact.
-        <p className="rounded-xl border border-slate-700 bg-brand-surface p-6 text-center text-sm text-slate-300">
+        <p className="rounded-md bg-surface shadow-edge p-6 text-center text-[13px] text-neutral-300">
           Not started — the block begins at your first logged session.
         </p>
       ) : (
         <>
           {/* AC1/AC2: two facts and the gap between them. Nothing is compared to
               anything, here or below. */}
-          <section className="rounded-xl border border-slate-700 bg-brand-surface p-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <section className="rounded-md bg-surface shadow-edge p-3">
+            <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">
               Under tension
             </h2>
-            <p className="mt-0.5 text-lg font-semibold tabular-nums text-slate-100">
+            <p className="mt-0.5 text-lg font-medium tabular-nums text-ink">
               {describeTension(grid.total)}
             </p>
-            <p className="mt-0.5 text-xs text-slate-500">{grid.position.label}</p>
+            <p className="mt-0.5 text-xs text-neutral-500">{grid.position.label}</p>
             {describeUntimed(grid.total) && (
-              <p className="mt-1.5 text-xs leading-snug text-amber-200/80">
+              <p className="mt-1.5 text-xs leading-snug text-neutral-500">
                 {describeUntimed(grid.total)} — those holds are counted, and the seconds beside them
                 are not.
               </p>
@@ -70,23 +71,21 @@ export function Block({ onExit }: { onExit: () => void }) {
               poster reads the same at week 3 and at week 12 (D45b). */}
           <button
             onClick={() => go({ name: 'poster' })}
-            className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-700 bg-brand-surface p-3 text-left"
+            className="flex w-full items-center justify-between gap-3 rounded-md bg-surface shadow-edge p-3 text-left"
           >
             <span className="min-w-0">
-              <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <span className="block text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">
                 The block, session by session
               </span>
-              <span className="mt-0.5 block text-xs leading-snug text-slate-400">
+              <span className="mt-0.5 block text-xs leading-snug text-neutral-400">
                 Every session as a mark, week by week, with §4E's before and after.
               </span>
             </span>
-            <span aria-hidden className="shrink-0 text-slate-500">
-              ›
-            </span>
+            <Icon name="caret-right" className="shrink-0 text-[13px] text-neutral-600" />
           </button>
 
           {grid.total.holds === 0 ? (
-            <p className="rounded-xl border border-slate-700 bg-brand-surface p-6 text-center text-sm text-slate-400">
+            <p className="rounded-md bg-surface shadow-edge p-6 text-center text-[13px] text-neutral-400">
               No holds logged in this block yet. Sets appear here once a finished session records
               one.
             </p>
@@ -96,18 +95,18 @@ export function Block({ onExit }: { onExit: () => void }) {
 
           {/* AC8/AC9: what the numbers above are made of, said plainly rather than
               left for the owner to infer from a total that looks low. */}
-          <section className="rounded-xl border border-slate-700 bg-slate-900/60 p-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <section className="rounded-md border border-neutral-800 bg-bg/60 p-3">
+            <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">
               What is counted
             </h2>
-            <ul className="mt-1 space-y-1 text-xs leading-snug text-slate-400">
+            <ul className="mt-1 space-y-1 text-xs leading-snug text-neutral-400">
               <li>
-                A <span className="text-slate-300">hold</span> is one logged set of an exercise the
+                A <span className="text-neutral-300">hold</span> is one logged set of an exercise the
                 plan prescribes a hold for — the PIMA pulls (§4B), the max hangs (§4C), the bar
                 pulls and lock-off holds (§5A, §5B).
               </li>
               <li>
-                Seconds are the durations <span className="text-slate-300">recorded</span> on those
+                Seconds are the durations <span className="text-neutral-300">recorded</span> on those
                 sets. A set logged without one is counted as a hold and adds no time; nothing is
                 filled in from a prescription.
               </li>
@@ -123,13 +122,13 @@ export function Block({ onExit }: { onExit: () => void }) {
           {grid.excludedBatteries > 0 && (
             <button
               onClick={() => go({ name: 'retest' })}
-              className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-700 bg-brand-surface p-3 text-left"
+              className="flex w-full items-center justify-between gap-3 rounded-md bg-surface shadow-edge p-3 text-left"
             >
               <span className="min-w-0">
-                <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <span className="block text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">
                   §4E baseline / retest
                 </span>
-                <span className="mt-0.5 block text-xs leading-snug text-slate-400">
+                <span className="mt-0.5 block text-xs leading-snug text-neutral-400">
                   {grid.excludedBatteries === 1
                     ? 'One battery falls inside this block and is not counted above'
                     : `${grid.excludedBatteries} batteries fall inside this block and are not counted above`}{' '}
@@ -137,9 +136,7 @@ export function Block({ onExit }: { onExit: () => void }) {
                   screen.
                 </span>
               </span>
-              <span aria-hidden className="shrink-0 text-slate-500">
-                ›
-              </span>
+              <Icon name="caret-right" className="shrink-0 text-[13px] text-neutral-600" />
             </button>
           )}
         </>

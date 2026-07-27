@@ -25,9 +25,9 @@ export function EdgeWeekGrid({ grid }: { grid: Grid }) {
   const [mode, setMode] = useState<CellMode>('holds');
 
   return (
-    <section className="rounded-xl border border-slate-700 bg-brand-surface p-3">
+    <section className="rounded-md bg-surface shadow-edge p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">
           Edge × week
         </h2>
         <div className="flex gap-1.5" role="group" aria-label="Cell contents">
@@ -36,10 +36,10 @@ export function EdgeWeekGrid({ grid }: { grid: Grid }) {
               key={m.mode}
               onClick={() => setMode(m.mode)}
               aria-pressed={m.mode === mode}
-              className={`rounded-lg px-3 py-1 text-xs font-semibold ${
+              className={`rounded-lg px-3 py-1 text-xs font-medium ${
                 m.mode === mode
-                  ? 'bg-brand-accent text-brand-bg'
-                  : 'border border-slate-700 text-slate-300'
+                  ? 'border-accent bg-accent/[.12] text-accent'
+                  : 'border border-neutral-800 text-neutral-300'
               }`}
             >
               {m.label}
@@ -53,35 +53,35 @@ export function EdgeWeekGrid({ grid }: { grid: Grid }) {
       <div className="mt-2 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
-              <th scope="col" className="pb-1 pr-2 font-semibold">
+            <tr className="text-left text-xs uppercase tracking-wide text-neutral-500">
+              <th scope="col" className="pb-1 pr-2 font-medium">
                 Week
               </th>
               {grid.edges.map((edge) => (
                 <th
                   key={formatEdge(edge)}
                   scope="col"
-                  className="pb-1 pl-2 text-right font-semibold tabular-nums"
+                  className="pb-1 pl-2 text-right font-medium tabular-nums"
                 >
                   {formatEdge(edge)}
                 </th>
               ))}
-              <th scope="col" className="pb-1 pl-3 text-right font-semibold">
+              <th scope="col" className="pb-1 pl-3 text-right font-medium">
                 All
               </th>
             </tr>
           </thead>
           <tbody className="align-top">
             {grid.rows.map((row) => (
-              <tr key={row.week} className="border-t border-slate-800">
+              <tr key={row.week} className="border-t border-neutral-900">
                 <th scope="row" className="py-1.5 pr-2 text-left font-normal">
                   {/* "W3", not "3": sessions sit beside the week rather than in a
                       column of their own — they are the context that makes the
                       row's counts readable, not a fourth thing to compare — and
                       two bare numbers side by side read as one. */}
-                  <span className="text-slate-300">W{row.week}</span>
+                  <span className="text-neutral-300">W{row.week}</span>
                   {row.sessions > 0 && (
-                    <span className="ml-1.5 text-xs text-slate-600">{row.sessions}×</span>
+                    <span className="ml-1.5 text-xs text-neutral-600">{row.sessions}×</span>
                   )}
                 </th>
                 {row.cells.map((cell, i) => (
@@ -92,8 +92,8 @@ export function EdgeWeekGrid({ grid }: { grid: Grid }) {
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 border-slate-700 text-slate-300">
-              <th scope="row" className="py-1.5 pr-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <tr className="border-t-2 border-neutral-800 text-neutral-300">
+              <th scope="row" className="py-1.5 pr-2 text-left text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">
                 Block
               </th>
               {grid.columnTotals.map((cell, i) => (
@@ -105,11 +105,11 @@ export function EdgeWeekGrid({ grid }: { grid: Grid }) {
         </table>
       </div>
 
-      <p className="mt-2 text-xs leading-snug text-slate-500">
+      <p className="mt-2 text-xs leading-snug text-neutral-500">
         {mode === 'holds' ? (
           <>
             Each cell counts the holds logged that week on that edge, and a row's cells add up to
-            its <span className="text-slate-400">All</span>.
+            its <span className="text-neutral-400">All</span>.
           </>
         ) : (
           <>
@@ -121,7 +121,7 @@ export function EdgeWeekGrid({ grid }: { grid: Grid }) {
         {grid.edges.includes(null) && (
           <>
             {' '}
-            <span className="text-slate-400">no edge</span> holds the sets logged without one — the
+            <span className="text-neutral-400">no edge</span> holds the sets logged without one — the
             bar pulls and lock-offs, which have no edge, and any hang where it was not recorded.
           </>
         )}
@@ -143,15 +143,15 @@ function Cell({
   return (
     <td
       className={`py-1.5 pl-2 text-right tabular-nums ${
-        emphasis ? 'pl-3 font-semibold text-slate-200' : 'text-slate-300'
+        emphasis ? 'pl-3 font-medium text-neutral-200' : 'text-neutral-300'
       }`}
     >
-      {text === null ? <span className="text-slate-700">·</span> : text}
+      {text === null ? <span className="text-neutral-700">·</span> : text}
       {/* The gap travels with the number it is missing from (D43c), on the reading
           where it is missing: a seconds cell short three sets is the one that
           would otherwise read as complete. */}
       {mode === 'seconds' && totals.untimed > 0 && totals.untimed < totals.holds && (
-        <span className="block text-[10px] font-normal text-slate-600">+{totals.untimed} untimed</span>
+        <span className="block text-[10px] font-normal text-neutral-600">+{totals.untimed} untimed</span>
       )}
     </td>
   );

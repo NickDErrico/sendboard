@@ -13,9 +13,9 @@ function Inline({ text, terms }: { text: string; terms: string[] }) {
     <>
       {inlineSpans(text, terms).map((span, i) => {
         const className = [
-          span.bold ? 'font-semibold text-slate-100' : '',
+          span.bold ? 'font-medium text-ink' : '',
           span.italic ? 'italic' : '',
-          span.hit ? 'rounded bg-brand-accent/25 text-brand-accent' : '',
+          span.hit ? 'rounded-sm bg-accent/25 text-accent-100' : '',
         ]
           .filter(Boolean)
           .join(' ');
@@ -35,19 +35,19 @@ function Block({ block, terms }: { block: PlanBlock; terms: string[] }) {
   switch (block.kind) {
     case 'para':
       return (
-        <p className="break-words text-sm leading-relaxed text-slate-300">
+        <p className="break-words text-[13px] leading-relaxed text-neutral-300">
           <Inline text={block.text} terms={terms} />
         </p>
       );
     case 'quote':
       return (
-        <blockquote className="border-l-4 border-brand-accent/50 bg-brand-accent/5 py-2 pl-3 text-sm leading-relaxed text-slate-200">
+        <blockquote className="border-l-4 border-accent/50 bg-accent/[.08] py-2 pl-3 text-sm leading-relaxed text-neutral-200">
           <Inline text={block.text} terms={terms} />
         </blockquote>
       );
     case 'list': {
       const className =
-        'space-y-1.5 pl-5 text-sm leading-relaxed text-slate-300 marker:text-slate-600';
+        'space-y-1.5 pl-5 text-sm leading-relaxed text-neutral-300 marker:text-neutral-600';
       const items = block.items.map((item, i) => (
         <li key={i} className="break-words pl-1">
           <Inline text={item} terms={terms} />
@@ -71,7 +71,7 @@ function Block({ block, terms }: { block: PlanBlock; terms: string[] }) {
                 {block.header.map((cell, i) => (
                   <th
                     key={i}
-                    className="whitespace-nowrap border-b border-slate-700 px-2 py-1.5 font-semibold uppercase tracking-wide text-slate-500"
+                    className="whitespace-nowrap border-b border-neutral-800 px-2 py-1.5 font-medium uppercase tracking-wide text-neutral-500"
                   >
                     <Inline text={cell} terms={terms} />
                   </th>
@@ -84,7 +84,7 @@ function Block({ block, terms }: { block: PlanBlock; terms: string[] }) {
                   {row.map((cell, c) => (
                     <td
                       key={c}
-                      className="border-b border-slate-800 px-2 py-1.5 leading-snug text-slate-300"
+                      className="border-b border-neutral-900 px-2 py-1.5 leading-snug text-neutral-300"
                     >
                       <Inline text={cell} terms={terms} />
                     </td>
@@ -111,11 +111,11 @@ export function PlanSection({
   return (
     <article className="space-y-3">
       <header>
-        <p className="text-xs font-semibold uppercase tracking-wide text-brand-accent">
+        <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-accent">
           {section.label}
           {section.parentTitle && !compact ? ` · ${section.parentTitle}` : ''}
         </p>
-        <h2 className={`mt-0.5 font-bold tracking-tight text-slate-100 ${compact ? 'text-base' : 'text-lg'}`}>
+        <h2 className={`mt-0.5 font-medium tracking-tight text-ink ${compact ? 'text-base' : 'text-lg'}`}>
           <Inline text={section.title} terms={terms} />
         </h2>
       </header>

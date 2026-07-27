@@ -28,6 +28,8 @@ import { primeSpeech, say } from '../lib/speech';
 import type { BodyweightEntry } from '../types';
 import { PERSISTENCE_COPY, checkPersistence, type PersistenceState } from '../lib/persistence';
 import { beepTest } from '../lib/beep';
+import { Icon, btnGhost, btnPrimary, btnSecondary, input } from '../components/ui';
+import { ExpandableRow, ReadRow, RowRule, readList } from '../components/ReadList';
 
 // T6 settings shell + T7 backup section. Deliberately NO reminder UI of any kind
 // (D2a): no time picker, no notification permission, no deep-link URLs. Reminders
@@ -135,48 +137,55 @@ export function Settings({
   }
 
   return (
-    <div className="mx-auto max-w-md p-4 pb-24">
+    <div className="mx-auto max-w-md px-4 pb-24 pt-[54px]">
       <header className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight text-slate-100">Settings</h1>
+        <h1 className="text-[15px] font-medium tracking-[-0.01em]">Settings</h1>
         <button
           onClick={onExit}
-          className="rounded px-1 py-1 text-sm text-slate-400 hover:text-slate-200"
+          className="rounded-md px-1 py-1 text-[13px] font-medium text-accent hover:bg-accent/10"
         >
           Done
         </button>
       </header>
 
       <div className="space-y-3">
-        {/* T13 AC2: the build stamp, not the (never-bumped) package version, is
-            what tells the owner an update landed. Compare it after relaunching
-            twice — the service worker updates itself (registerType: autoUpdate),
-            so the app never needs deleting, and deleting it is what destroys the
-            log. */}
-        <section className="rounded-xl border border-slate-700 bg-brand-surface p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-slate-300">Build</span>
-            <span className="font-mono text-sm text-slate-400">
-              {new Date(__BUILD_TIME__).toLocaleString()}
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-slate-500">
-            v{__APP_VERSION__} · {__COMMIT__}
-          </p>
-          <p className="mt-2 text-xs text-slate-500">
-            Updates install themselves — close Sendboard and open it twice, then check this
-            timestamp. Never delete the app to update it; that erases your log.
-          </p>
+        {/* Nocturne's collapse rule: the build stamp, the storage verdict and the
+            install guide were three cards in a row and none of them is a thing
+            you *do* — the first two report and the third goes somewhere. As one
+            card of rows the whole preamble is four lines instead of half a
+            screen, and the section you actually came to change is above the fold.
+
+            Each row's explanation is one tap away rather than always on: it is
+            read once, and after that it sits between the owner and the setting
+            they opened this screen for. */}
+        <section className={readList}>
+          {/* T13 AC2: the build stamp, not the (never-bumped) package version, is
+              what tells the owner an update landed. Compare it after relaunching
+              twice — the service worker updates itself (registerType:
+              autoUpdate), so the app never needs deleting, and deleting it is
+              what destroys the log. */}
+          <ExpandableRow
+            icon="arrows-clockwise"
+            title="Build"
+            detail={`${new Date(__BUILD_TIME__).toLocaleString()} · v${__APP_VERSION__} · ${__COMMIT__}`}
+          >
+            <p>
+              Updates install themselves — close Sendboard and open it twice, then check this
+              timestamp. Never delete the app to update it; that erases your log.
+            </p>
+          </ExpandableRow>
+          <RowRule />
+
+          <PersistenceStatus />
+          <RowRule />
+
+          <ReadRow
+            icon="device-mobile"
+            title="How to install"
+            detail="Add Sendboard to your home screen"
+            onClick={onOpenInstallGuide}
+          />
         </section>
-
-        <PersistenceStatus />
-
-        <button
-          onClick={onOpenInstallGuide}
-          className="flex w-full items-center justify-between rounded-xl border border-slate-700 bg-brand-surface p-4 text-left transition-colors hover:border-slate-600"
-        >
-          <span className="text-sm font-medium text-slate-200">How to install</span>
-          <span className="text-slate-500">→</span>
-        </button>
 
         <BlockStart reloadKey={bwReloadKey} />
 
@@ -186,21 +195,21 @@ export function Settings({
 
         <BodyweightLog reloadKey={bwReloadKey} />
 
-        <section className="space-y-3 rounded-xl border border-slate-700 bg-brand-surface p-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Data backup</h2>
-          <p className="text-sm text-slate-400">
+        <section className="space-y-3 rounded-md bg-surface shadow-edge p-3">
+          <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">Data backup</h2>
+          <p className="text-[13px] text-neutral-400">
             Export every session and check-off to a JSON file, or restore from one. The exercise
             catalog isn’t included — it ships with the app.
           </p>
 
           <button
             onClick={() => void handleExport()}
-            className="w-full rounded-lg bg-brand-accent px-4 py-2 font-semibold text-brand-bg"
+            className={`${btnPrimary} w-full py-2`}
           >
             Export backup
           </button>
 
-          <label className="block w-full cursor-pointer rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-center font-semibold text-slate-200">
+          <label className={`${btnSecondary} w-full cursor-pointer py-2`}>
             Import backup
             <input
               type="file"
@@ -211,8 +220,8 @@ export function Settings({
           </label>
 
           {pending && (
-            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
-              <p className="text-sm text-amber-100">
+            <div className="rounded-lg border border-accent/40 bg-accent/[.08] p-3">
+              <p className="text-[13px] text-accent-100">
                 This will replace your current {plural(pending.currentLogs, 'session')} and{' '}
                 {pending.currentChecks} check-offs with {plural(pending.data.logs.length, 'session')}{' '}
                 and {pending.data.checks.length} check-offs from the file. Bodyweight readings are
@@ -220,15 +229,14 @@ export function Settings({
                 can’t be undone.
               </p>
               <div className="mt-3 flex gap-2">
-                <button
-                  onClick={() => setPending(null)}
-                  className="flex-1 rounded-lg px-4 py-2 text-sm text-slate-300"
-                >
+                <button onClick={() => setPending(null)} className={`${btnSecondary} flex-1 py-2`}>
                   Cancel
                 </button>
+                {/* The one hue that is not the accent, for the one action here
+                    that destroys something. */}
                 <button
                   onClick={() => void doImport(pending.data, pending.upgradedFrom)}
-                  className="flex-1 rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-200"
+                  className={`${btnSecondary} flex-1 border-warn/50 bg-warn/10 py-2 !text-warn hover:bg-warn/20`}
                 >
                   Replace all
                 </button>
@@ -237,7 +245,7 @@ export function Settings({
           )}
 
           {message && (
-            <p className={`text-sm ${message.kind === 'ok' ? 'text-emerald-300' : 'text-red-300'}`}>
+            <p className={`text-sm ${message.kind === 'ok' ? 'text-accent-300' : 'text-warn'}`}>
               {message.text}
             </p>
           )}
@@ -248,9 +256,9 @@ export function Settings({
             the voice and the count-in to the same section, for the same reason. */}
         <SoundSettings reloadKey={bwReloadKey} />
 
-        <section className="rounded-xl border border-slate-700 bg-brand-surface p-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Reminders</h2>
-          <p className="mt-2 text-sm text-slate-400">
+        <section className="rounded-md bg-surface shadow-edge p-3">
+          <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">Reminders</h2>
+          <p className="mt-2 text-[13px] text-neutral-400">
             Sendboard has no built-in reminders. Set a repeating iPhone alarm or a Todoist recurring
             task for your training time, then tap the Sendboard icon to open it. See the README for
             step-by-step setup.
@@ -318,39 +326,36 @@ function BlockStart({ reloadKey }: { reloadKey: number }) {
   }
 
   return (
-    <section className="space-y-3 rounded-xl border border-slate-700 bg-brand-surface p-4">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Block</h2>
+    <section className="space-y-3 rounded-md bg-surface shadow-edge p-3">
+      <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">Block</h2>
 
       {block === null ? (
-        <p className="text-sm text-slate-400">
+        <p className="text-[13px] text-neutral-400">
           Not started — the block begins at your first logged session.
         </p>
       ) : (
-        <p className="text-sm text-slate-300">
+        <p className="text-[13px] text-neutral-300">
           {block.label} ·{' '}
-          <span className="text-slate-500">
+          <span className="text-neutral-500">
             {block.derived ? 'counted from your first session, ' : 'started '}
             {new Date(`${block.startKey}T00:00`).toLocaleDateString()}
           </span>
         </p>
       )}
 
-      <button
-        onClick={() => void startNewBlock()}
-        className="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200"
-      >
+      <button onClick={() => void startNewBlock()} className={`${btnSecondary} w-full py-2`}>
         Start a new block today
       </button>
       {marker !== null && (
         <button
           onClick={() => void clearMarker()}
-          className="w-full rounded-lg px-4 py-2 text-sm text-slate-400"
+          className={`${btnGhost} w-full py-2 !text-neutral-400`}
         >
           Use my first session instead
         </button>
       )}
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-neutral-500">
         The week comes from your log, not a schedule — nothing here is ever due, and past week 8 it
         just reads “week 8+”. Set this only when you deliberately begin a new block; §4F’s weeks are
         counted from it.
@@ -395,8 +400,8 @@ function StandardEdge({ reloadKey }: { reloadKey: number }) {
   }
 
   return (
-    <section className="space-y-2 rounded-xl border border-slate-700 bg-brand-surface p-4">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <section className="space-y-2 rounded-md bg-surface shadow-edge p-3">
+      <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">
         Standard edge
       </h2>
       <div className="flex items-center gap-2">
@@ -407,11 +412,11 @@ function StandardEdge({ reloadKey }: { reloadKey: number }) {
           inputMode="decimal"
           placeholder="20"
           aria-label="Standard edge, millimetres"
-          className="w-20 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-right text-sm text-slate-100 focus:border-brand-accent focus:outline-none"
+          className={`${input} w-20 text-right`}
         />
-        <span className="text-xs text-slate-500">mm</span>
+        <span className="text-xs text-neutral-500">mm</span>
       </div>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-neutral-500">
         Prefilled on every set that records an edge. §4E: “Pick one standard edge (14–20mm) and
         never change it mid-block — changing edge size invalidates the comparison more than any
         training variable.”
@@ -472,11 +477,11 @@ function GearSettings({ reloadKey }: { reloadKey: number }) {
   }
 
   return (
-    <section className="space-y-3 rounded-xl border border-slate-700 bg-brand-surface p-4">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your gear</h2>
+    <section className="space-y-3 rounded-md bg-surface shadow-edge p-3">
+      <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">Your gear</h2>
 
       <div className="space-y-1">
-        <label className="text-sm text-slate-300" htmlFor="gear-edges">
+        <label className="text-sm text-neutral-300" htmlFor="gear-edges">
           Board edges
         </label>
         <input
@@ -487,16 +492,16 @@ function GearSettings({ reloadKey }: { reloadKey: number }) {
           inputMode="decimal"
           placeholder="20, 18, 15, 10"
           aria-label="Board edges, millimetres, comma separated"
-          className="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-accent focus:outline-none"
+          className={input}
         />
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-neutral-500">
           The rungs that exist on your board, in millimetres. Each one becomes a one-tap choice when
           you log an edge — typing any other value still works.
         </p>
       </div>
 
       <div className="space-y-1">
-        <label className="text-sm text-slate-300" htmlFor="gear-step">
+        <label className="text-sm text-neutral-300" htmlFor="gear-step">
           Load increment
         </label>
         <div className="flex items-center gap-2">
@@ -508,11 +513,11 @@ function GearSettings({ reloadKey }: { reloadKey: number }) {
             inputMode="decimal"
             placeholder="2.5"
             aria-label="Load increment, pounds"
-            className="w-20 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-right text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-accent focus:outline-none"
+            className={`${input} w-20 text-right`}
           />
-          <span className="text-xs text-slate-500">lb</span>
+          <span className="text-xs text-neutral-500">lb</span>
         </div>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-neutral-500">
           The smallest weight you can actually add. It sets the size of the − / + step on added load
           — §4F asks for increments of 1–3%, and whether to take one is yours.
         </p>
@@ -572,9 +577,9 @@ function SoundSettings({ reloadKey }: { reloadKey: number }) {
   }
 
   return (
-    <section className="space-y-3 rounded-xl border border-slate-700 bg-brand-surface p-4">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sound</h2>
-      <p className="text-sm text-slate-400">
+    <section className="space-y-3 rounded-md bg-surface shadow-edge p-3">
+      <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">Sound</h2>
+      <p className="text-[13px] text-neutral-400">
         The timer plays a tone when a hold ends and when a rest is up, and pips through the target
         window of a hang so you can hear where you are without looking. It only sounds while
         Sendboard is on screen — iOS suspends a backgrounded web app.
@@ -583,20 +588,25 @@ function SoundSettings({ reloadKey }: { reloadKey: number }) {
       <button
         onClick={() => void toggleVoice()}
         aria-pressed={voice}
-        className={`flex w-full items-center justify-between rounded-lg px-4 py-2 text-sm font-semibold ${
-          voice ? 'bg-emerald-500/20 text-emerald-200' : 'border border-slate-700 text-slate-300'
+        className={`flex w-full items-center justify-between rounded-md border px-4 py-2 text-[13px] font-medium transition-colors ${
+          voice
+            ? 'border-accent bg-accent/[.12] text-accent-200'
+            : 'border-neutral-800 text-neutral-300 hover:border-white/[.34]'
         }`}
       >
         <span>Spoken cues</span>
-        <span aria-hidden>{voice ? 'On ✓' : 'Off'}</span>
+        <span className="flex items-center gap-1.5">
+          {voice && <Icon name="check" className="text-[13px] text-accent-400" />}
+          {voice ? 'On' : 'Off'}
+        </span>
       </button>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-neutral-500">
         Counts you in and says which set is next when a rest ends. Turning it off silences the words
         only — every tone still plays.
       </p>
 
       <div className="space-y-1">
-        <label className="text-sm text-slate-300" htmlFor="lead-in">
+        <label className="text-sm text-neutral-300" htmlFor="lead-in">
           Count-in
         </label>
         <div className="flex items-center gap-2">
@@ -608,21 +618,18 @@ function SoundSettings({ reloadKey }: { reloadKey: number }) {
             inputMode="decimal"
             placeholder="3"
             aria-label="Count-in before a hold, seconds"
-            className="w-20 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-right text-sm text-slate-100 focus:border-brand-accent focus:outline-none"
+            className={`${input} w-20 text-right`}
           />
-          <span className="text-xs text-slate-500">seconds</span>
+          <span className="text-xs text-neutral-500">seconds</span>
         </div>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-neutral-500">
           “3, 2, 1, pull” — the hold clock starts on <em>pull</em>, so the recorded time is the
           effort and not the time it took to get loaded. Set 0 to start on the tap instead.
         </p>
       </div>
 
       <div className="flex gap-2">
-        <button
-          onClick={beepTest}
-          className="flex-1 rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 font-semibold text-slate-200"
-        >
+        <button onClick={beepTest} className={`${btnSecondary} flex-1 py-2`}>
           Test sound
         </button>
         <button
@@ -630,7 +637,7 @@ function SoundSettings({ reloadKey }: { reloadKey: number }) {
             primeSpeech();
             say('Rest done. Set 3 of 5.');
           }}
-          className="flex-1 rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 font-semibold text-slate-200"
+          className={`${btnSecondary} flex-1 py-2`}
         >
           Test voice
         </button>
@@ -680,38 +687,38 @@ function BodyweightLog({ reloadKey }: { reloadKey: number }) {
   }
 
   return (
-    <section className="space-y-2 rounded-xl border border-slate-700 bg-brand-surface p-4">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Bodyweight</h2>
+    <section className="space-y-2 rounded-md bg-surface shadow-edge p-3">
+      <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">Bodyweight</h2>
       {entries === null ? (
-        <p className="text-xs text-slate-500">Loading…</p>
+        <p className="text-xs text-neutral-500">Loading…</p>
       ) : entries.length === 0 ? (
-        <p className="text-sm text-slate-400">
+        <p className="text-[13px] text-neutral-400">
           None recorded. Add one from the home screen — added-load figures are only comparable
           against a known bodyweight (§4E).
         </p>
       ) : (
         <>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-neutral-500">
             Correct a mistyped reading here. Every %BW figure is divided by it.
           </p>
           <ul className="space-y-1.5">
             {entries.map((entry) => (
               <li key={entry.date} className="flex items-center gap-2">
-                <span className="flex-1 font-mono text-xs text-slate-400">{entry.date}</span>
+                <span className="flex-1 text-xs text-neutral-400">{entry.date}</span>
                 <input
                   defaultValue={String(entry.lb)}
                   onBlur={(e) => void correct(entry.date, e.target.value)}
                   inputMode="decimal"
                   aria-label={`Bodyweight on ${entry.date}, pounds`}
-                  className="w-20 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-right text-sm text-slate-100 focus:border-brand-accent focus:outline-none"
+                  className={`${input} w-20 text-right`}
                 />
-                <span className="text-xs text-slate-500">lb</span>
+                <span className="text-xs text-neutral-500">lb</span>
                 <button
                   onClick={() => void remove(entry.date)}
                   aria-label={`Delete bodyweight recorded on ${entry.date}`}
-                  className="rounded-md px-2 py-1 text-slate-500 hover:text-red-400"
+                  className="rounded-md px-2 py-1 text-neutral-600 hover:text-warn"
                 >
-                  ✕
+                  <Icon name="x" className="text-[13px]" />
                 </button>
               </li>
             ))}
@@ -729,29 +736,28 @@ function PersistenceStatus() {
     void (async () => setState(await checkPersistence()))();
   }, []);
 
-  const tone =
-    state === 'persisted'
-      ? 'text-emerald-300'
-      : state === 'denied'
-        ? 'text-amber-300'
-        : 'text-slate-400';
+  // A granted request is the accent; anything else is neutral. Not a warning:
+  // the browser saying no is a normal answer, and D5's export is the real backup
+  // either way — colouring it as a problem would be the app worrying on the
+  // owner's behalf about something they cannot change.
+  const tone = state === 'persisted' ? 'text-accent-300' : 'text-neutral-400';
 
   return (
-    <section className="rounded-xl border border-slate-700 bg-brand-surface p-4">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        Storage durability
-      </h2>
-      {state === null ? (
-        <p className="mt-2 text-sm text-slate-400">Checking…</p>
-      ) : (
-        <>
-          <p className={`mt-2 text-sm font-semibold ${tone}`}>
+    <ExpandableRow
+      icon="database"
+      title="Storage durability"
+      detail={
+        state === null ? (
+          'Checking…'
+        ) : (
+          <span className={tone}>
             {state === 'persisted' ? 'Persistent storage granted' : `Persistent storage: ${state}`}
-          </p>
-          <p className="mt-1 text-sm text-slate-400">{PERSISTENCE_COPY[state]}</p>
-        </>
-      )}
-    </section>
+          </span>
+        )
+      }
+    >
+      <p>{state === null ? 'Checking…' : PERSISTENCE_COPY[state]}</p>
+    </ExpandableRow>
   );
 }
 

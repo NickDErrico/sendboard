@@ -1,4 +1,5 @@
 import { RPE_OPTIONS, stepLoad } from '../lib/gear';
+import { Icon } from './ui';
 
 /**
  * The one-tap entry panel for a set value (T18).
@@ -16,12 +17,11 @@ import { RPE_OPTIONS, stepLoad } from '../lib/gear';
 
 export type PickerField = 'edgeMm' | 'addedLb' | 'rpe';
 
-const chipClass =
-  'rounded-md border px-2.5 py-1 text-[13px] font-medium tabular-nums';
-const activeChip = 'border-brand-accent bg-brand-accent/15 text-brand-accent';
-const idleChip = 'border-slate-700 text-slate-300';
+const chipClass = 'rounded-sm border px-2.5 py-1 text-[13px] font-medium tabular-nums transition-colors';
+const activeChip = 'border-accent bg-accent/[.15] text-accent';
+const idleChip = 'border-neutral-800 text-neutral-300 hover:border-neutral-700';
 const typedInputClass =
-  'w-16 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-center text-[13px] text-slate-100 placeholder:text-slate-600 focus:border-brand-accent focus:outline-none';
+  'w-16 rounded-sm border border-neutral-800 bg-transparent px-2 py-1 text-center text-[13px] text-ink caret-accent placeholder:text-neutral-700 focus:border-accent focus:outline-none';
 
 export function SetValuePicker({
   field,
@@ -63,7 +63,7 @@ export function SetValuePicker({
   }
 
   return (
-    <div className="mt-1 flex flex-wrap items-center gap-1 pl-5">
+    <div className="flex flex-wrap items-center gap-1 px-2.5 pb-2 pl-[38px]">
       {field === 'edgeMm' &&
         edges.map((mm) => {
           const isStandard = mm === standardEdgeMm;
@@ -77,9 +77,7 @@ export function SetValuePicker({
             >
               {mm}
               {isStandard && (
-                <span aria-hidden className="ml-0.5 text-[10px] text-brand-accent">
-                  ★
-                </span>
+                <Icon name="star" weight="fill" className="ml-0.5 text-[9px] text-accent" />
               )}
             </button>
           );
@@ -101,7 +99,7 @@ export function SetValuePicker({
           >
             +{step}
           </button>
-          <span className="px-1 text-[11px] text-slate-500">
+          <span className="px-1 text-[11px] text-neutral-500">
             {value === undefined ? 'not recorded' : value === 0 ? 'BW' : `+${value}lb`}
           </span>
         </>
@@ -136,7 +134,7 @@ export function SetValuePicker({
       <button
         onClick={onClose}
         aria-label="Close picker"
-        className="rounded-md px-2 py-1 text-[13px] text-slate-500"
+        className="rounded-sm px-2 py-1 text-[13px] text-neutral-500 hover:text-neutral-300"
       >
         Done
       </button>

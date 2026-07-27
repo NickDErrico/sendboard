@@ -28,25 +28,25 @@ export function PrescriptionVariants({
   const body = compact ? 'text-sm' : 'text-sm leading-relaxed';
 
   if (live === null && others.length === 0) {
-    return <p className={`break-words text-slate-200 ${body}`}>{exercise.prescription}</p>;
+    return <p className={`break-words text-neutral-200 ${body}`}>{exercise.prescription}</p>;
   }
 
   return (
     <div className="space-y-2">
       {live && (
-        <div className="rounded-lg border border-brand-accent/50 bg-brand-accent/5 p-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-brand-accent">
+        <div className="rounded-lg border border-accent/50 bg-accent/[.08] p-2">
+          <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-accent">
             This week · {live.label}
           </p>
-          <p className={`mt-1 break-words text-slate-100 ${body}`}>{live.text}</p>
+          <p className={`mt-1 break-words text-ink ${body}`}>{live.text}</p>
         </div>
       )}
       {others.map((variant) => (
-        <div key={variant.label} className="rounded-lg border border-slate-700 p-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <div key={variant.label} className="rounded-lg border border-neutral-800 p-2">
+          <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">
             {variant.label}
           </p>
-          <p className={`mt-1 break-words text-slate-400 ${body}`}>{variant.text}</p>
+          <p className={`mt-1 break-words text-neutral-400 ${body}`}>{variant.text}</p>
         </div>
       ))}
       {/* D41's honesty note. `holdSeconds` and `prescribedSets` describe the peak
@@ -55,7 +55,7 @@ export function PrescriptionVariants({
           rep-structured variant off as needing its own decision, so the app says
           which variant the timing follows rather than switching it silently. */}
       {timedElsewhere && (
-        <p className="text-xs leading-snug text-slate-500">
+        <p className="text-xs leading-snug text-neutral-500">
           The timer and set count follow {timedElsewhere.label} (§4B) — the reps in this week’s
           variant are yours to count.
         </p>

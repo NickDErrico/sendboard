@@ -4,6 +4,8 @@ import { createLog } from '../lib/session';
 import { getAllExercises, getAllLogs, saveLog } from '../lib/storage';
 import { go } from '../lib/routes';
 import { ExerciseDetail } from './ExerciseDetail';
+import { Icon, btnPrimary } from '../components/ui';
+import { RowRule, readList } from '../components/ReadList';
 
 // T9 (AC4/AC5): the `#/routine/:id` screen. Replaces T6's inline start block in
 // App.tsx, which showed only an exercise count — the owner needs to see what a
@@ -39,60 +41,62 @@ export function RoutineDetail({ routine }: { routine: Routine }) {
   }
 
   return (
-    <div className="mx-auto max-w-md p-4 pb-28">
+    <div className="mx-auto max-w-md px-4 pb-28 pt-[54px]">
       <header className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-xl font-bold tracking-tight text-slate-100">{routine.name}</h1>
-          <p className="mt-0.5 text-xs text-slate-500">{routine.exerciseIds.length} exercises</p>
+          <h1 className="text-[15px] font-medium tracking-[-0.01em]">{routine.name}</h1>
+          <p className="mt-0.5 text-xs text-neutral-500">{routine.exerciseIds.length} exercises</p>
         </div>
         <button
           onClick={() => go({ name: 'home' })}
-          className="shrink-0 rounded px-1 py-1 text-sm text-slate-400 hover:text-slate-200"
+          className="shrink-0 rounded-md px-1 py-1 text-[13px] font-medium text-accent hover:bg-accent/10"
         >
           Home
         </button>
       </header>
 
       {inProgress && (
-        <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
-          <p className="text-sm font-semibold text-amber-200">You have an unfinished session</p>
-          <p className="mt-0.5 text-xs text-amber-100/80">
+        <div className="mb-4 rounded-md border border-accent/40 bg-accent/[.08] p-4">
+          <p className="text-[13px] font-medium text-accent-200">You have an unfinished session</p>
+          <p className="mt-0.5 text-xs text-accent-200/80">
             Started {new Date(inProgress.startedAt).toLocaleString()}. Finish or discard it before
             starting another.
           </p>
           <button
             onClick={() => go({ name: 'session' })}
-            className="mt-3 rounded-lg bg-brand-accent px-4 py-2 text-sm font-semibold text-brand-bg"
+            className={`${btnPrimary} mt-3 py-2`}
           >
             Resume session
           </button>
         </div>
       )}
 
-      <ol className="space-y-2">
+      {/* The routine's contents, as one card of rows: a preview is a thing you
+          read before you start, and a card per exercise made eleven surfaces out
+          of one list. */}
+      <ol className={`${readList} mb-4`}>
         {routine.exerciseIds.map((exId, i) => {
           const exercise = exercisesById.get(exId);
           return (
             <li key={exId}>
+              {i > 0 && <RowRule />}
               <button
                 onClick={() => exercise && setDetailId(exId)}
                 disabled={!exercise}
-                className="flex w-full items-center gap-3 rounded-xl border border-slate-700 bg-brand-surface p-3 text-left disabled:opacity-60"
+                className="flex w-full items-center gap-3 rounded-md px-1 py-3 text-left transition-colors hover:bg-white/5 disabled:opacity-60 disabled:hover:bg-transparent"
               >
-                <span className="w-4 shrink-0 text-xs text-slate-500">{i + 1}</span>
+                <span className="w-4 shrink-0 text-[11px] tabular-nums text-neutral-600">{i + 1}</span>
                 <span className="min-w-0 flex-1">
                   {/* Missing catalog entry → raw id, never crash (T2 edge case). */}
-                  <span className="block font-medium text-slate-100">{exercise?.name ?? exId}</span>
+                  <span className="block text-[13px] font-medium">{exercise?.name ?? exId}</span>
                   {exercise && (
-                    <span className="mt-0.5 block break-words text-xs leading-relaxed text-slate-400">
+                    <span className="mt-0.5 block break-words text-[11px] leading-snug text-neutral-500">
                       {exercise.summary}
                     </span>
                   )}
                 </span>
                 {exercise && (
-                  <span aria-hidden className="shrink-0 text-slate-600">
-                    ›
-                  </span>
+                  <Icon name="caret-right" className="shrink-0 text-[13px] text-neutral-600" />
                 )}
               </button>
             </li>
@@ -103,7 +107,7 @@ export function RoutineDetail({ routine }: { routine: Routine }) {
       {!inProgress && (
         <button
           onClick={() => void start()}
-          className="mt-5 w-full rounded-lg bg-brand-accent px-4 py-3 font-semibold text-brand-bg"
+          className={`${btnPrimary} w-full py-3`}
         >
           Start {routine.name}
         </button>

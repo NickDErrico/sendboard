@@ -4,6 +4,7 @@ import { ExerciseProgress } from '../components/ExerciseProgress';
 import { PlanRefLinks } from '../components/PlanRefLinks';
 import { PrescriptionVariants } from '../components/PrescriptionVariants';
 import { useBlockWeek } from '../lib/useBlockWeek';
+import { Icon } from '../components/ui';
 
 // Only overcoming/yielding are required to be labelled (AC6); dynamic is shown
 // too as useful context, 'none' is omitted.
@@ -33,19 +34,19 @@ export function ExerciseDetail({
   const blockWeek = useBlockWeek();
 
   return (
-    <div className="mx-auto max-w-md p-4 pb-24">
+    <div className="mx-auto max-w-md px-4 pb-24 pt-[54px]">
       <button
         onClick={onBack}
-        className="mb-4 -ml-1 flex items-center gap-1 rounded px-1 py-1 text-sm text-slate-400 hover:text-slate-200"
+        className="mb-4 -ml-1 flex items-center gap-1 rounded-md px-1 py-1 text-[13px] font-medium text-accent hover:bg-accent/10"
       >
-        <span aria-hidden>←</span> Back
+        <Icon name="caret-left" className="text-[13px]" />Back
       </button>
 
-      <h1 className="text-xl font-bold tracking-tight text-slate-100">{exercise.name}</h1>
+      <h1 className="text-[15px] font-medium tracking-[-0.01em]">{exercise.name}</h1>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {isoLabel && (
-          <span className="inline-flex items-center rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-300">
+          <span className="inline-flex items-center rounded-md border border-accent/40 bg-accent/[.08] px-2 py-0.5 text-xs font-medium text-accent-300">
             {isoLabel}
           </span>
         )}
@@ -68,15 +69,15 @@ export function ExerciseDetail({
           the other stays fully readable here — the detail screen is precisely
           where D25 requires the whole plan to remain legible. */}
       <section className="mt-5">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Prescription</h2>
+        <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">Prescription</h2>
         <div className="mt-1">
           <PrescriptionVariants exercise={exercise} week={blockWeek} />
         </div>
       </section>
 
       <section className="mt-5">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">How to</h2>
-        <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-200 marker:text-slate-500">
+        <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">How to</h2>
+        <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-neutral-200 marker:text-neutral-500">
           {exercise.howTo.map((step, i) => (
             <li key={i} className="break-words pl-1">
               {step}
@@ -87,8 +88,8 @@ export function ExerciseDetail({
 
       {exercise.cues.length > 0 && (
         <section className="mt-5">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cues</h2>
-          <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-slate-300 marker:text-slate-600">
+          <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">Cues</h2>
+          <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-neutral-300 marker:text-neutral-600">
             {exercise.cues.map((cue, i) => (
               <li key={i} className="break-words pl-1">
                 {cue}
@@ -100,11 +101,11 @@ export function ExerciseDetail({
 
       {/* AC4 / edge case: rendered as a distinct warning block only when non-empty. */}
       {exercise.safetyNotes.length > 0 && (
-        <section className="mt-6 rounded-lg border-l-4 border-red-500 bg-red-500/10 p-3">
-          <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-red-300">
+        <section className="mt-6 rounded-lg border-l-4 border-warn bg-warn/10 p-3">
+          <h2 className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-warn">
             <span aria-hidden>⚠</span> Safety
           </h2>
-          <ul className="mt-2 space-y-1.5 text-sm leading-relaxed text-red-100">
+          <ul className="mt-2 space-y-1.5 text-sm leading-relaxed text-warn">
             {exercise.safetyNotes.map((note, i) => (
               <li key={i} className="break-words">
                 {note}

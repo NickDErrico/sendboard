@@ -47,9 +47,9 @@ end of each block regardless.
 ## Timing a session
 
 Exercises the training plan gives a duration for carry a **Start hold** control during
-a session. The hold counts *up* with its target range banded — 7–10s reads amber below
-7s and green inside the range — and **ends itself at the top of the range**, sounding a
-long low tone so you can hang with your eyes shut. It then starts the prescribed rest
+a session. The hold counts *up* with its target range banded — 7–10s reads grey while
+it is building and lights to the accent inside the range — and **ends itself at the top
+of the range**, sounding a long low tone so you can hang with your eyes shut. It then starts the prescribed rest
 in the same transition and offers to log the duration as a set, with last session's
 load carried forward. Stopping early is always available and records what actually
 elapsed; only the auto-stop records the prescribed figure.
@@ -78,11 +78,16 @@ hold time after dropping to a smaller edge is progress, not a setback, and one
 continuous line would draw it as the latter. Edge gets its own view where a smaller
 edge sits higher.
 
+Each edge is drawn in its own step of the accent ramp *and* its own stroke
+pattern, keyed to the edge itself — so a rung looks the same everywhere it
+appears, including when you come back up to it after a spell on something
+smaller, and the labels under the axis work as a legend.
+
 The chart reports and never judges: no trendline, no projection, no personal-best
 badge, no improving-or-declining verdict. §4E's interpretation rubric is yours to
 apply, and §7 treats a falling line as a reason to deload.
 
-A point drawn with a **red ring** is a set that ended on pain or a form breakdown —
+A point drawn with an **amber ring** is a set that ended on pain or a form breakdown —
 see below. It is marked, never excluded: dropping the low points would erase the only
 thing that makes a declining line visible.
 
@@ -123,6 +128,32 @@ in history. The plan's own stop conditions (§7, §8) are still yours to apply.
 
 Vite · React · TypeScript · Tailwind CSS · `vite-plugin-pwa` · `idb`.
 Deployed to GitHub Pages from `main` via GitHub Actions.
+
+The interface follows the **Nocturne** design system: a dark blue-grey ground, Inter
+(headings never past weight 500), 8px radii, and a single blurple accent used as a
+line, a border and a glow — never as a flood. Status is carried by tonal weight on
+that one hue rather than by adding colours, which is why the hold band, a completed
+exercise and a finished rest are all steps on the same ramp. The one exception is
+`#f6a06b`, reserved for tissue: a set that ended on pain or a form breakdown, and the
+plan's own safety notes. Icons are [Phosphor](https://phosphoricons.com)
+(`@phosphor-icons/web`, regular + fill). The recipes live in
+[`src/components/ui.tsx`](src/components/ui.tsx) and the tokens in
+[`tailwind.config.js`](tailwind.config.js).
+
+**Both typefaces are self-hosted and precached**, so an offline launch renders in
+Inter with real icons rather than falling back to the system face and a grid of
+tofu boxes. Neither ships whole: two build-time plugins in
+[`vite.config.ts`](vite.config.ts) trim Inter to its Latin subset and Phosphor to
+woff2, which takes ~9.2 MB of vendored font files down to the 327 KB actually
+served. Nothing is fetched from a CDN at runtime.
+
+One structural rule is worth knowing before adding a screen: **a card is a
+promise that there is something to do.** Where three or more things you merely
+*read* would sit as sibling cards, they collapse into one card of rows with
+chevrons — [`src/components/ReadList.tsx`](src/components/ReadList.tsx). That is
+why the exercise catalog, the plan's contents, a routine's preview, Settings'
+build-and-storage preamble and Home's tension/§4E/bodyweight block are all lists
+rather than stacks of cards.
 
 ## Develop
 
