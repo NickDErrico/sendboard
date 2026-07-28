@@ -72,6 +72,32 @@ export interface Exercise {
    * Absent on every other entry, which therefore renders exactly as before.
    */
   variants?: PrescriptionVariant[];
+  /**
+   * The single grip this exercise is performed in (T29).
+   *
+   * Present where a section names one — §4B's half-crimp and its open-hand
+   * rotation, §4C's two max hangs, §4E's tests. Until now the grip lived only in
+   * the entry's *name*, which meant no surface could show it beside a running set
+   * and nothing could assert it. Absent on every exercise the plan gives no grip
+   * for, which is most of them.
+   *
+   * Mutually exclusive with `gripSequence` in practice, not in the type: an
+   * exercise has one grip or a rotation through several, never both.
+   */
+  grip?: string;
+  /**
+   * An ordered grip rotation, one block per position, for exercises the plan
+   * prescribes as a *sequence* rather than a single grip (T29, §10A).
+   *
+   * The abrahangs are the only entry that carries one. Each block's `rounds` is
+   * a count of this exercise's own cadence — 6 rounds of `holdSeconds` /
+   * `restSeconds`, not 6 sets of anything else — so the sequence and the timer
+   * cannot disagree about how long the session is. Summing `rounds` against the
+   * cadence is how §10A's "20 hangs, 10:00" is checked rather than asserted.
+   *
+   * Declaration order is the order they are run (§10A). Absent everywhere else.
+   */
+  gripSequence?: GripBlock[];
   cues: string[]; // form/technique reminders
   safetyNotes: string[]; // may be empty; rendered visually distinct
   /**
@@ -111,6 +137,20 @@ export interface Routine {
  * because a block that runs long is a training decision (§4F) and a protocol does
  * not expire.
  */
+/**
+ * One position in a grip rotation (T29, §10A).
+ *
+ * `grip` is the name as the addendum writes it and `digits` is the addendum's own
+ * parenthetical — split so a board-legible surface can show the name large and
+ * the fingers small, never so the app can reword either (D6).
+ */
+export interface GripBlock {
+  grip: string; // "Front-3 open"
+  digits?: string; // "digits 2–4" — only where the name alone is ambiguous
+  /** Rounds of the exercise's own hold/rest cadence spent in this grip. */
+  rounds: number;
+}
+
 export interface PrescriptionVariant {
   weeks: [min: number, max: number];
   label: string; // "Weeks 1–4 · tendon variant"

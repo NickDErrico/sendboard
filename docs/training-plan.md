@@ -230,3 +230,35 @@ Honest framing: the prehab and antagonist items in the table above are the highe
 ## 9. Expected Timeline
 
 Tendon and neural adaptations from a protocol like this typically show measurable strength gains in **4–8 weeks**, with peak-force gains in the literature ranging up to ~20–28% over 8 weeks for well-executed max-hang-style protocols. Translating that into sending V6 consistently usually takes a bit longer, since it also depends on the technique gains from your climbing days — expect to see it click somewhere in weeks 6–10 if you stay consistent.
+
+---
+
+## 10. Addenda
+
+Sections 1–9 are the original plan. Everything below was added afterwards to fill in detail the plan referred to but never wrote down. Each addendum says where its numbers came from, and where one contradicts an earlier section it says so explicitly — the earlier text is left standing rather than quietly edited, so the disagreement stays visible.
+
+### A. Abrahang grip rotation
+
+§8 prescribes Abrahangs as "10s on / 50s off, ~10 minutes" and cites Gilmore et al. (2024) as the evidence. Those are two different routines. The 10s/50s cadence is Emil Abrahamsson's original 30-day experiment; the routine Gilmore et al. actually measured is the Crimpd app's version, which runs **10s on / 20s off** and reaches the same ten minutes with twice as many hangs across six grip positions. §8's own reasoning — the ~10 minute collagen-response window and the ≥6h spacing — is Baar's and applies to both.
+
+**This addendum adopts the Crimpd/Gilmore version, and supersedes §8's 10s/50s figure.** The rest of §8's Abrahang guidance is unchanged: light intensity, feet down, twice daily at least six hours apart, a warm-up rather than a daily habit.
+
+- Edge: **18–22mm**, the same one throughout
+- Hang: **10 seconds**, rest **20 seconds**
+- Intensity: feet stay on the floor at all times; load until you feel only a small strain in the forearms — roughly **40% of max**, nowhere near a limit effort
+- Total: **20 hangs, 10:00**
+
+| # | Grip | Hangs |
+|---|---|---|
+| 1 | 4-finger open | 6 |
+| 2 | Front-3 open (digits 2–4) | 6 |
+| 3 | Front-2 open (digits 2–3) | 2 |
+| 4 | Middle-2 open (digits 3–4) | 2 |
+| 5 | Front-2 half-crimp | 2 |
+| 6 | Middle-2 half-crimp | 2 |
+
+Run the grips in that order. The two-finger positions come last and are the ones to drop first: they are the highest strain per unit of load in the whole routine, and this is a warm-up.
+
+### B. Grip in the finger warm-up
+
+§4A ends the warm-up with "2–3 sub-maximal hangs on your training edge" and names no grip. Take those hangs in **the grips that session trains** — half-crimp and open-hand, per §4B and §4C. Warming up in a grip you are not about to load, and not warming up one you are, is the gap this closes. Nothing else about §4A changes: it is still 10–15 minutes, still jugs first, still no countdown on any stage.

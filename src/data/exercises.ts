@@ -2,7 +2,10 @@ import type { Exercise } from '../types';
 
 // The exercise catalog. Code-seeded per D6: edit this file and redeploy to change
 // it — there is no in-app editor. Every field is sourced from docs/training-plan.md;
-// do not invent content. gtgEligible is true for exactly six general movements
+// do not invent content. That includes §10, the addenda: content the plan referred
+// to but never wrote down goes *into the document first*, with its source and any
+// section it supersedes stated there, and only then into this file. A grip, a
+// cadence or a set count that exists only here is the failure mode D6 names. gtgEligible is true for exactly six general movements
 // (D13); no Day 1 max protocol is eligible (plan §8). Per D14, no summary/cue
 // claims GtG strengthens tendons — that is the isometrics protocol's job (plan §4B).
 export const EXERCISES: Exercise[] = [
@@ -22,11 +25,12 @@ export const EXERCISES: Exercise[] = [
     prescription: '10–15 min, building to 2–3 sub-maximal hangs on your training edge',
     cues: [
       'Do not rush this — cold pulleys are the number-one finger-injury cause.',
+      'Take the final sub-maximal hangs in the grips you are about to train — half-crimp and open-hand (§10B).',
       'Stop if a finger feels sharp rather than merely warming up.',
     ],
     safetyNotes: ['Warm fingers thoroughly before any hangboard work (plan §7).'],
     gtgEligible: false,
-    planRefs: ['4A'], // T25/D42
+    planRefs: ['4A', '10B'], // T25/D42
   },
   {
     id: 'abrahangs-no-hang',
@@ -37,20 +41,36 @@ export const EXERCISES: Exercise[] = [
     summary: 'Light no-hangs with feet on the ground — a collagen-priming warm-up, not a max effort.',
     howTo: [
       'Set up a no-hang device with your feet on the ground taking most of your weight.',
-      'Load the fingers lightly — nowhere near maximal.',
-      'Hold for 10 seconds, then rest for 50 seconds.',
-      'Repeat for about 10 minutes.',
+      'Load the fingers lightly — a small strain in the forearms, roughly 40% of max.',
+      'Hold for 10 seconds, then rest for 20 seconds.',
+      'Work through the six grips in order — 20 hangs, about 10 minutes.',
     ],
-    prescription: '10s on / 50s off, ~10 min at light intensity; optionally twice daily, ≥6h apart',
+    // T29: §10A's cadence, which supersedes §8's 10s/50s — see that addendum for
+    // why the two disagree. The twice-daily / ≥6h spacing is still §8's.
+    prescription:
+      '10s on / 20s off, 20 hangs (~10 min) across six grips @ ~40% max on an 18–22mm edge; optionally twice daily, ≥6h apart',
     holdSeconds: [10, 10],
-    restSeconds: 50,
+    restSeconds: 20,
+    // T29: §10A's table, in its order. `rounds` sums to 20, which against the
+    // 10s + 20s cadence above is the addendum's ten minutes — asserted in
+    // warmup.test.ts rather than trusted.
+    gripSequence: [
+      { grip: '4-finger open', rounds: 6 },
+      { grip: 'Front-3 open', digits: 'digits 2–4', rounds: 6 },
+      { grip: 'Front-2 open', digits: 'digits 2–3', rounds: 2 },
+      { grip: 'Middle-2 open', digits: 'digits 3–4', rounds: 2 },
+      { grip: 'Front-2 half-crimp', digits: 'digits 2–3', rounds: 2 },
+      { grip: 'Middle-2 half-crimp', digits: 'digits 3–4', rounds: 2 },
+    ],
     cues: [
       'Keep it genuinely easy — this primes connective tissue, it is not a strength set.',
+      'Feet stay on the floor the whole way through; load until you feel a small strain, no more.',
+      'The two-finger grips come last and are the first to drop — highest strain per unit of load.',
       'Use it as a warm-up before Day 1 and climbing days, not as a daily habit.',
     ],
     safetyNotes: [],
     gtgEligible: false,
-    planRefs: ['4A', '8'], // T25/D42
+    planRefs: ['4A', '8', '10A'], // T25/D42
   },
   {
     id: 'bodyweight-pullups',
@@ -117,6 +137,9 @@ export const EXERCISES: Exercise[] = [
         timed: true,
       },
     ],
+    // §4B: "Grip: half-crimp (rotate in open-hand every other session…)". The
+    // rotation is the open-hand entry beside this one, in the same routine.
+    grip: 'Half-crimp',
     cues: [
       'Progress by feel, not by adding weight — this is neural recruitment and rate of force.',
       'Keep your feet planted; nothing should actually move.',
@@ -162,6 +185,7 @@ export const EXERCISES: Exercise[] = [
         timed: true,
       },
     ],
+    grip: 'Open-hand', // §4B
     cues: [
       'Rotate to open-hand every other session to protect the A2 pulleys.',
       'Progress by feel, not by adding weight.',
@@ -190,6 +214,7 @@ export const EXERCISES: Exercise[] = [
     // D20/D22: §4F progresses this by load. Edge is declared because it is the
     // condition the other two are measured under, not a peer metric.
     metrics: ['holdSec', 'addedLb', 'edgeMm'],
+    grip: 'Half-crimp', // §4C: "Grip: half-crimp, alternate open-hand"
     cues: [
       'Should be hard by rep 3, not failing before then.',
       'Keep one standard edge (14–20mm) for the whole block so retests compare.',
@@ -219,6 +244,7 @@ export const EXERCISES: Exercise[] = [
     holdSeconds: [7, 10],
     restSeconds: 180,
     metrics: ['holdSec', 'addedLb', 'edgeMm'],
+    grip: 'Open-hand', // §4C
     cues: [
       'Alternate with the half-crimp version session to session.',
       'Keep the same standard edge all block for valid retests.',
@@ -547,6 +573,9 @@ export const EXERCISES: Exercise[] = [
     // No holdSec: the hold is fixed at 7s by the protocol, so the only things that
     // move between week 1 and week 8 are the load and the edge it was held on.
     metrics: ['addedLb', 'edgeMm'],
+    // §4E: "same edge, same grip". The grip is a *condition* of the comparison
+    // here, like the edge — which is why it is declared rather than left in the name.
+    grip: 'Half-crimp',
     cues: [
       'Identical conditions both times — same edge, same grip, same time of day, same warm-up — or the comparison is meaningless (§4E).',
       'Record bodyweight the same day: added weight alone is half a measurement (§4E).',
@@ -577,6 +606,7 @@ export const EXERCISES: Exercise[] = [
     holdSeconds: [7, 7],
     restSeconds: 180,
     metrics: ['addedLb', 'edgeMm'],
+    grip: 'Open-hand', // §4E
     cues: [
       'Same edge as the half-crimp test, and the same edge again at week 8 (§4E).',
     ],

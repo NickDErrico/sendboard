@@ -1,4 +1,4 @@
-import type { Exercise } from '../types';
+import type { Exercise, GripBlock } from '../types';
 import { holdSpecOf, isRestComplete, restMsOf, type TimerState } from './timer';
 
 /**
@@ -38,6 +38,12 @@ export interface CyclePlan {
   holdSec: number;
   restSec: number;
   prescription: string;
+  /**
+   * The grip rotation the rounds run through (T29, §10A), or `[]` where the entry
+   * declares none — a cadence with no prescribed grips repeats indefinitely
+   * exactly as it did before, which is what keeps this additive.
+   */
+  blocks: GripBlock[];
 }
 
 export type WarmupPlan = StagedPlan | CyclePlan;
@@ -64,6 +70,7 @@ export function warmupPlanOf(exercise: Exercise | undefined): WarmupPlan | null 
       holdSec: hold.max,
       restSec: restMs / 1000,
       prescription: exercise.prescription,
+      blocks: exercise.gripSequence ?? [],
     };
   }
 
@@ -140,4 +147,99 @@ export function isCycleStale(state: TimerState, now: number, armed: boolean): bo
 /** "round 3" — a count of what has been run, never a target to reach (D23). */
 export function roundLabel(round: number): string {
   return `round ${Math.max(1, Math.floor(round))}`;
+}
+
+// ─── Grip rotations (T29) ────────────────────────────────────────────────────
+
+/**
+ * Where a round falls in the grip sequence (§10A).
+ *
+ * The one place in this module where a warm-up *does* have a count to reach, and
+ * the exception is the addendum's, not the app's: §10A prescribes twenty hangs in
+ * a stated order, so "hang 2 of 6, front-3 open" is quoting a prescription rather
+ * than inventing a quota. D23 is untouched — nothing is blocked at the end of the
+ * sequence and nothing is graded against it; the owner can stop anywhere and the
+ * only thing that changes is which grip the screen names.
+ */
+export interface GripPosition {
+  block: GripBlock;
+  /** 0-based index of the block in the sequence. */
+  blockIndex: number;
+  /** 1-based position within this block: 2 of 6. */
+  roundInBlock: number;
+  /** The grip that follows this block, or null on the last one. */
+  next: GripBlock | null;
+}
+
+/** Rounds the whole sequence asks for; 0 where none is declared. */
+export function totalRounds(blocks: GripBlock[]): number {
+  return blocks.reduce((sum, block) => sum + Math.max(0, Math.floor(block.rounds)), 0);
+}
+
+/**
+ * How long the sequence takes at a given cadence, in seconds.
+ *
+ * Exists so §10A's "20 hangs, 10:00" is *checked* rather than transcribed twice:
+ * the catalog states the grips and the intervals, and the ten minutes is a
+ * consequence of both. A test asserts it; nothing in the UI counts down to it
+ * (D40).
+ */
+export function sequenceDurationSec(plan: CyclePlan): number {
+  return totalRounds(plan.blocks) * (plan.holdSec + plan.restSec);
+}
+
+/**
+ * The grip a 1-based round is taken in, or null when the round falls outside the
+ * sequence — past the end, or on a cycle that declares no grips at all.
+ *
+ * Null is a supported state on both sides: rounds run before the sequence is
+ * declared (a plain cadence) and rounds run after it ends (the owner tapped "more
+ * rounds") are both legitimate, and neither gets a grip name the plan did not
+ * prescribe.
+ */
+export function gripAt(blocks: GripBlock[], round: number): GripPosition | null {
+  const target = Math.floor(round);
+  if (target < 1) return null;
+
+  let seen = 0;
+  for (let i = 0; i < blocks.length; i += 1) {
+    const rounds = Math.max(0, Math.floor(blocks[i].rounds));
+    // A zero-round block is skipped rather than treated as a boundary: it would
+    // otherwise claim the round belonging to the block after it.
+    if (rounds === 0) continue;
+    if (target <= seen + rounds) {
+      return {
+        block: blocks[i],
+        blockIndex: i,
+        roundInBlock: target - seen,
+        next: blocks.slice(i + 1).find((b) => Math.floor(b.rounds) > 0) ?? null,
+      };
+    }
+    seen += rounds;
+  }
+  return null;
+}
+
+/**
+ * True once every prescribed round has been run.
+ *
+ * The cycle stops arming itself here — an auto-repeating cadence that ran past
+ * its own prescription would be the app adding training volume, which is the
+ * thing D39's carve-out is narrow enough to exclude. Resuming is still one tap on
+ * "More rounds", because stopping at twenty is the prescription's decision and
+ * continuing is the owner's (D23).
+ */
+export function isSequenceComplete(blocks: GripBlock[], round: number): boolean {
+  const total = totalRounds(blocks);
+  return total > 0 && Math.floor(round) >= total;
+}
+
+/** "Front-3 open · digits 2–4" — the full name where a surface has room for it. */
+export function formatGrip(block: GripBlock): string {
+  return block.digits ? `${block.grip} · ${block.digits}` : block.grip;
+}
+
+/** "hang 2 of 6" — position within the current grip, which is what §10A counts. */
+export function formatGripRound(position: GripPosition): string {
+  return `hang ${position.roundInBlock} of ${Math.floor(position.block.rounds)}`;
 }

@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
   CYCLE_GRACE_MS,
+  formatGrip,
+  formatGripRound,
   formatRun,
+  gripAt,
   isCycleStale,
   isLastStage,
+  isSequenceComplete,
   nextStage,
   roundLabel,
+  sequenceDurationSec,
   shouldStartNextRound,
+  totalRounds,
   warmupPlanOf,
 } from './warmup';
 import { EXERCISES } from '../data/exercises';
@@ -44,7 +50,18 @@ describe('warmupPlanOf', () => {
 
   it('runs a cadence where the plan states both intervals (AC3)', () => {
     const plan = warmupPlanOf(byId('abrahangs-no-hang'));
-    expect(plan).toMatchObject({ form: 'cycle', holdSec: 10, restSec: 50 });
+    // T29: §10A's cadence, which supersedes §8's 10s/50s — the addendum says so
+    // in the document, and this is where the app agreeing with it is checked.
+    expect(plan).toMatchObject({ form: 'cycle', holdSec: 10, restSec: 20 });
+  });
+
+  it('carries the entry\'s grip rotation onto the plan, or none (T29)', () => {
+    const plan = warmupPlanOf(byId('abrahangs-no-hang'));
+    expect(plan && 'blocks' in plan && plan.blocks).toEqual(byId('abrahangs-no-hang')?.gripSequence);
+    // A cadence with no declared grips is still a cadence — every pre-T29 entry
+    // reaches the same runner and simply shows no grip.
+    const plain = warmupPlanOf({ ...base, holdSeconds: [10, 10], restSeconds: 20 });
+    expect(plain && 'blocks' in plain && plain.blocks).toEqual([]);
   });
 
   it('is offered for warm-ups and for nothing else — the D39 gate', () => {
@@ -146,5 +163,82 @@ describe('the cycle, and the fence around it (D39)', () => {
     // §4A says "~10 min at light intensity" and states no round count, so there
     // is no total for this label to be "of".
     expect(roundLabel(3)).not.toMatch(/of|\/|left|remaining/);
+  });
+});
+
+describe('grip rotations (T29)', () => {
+  const blocks = byId('abrahangs-no-hang')?.gripSequence ?? [];
+
+  it('is §10A\u2019s table, in the addendum\u2019s order', () => {
+    expect(blocks.map((b) => [b.grip, b.rounds])).toEqual([
+      ['4-finger open', 6],
+      ['Front-3 open', 6],
+      ['Front-2 open', 2],
+      ['Middle-2 open', 2],
+      ['Front-2 half-crimp', 2],
+      ['Middle-2 half-crimp', 2],
+    ]);
+  });
+
+  // The one number §10A states that the catalog does *not*: twenty hangs at
+  // 10s + 20s is ten minutes, and the addendum's "20 hangs, 10:00" is only true
+  // if the grips and the cadence agree. Changing either without the other breaks
+  // here rather than on the board.
+  it('reaches the addendum\u2019s ten minutes from the grips and the cadence', () => {
+    const plan = warmupPlanOf(byId('abrahangs-no-hang'));
+    expect(totalRounds(blocks)).toBe(20);
+    expect(plan?.form === 'cycle' && sequenceDurationSec(plan)).toBe(600);
+  });
+
+  it('names the grip a round is taken in, and its position within that grip', () => {
+    expect(gripAt(blocks, 1)).toMatchObject({ blockIndex: 0, roundInBlock: 1 });
+    expect(gripAt(blocks, 6)).toMatchObject({ blockIndex: 0, roundInBlock: 6 });
+    // The boundary: round 7 is the first of the front-3 block, not the seventh
+    // of a six-round one.
+    expect(gripAt(blocks, 7)).toMatchObject({ blockIndex: 1, roundInBlock: 1 });
+    expect(gripAt(blocks, 13)).toMatchObject({ blockIndex: 2, roundInBlock: 1 });
+    expect(gripAt(blocks, 20)).toMatchObject({ blockIndex: 5, roundInBlock: 2 });
+  });
+
+  it('reports what follows, and nothing after the last block', () => {
+    expect(gripAt(blocks, 6)?.next?.grip).toBe('Front-3 open');
+    expect(gripAt(blocks, 20)?.next).toBeNull();
+  });
+
+  it('names no grip outside the sequence', () => {
+    // Past the end: the owner tapped for more rounds, which §10A does not
+    // prescribe a grip for, so the app names none rather than wrapping around.
+    expect(gripAt(blocks, 21)).toBeNull();
+    expect(gripAt(blocks, 0)).toBeNull();
+    expect(gripAt(blocks, -3)).toBeNull();
+    // And on a cadence that declares no rotation at all.
+    expect(gripAt([], 1)).toBeNull();
+  });
+
+  it('skips a zero-round block rather than letting it claim the next round', () => {
+    const withEmpty = [
+      { grip: 'A', rounds: 0 },
+      { grip: 'B', rounds: 2 },
+    ];
+    expect(gripAt(withEmpty, 1)).toMatchObject({ blockIndex: 1, roundInBlock: 1 });
+    expect(totalRounds(withEmpty)).toBe(2);
+  });
+
+  it('completes only at the prescribed total, and never without one', () => {
+    expect(isSequenceComplete(blocks, 19)).toBe(false);
+    expect(isSequenceComplete(blocks, 20)).toBe(true);
+    expect(isSequenceComplete(blocks, 25)).toBe(true);
+    // A cadence with no sequence has no end to reach — it repeats until the
+    // owner stops it, exactly as it did before T29.
+    expect(isSequenceComplete([], 999)).toBe(false);
+  });
+
+  it('formats the grip and the position for the board', () => {
+    expect(formatGrip({ grip: 'Front-3 open', digits: 'digits 2–4', rounds: 6 })).toBe(
+      'Front-3 open · digits 2–4',
+    );
+    expect(formatGrip({ grip: '4-finger open', rounds: 6 })).toBe('4-finger open');
+    const position = gripAt(blocks, 8);
+    expect(position && formatGripRound(position)).toBe('hang 2 of 6');
   });
 });

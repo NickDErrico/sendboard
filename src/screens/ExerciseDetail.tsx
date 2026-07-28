@@ -75,6 +75,44 @@ export function ExerciseDetail({
         </div>
       </section>
 
+      {/* T29: the grip, where the plan names one. Until now it lived only in the
+          entry's title, which meant "Max Hang — Half-Crimp" carried a training
+          variable in a string nothing could read. Renders nothing for the
+          exercises the plan gives no grip for, which is most of them. */}
+      {(exercise.grip || exercise.gripSequence) && (
+        <section className="mt-5">
+          <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">
+            {exercise.gripSequence ? 'Grip sequence' : 'Grip'}
+          </h2>
+          {exercise.grip && <p className="mt-1 text-sm text-neutral-200">{exercise.grip}</p>}
+          {exercise.gripSequence && (
+            <ol className="mt-2 space-y-1.5">
+              {exercise.gripSequence.map((block, i) => (
+                <li
+                  key={`${block.grip}-${i}`}
+                  className="flex items-baseline justify-between gap-3 text-sm text-neutral-200"
+                >
+                  {/* No ordinal: the first grip is called "4-finger open", and a
+                      "1" beside it reads as part of the name. Declaration order
+                      is the running order (§10A) and the list shows it. */}
+                  <span className="min-w-0">
+                    {block.grip}
+                    {block.digits && (
+                      <span className="text-[13px] text-neutral-500"> · {block.digits}</span>
+                    )}
+                  </span>
+                  {/* "hangs", not "sets": a warm-up round logs nothing, and
+                      calling it a set would imply a SetEntry that never exists. */}
+                  <span className="shrink-0 tabular-nums text-neutral-500">
+                    ×{block.rounds}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      )}
+
       <section className="mt-5">
         <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-500">How to</h2>
         <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-neutral-200 marker:text-neutral-500">
