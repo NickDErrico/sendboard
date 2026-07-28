@@ -2456,3 +2456,22 @@ The final task in the v1.8 backlog, and the one with the least new derivation in
 **Net effect on scope:** one task, one decision, one new pure module, one new screen, one new route, one new entry point, and one shared floor helper amending T26 and T27. No new dependencies, no type change, no catalog change, no stored field, no `DB_VERSION` or `BACKUP_SCHEMA_VERSION` movement, and no reversal of D2a, D5, D6, D15, D18, D22, D23, D25, D29, D42, D43 or D44.
 
 **Wave 3 is complete, and with it the v1.8 backlog apart from T17.** T14–T16 (capture), T18–T21 (ergonomics), T22–T25 (dead time) and T26–T28 (insight) are all built. **T17** — symptom check and plan-cited stop-signal card — remains deferred within Wave 1 on the owner's own "I don't care about T17 that much", and nothing in Wave 3 produced a reason to revisit that. The app now holds four decisions whose entire job is to keep it from grading its owner — D23, D43, D44, D45 — and each of them has a shipped surface enforcing it.
+
+---
+
+**2026-07-27 — T30 built: the rest ends with a countdown. Owner's request, no new decision, and the whole build is one pure function plus a tone.**
+
+The rest cue fires at the instant the owner is meant to already be *on* the board — chalked, hands on the edge — which is a second too late to start walking back to it. T30 gives back the last five seconds: `restCountdownSecondsLeft(state, now)` returns 5, 4, 3, 2, 1 and 0 everywhere else, each second gets `beepRestCountTick`, and the three surfaces that render a rest read it.
+
+| Choice | Why |
+|---|---|
+| A derived reading, not an armed timer | D18, unchanged: `ceil(restRemainingMs / 1000)` inside the window and 0 outside it, so a rest backgrounded through its own countdown comes back on the second the clock says and there is nothing to cancel. The `+30s` case is the one that would have bitten — extending moves `restMs` and not `startedAt`, so the cue keys carry the length as well as the start, and an extend re-arms the whole window. Exactly the bug T22 shipped in the deck, guarded by a test this time rather than by a browser. |
+| The tick is lower than the count-in's | D34's channel split applied to two sounds that are both ticks. 350 Hz against `beepCountTick`'s 440: from the floor, with the phone face down, pitch is the only thing separating "the hold clock is about to start" from "the rest is about to end". |
+| The digits are not spoken; one heads-up is | `say` cancels whatever is still in the mouth, so a spoken "one" would be cut off mid-word by `restDonePhrase` a second later — and that phrase carries the set number, which is the part worth hearing. So: `restReadyPhrase` once at the top of the window ("5 seconds. Get ready."), ticks for the rest, and the seconds belong to the tone. |
+| Zero belongs to the rest cue | The countdown means *walk back*; `beepRestEnd` means *pull*. Neither fires on the other's second, which is asserted rather than assumed. |
+| A rest no longer than the countdown gets none | It would be countdown end to end, which reports nothing. This is what keeps a short warm-up cycle rest quiet — and §10A's 20s cadence, landing in the same working tree as this task, is the reason that guard is written rather than argued. |
+| The bar keeps its card; focus mode drops its mm:ss | Five seconds is not long enough to be worth moving the buttons under a reaching hand, so the timer bar changes colour and its header only. Focus mode has room and takes the count-in's shape instead: a bare digit under the word *get ready*, because "0:04" and "0:44" are one glance apart from the board and a lone 4 is not. The warm-up runner gets it too, where it matters most — a cycle starts its own next round (D39), so these are the seconds in which hands go back on the device. |
+
+**Net effect on scope:** no new decision, no new module, no new screen, no new route, no type change, no catalog change, no stored field, and no `DB_VERSION` or `BACKUP_SCHEMA_VERSION` movement. One constant, one reading, one tone, one phrase, three views.
+
+**Verified in a browser** on a driven clock rather than by waiting out a 3 minute rest: the timer bar reads *next · set 1 of 5* at 0:06 and *get ready · set 1 of 5* in accent-300 from 0:05, and focus mode steps 0:06 → 5 → 4 → 1 → *rest complete — go*. The boundary is the assertion — nothing at six, everything at five.

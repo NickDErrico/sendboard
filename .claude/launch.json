@@ -132,6 +132,19 @@
       "port": 5200
     },
     {
+      "name": "dev-t30",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5201",
+        "--strictPort"
+      ],
+      "port": 5201
+    },
+    {
       "name": "preview-t25",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

@@ -9,6 +9,7 @@ import {
   isOpenHold,
   isRestComplete,
   leadInSecondsLeft,
+  restCountdownSecondsLeft,
   restElapsedMs,
   restRemainingMs,
   type HoldSpec,
@@ -124,6 +125,7 @@ export function SessionTimer({
             remaining={restRemainingMs(state, now)}
             elapsed={restElapsedMs(state, now)}
             fraction={state.restMs > 0 ? restRemainingMs(state, now) / state.restMs : 0}
+            countdown={restCountdownSecondsLeft(state, now)}
             done={restDone}
             name={exerciseName}
             chainLabel={chainLabel}
@@ -304,6 +306,7 @@ function RestView({
   remaining,
   elapsed,
   fraction,
+  countdown,
   done,
   name,
   chainLabel,
@@ -316,6 +319,8 @@ function RestView({
   remaining: number;
   elapsed: number;
   fraction: number;
+  /** T30: seconds left inside the closing countdown, or 0 outside it. */
+  countdown: number;
   done: boolean;
   name: string;
   chainLabel: string | null;
@@ -335,17 +340,33 @@ function RestView({
   const cardIndex = restCardIndex(elapsed, deck.length);
   const card = done ? undefined : deck[cardIndex];
 
+  // T30: the last seconds are the walk back to the board, so they read as the
+  // count-in does — accent-300, and a header that says what to do rather than
+  // what is running. The card stays put underneath: it is five seconds, and a
+  // bar that changes height would move the buttons under a hand reaching for
+  // one. The colour is the whole visual change, because the tick is the cue.
+  const closing = countdown > 0;
+  const lit = done || closing;
+
   return (
     <div>
       <BarHead
         label="Rest"
         name={name}
-        right={done ? 'Rest complete — go' : chainLabel ? `next · ${chainLabel}` : 'resting'}
-        rightClass={done ? 'text-accent-300' : 'text-neutral-600'}
+        right={
+          done
+            ? 'Rest complete — go'
+            : closing
+              ? `get ready${chainLabel ? ` · ${chainLabel}` : ''}`
+              : chainLabel
+                ? `next · ${chainLabel}`
+                : 'resting'
+        }
+        rightClass={lit ? 'text-accent-300' : 'text-neutral-600'}
       />
 
       <div className="mt-1 flex items-center gap-3">
-        <span className={`${NUMERAL} ${done ? 'text-accent-300' : 'text-accent'}`}>
+        <span className={`${NUMERAL} ${lit ? 'text-accent-300' : 'text-accent'}`}>
           {formatClock(remaining)}
         </span>
         <div className="ml-auto flex gap-2">
@@ -360,7 +381,7 @@ function RestView({
 
       <div className="mt-2.5 h-1.5 overflow-hidden rounded-sm bg-neutral-900">
         <div
-          className={`h-full transition-[width] duration-100 ease-linear ${done ? 'bg-accent-300' : 'bg-accent'}`}
+          className={`h-full transition-[width] duration-100 ease-linear ${lit ? 'bg-accent-300' : 'bg-accent'}`}
           style={{ width: `${Math.min(1, Math.max(0, fraction)) * 100}%` }}
         />
       </div>

@@ -98,6 +98,20 @@ export function pipFrequency(second: number, hold: HoldSpec): number {
 // ─── The rest (T19's position, spoken) ───────────────────────────────────────
 
 /**
+ * "5 seconds. Get ready." — the heads-up at the top of a rest's last seconds
+ * (T30), and the only thing spoken during the countdown.
+ *
+ * The digits themselves are not said, and that is D34 rather than restraint:
+ * `say` cancels whatever is still in the mouth, so a spoken "one" would be cut
+ * off mid-word by `restDonePhrase` a second later — and the phrase carries the
+ * set number, which is the part worth hearing. The seconds are the tick's.
+ */
+export function restReadyPhrase(secondsLeft: number): string {
+  const n = Math.max(1, Math.round(secondsLeft));
+  return `${n} second${n === 1 ? '' : 's'}. Get ready.`;
+}
+
+/**
  * "Rest done. Set 4 of 5." — the one announcement in the app.
  *
  * It fires where the phone is furthest away and the number is most useful: the

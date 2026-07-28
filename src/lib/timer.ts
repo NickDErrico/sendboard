@@ -304,6 +304,35 @@ export function isRestComplete(state: TimerState, now: number): boolean {
   return state.phase === 'resting' && restRemainingMs(state, now) === 0;
 }
 
+/**
+ * How long before a rest ends the app starts counting it out (T30).
+ *
+ * The rest-end tone fires at the instant the owner is meant to already be *on*
+ * the board — chalked, hands on the edge, ready to pull — which is a moment too
+ * late to start walking back to it. Five seconds is that walk.
+ */
+export const REST_COUNTDOWN_SEC = 5;
+
+/**
+ * Seconds left inside a rest's closing countdown: 5, 4, 3, 2, 1 — and 0
+ * everywhere else, including the instant the rest is actually over, which
+ * belongs to `beepRestEnd` and says something different.
+ *
+ * Derived from `restRemainingMs` rather than tracked, like every other reading
+ * here (D18): a rest that was backgrounded through its own countdown comes back
+ * on the second the clock says, and there is no armed timer to cancel.
+ */
+export function restCountdownSecondsLeft(state: TimerState, now: number): number {
+  // A rest no longer than the countdown would be entirely countdown — there is
+  // no interval left to warn about, so it simply runs and ends. Which is also
+  // what keeps a short warm-up cycle rest (T23) from ticking end to end.
+  if (state.phase !== 'resting' || state.restMs <= REST_COUNTDOWN_SEC * 1000) return 0;
+  const remaining = restRemainingMs(state, now);
+  if (remaining === 0) return 0;
+  const seconds = Math.ceil(remaining / 1000);
+  return seconds <= REST_COUNTDOWN_SEC ? seconds : 0;
+}
+
 export type HoldStatus = 'under' | 'in' | 'over';
 
 /**

@@ -8,6 +8,7 @@ import {
   parseLeadIn,
   pipFrequency,
   restDonePhrase,
+  restReadyPhrase,
   voiceEnabled,
 } from './cues';
 import type { HoldSpec } from './timer';
@@ -107,6 +108,23 @@ describe('pipFrequency', () => {
   it('has one pitch where there is no band to spread across', () => {
     expect(pipFrequency(5, FIXED)).toBe(620);
     expect(pipFrequency(5, OPEN)).toBe(620);
+  });
+});
+
+describe('restReadyPhrase (T30)', () => {
+  it('says how long is left and what to do with it', () => {
+    expect(restReadyPhrase(5)).toBe('5 seconds. Get ready.');
+  });
+
+  // Spoken on whichever second the window is first seen, so it has to be right
+  // for a phone that was throttled through the top of it.
+  it('agrees with itself at one second', () => {
+    expect(restReadyPhrase(1)).toBe('1 second. Get ready.');
+  });
+
+  it('never announces a number it cannot honour', () => {
+    expect(restReadyPhrase(0)).toBe('1 second. Get ready.');
+    expect(restReadyPhrase(-3)).toBe('1 second. Get ready.');
   });
 });
 

@@ -11,6 +11,7 @@ import {
   isOpenHold,
   isRestComplete,
   leadInSecondsLeft,
+  restCountdownSecondsLeft,
   restElapsedMs,
   restRemainingMs,
   type HoldSpec,
@@ -144,6 +145,10 @@ export function FocusHold({
             with the phone on the floor. */}
         <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1.5 text-sm text-neutral-500">
           {edgeLabel && <span className={tagNeutral}>{edgeLabel}</span>}
+          {/* T29: beside the edge because §4E treats them the same way — "same
+              edge, same grip" are both conditions the numbers are measured
+              under, and the entry's title is not readable from the floor. */}
+          {exercise.grip && <span className={tagNeutral}>{exercise.grip}</span>}
           {chainLabel && <span>{chainLabel}</span>}
           <span>target {formatHoldTarget(hold)}</span>
           {exercise.restSeconds ? <span>rest {formatClock(exercise.restSeconds * 1000)}</span> : null}
@@ -299,6 +304,15 @@ function Readout({
   }
 
   if (state.phase === 'resting') {
+    // T30: the last five seconds drop the mm:ss and read as a bare digit, which
+    // is the same shape the count-in uses — and the format change is the point.
+    // From the board, "0:04" and "0:44" are one glance apart; a lone 4 under the
+    // word *get ready* is not, and it is the reading that decides whether the
+    // owner is chalked and hanging when the rest cue fires or walking when it does.
+    const countdown = restCountdownSecondsLeft(state, now);
+    if (countdown > 0) {
+      return <Big value={String(countdown)} label="get ready" tone="text-accent-300" glow="#d2cefd" />;
+    }
     return (
       <Big
         value={formatClock(restRemainingMs(state, now))}

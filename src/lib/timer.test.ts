@@ -23,6 +23,8 @@ import {
   LEAD_IN_GRACE_MS,
   leadInRemainingMs,
   leadInSecondsLeft,
+  REST_COUNTDOWN_SEC,
+  restCountdownSecondsLeft,
   restElapsedMs,
   restMsOf,
   restRemainingMs,
@@ -269,6 +271,61 @@ describe('rest countdown (AC4, AC5)', () => {
     expect(restElapsedMs(s, T0 + MIN_3 + 20_000)).toBe(MIN_3 + 20_000);
     expect(restElapsedMs(s, T0 - 5_000)).toBe(0);
     expect(restElapsedMs(startHold('x', T0), T0 + 5_000)).toBe(0);
+  });
+});
+
+describe('the closing countdown (T30)', () => {
+  it('is silent until the last five seconds, then counts 5 down to 1', () => {
+    const s = startRest('max-hang', MIN_3, T0);
+    expect(restCountdownSecondsLeft(s, T0)).toBe(0);
+    expect(restCountdownSecondsLeft(s, T0 + MIN_3 - 5_001)).toBe(0);
+    expect(restCountdownSecondsLeft(s, T0 + MIN_3 - 5_000)).toBe(REST_COUNTDOWN_SEC);
+    expect(restCountdownSecondsLeft(s, T0 + MIN_3 - 4_200)).toBe(5);
+    expect(restCountdownSecondsLeft(s, T0 + MIN_3 - 3_000)).toBe(3);
+    expect(restCountdownSecondsLeft(s, T0 + MIN_3 - 1)).toBe(1);
+  });
+
+  // Zero belongs to `beepRestEnd`, which says something different: the countdown
+  // is "walk back", the rest cue is "pull". Neither may fire on the other's second.
+  it('yields at zero rather than counting the instant the rest is over', () => {
+    const s = startRest('max-hang', MIN_3, T0);
+    expect(restCountdownSecondsLeft(s, T0 + MIN_3)).toBe(0);
+    expect(restCountdownSecondsLeft(s, T0 + MIN_3 + 30_000)).toBe(0);
+    expect(isRestComplete(s, T0 + MIN_3)).toBe(true);
+  });
+
+  // The bug this guards is the one T22 found in the deck: `+30s` moves `restMs`
+  // and not `startedAt`, so anything keyed on the wrong one is swallowed.
+  it('re-arms when a rest is extended mid-count', () => {
+    const s = startRest('max-hang', MIN_3, T0);
+    const at = T0 + MIN_3 - 3_000;
+    expect(restCountdownSecondsLeft(s, at)).toBe(3);
+    const extended = extendRest(s, 30);
+    expect(restCountdownSecondsLeft(extended, at)).toBe(0);
+    expect(restCountdownSecondsLeft(extended, at + 30_000)).toBe(3);
+  });
+
+  it('does not count a rest that would be entirely countdown', () => {
+    const short = startRest('warmup', 5_000, T0);
+    expect(restCountdownSecondsLeft(short, T0 + 1_000)).toBe(0);
+    expect(restCountdownSecondsLeft(short, T0 + 4_900)).toBe(0);
+    // A second more of rest than countdown is enough to be worth warning about.
+    const barely = startRest('warmup', 6_000, T0);
+    expect(restCountdownSecondsLeft(barely, T0 + 1_100)).toBe(5);
+  });
+
+  it('counts nothing outside a running rest', () => {
+    expect(restCountdownSecondsLeft(IDLE_TIMER, T0)).toBe(0);
+    expect(restCountdownSecondsLeft(startHold('x', T0), T0 + 1_000)).toBe(0);
+    expect(restCountdownSecondsLeft(startLeadIn('x', 3_000, T0), T0 + 1_000)).toBe(0);
+  });
+
+  // D18: a rest backgrounded through its own countdown comes back on the second
+  // the clock says — including "over", where the countdown simply never happened.
+  it('returns on the second the clock says after a suspend', () => {
+    const s = startRest('max-hang', MIN_3, T0);
+    expect(restCountdownSecondsLeft(s, T0 + MIN_3 - 2_000)).toBe(2);
+    expect(restCountdownSecondsLeft(s, T0 + MIN_3 + 120_000)).toBe(0);
   });
 });
 

@@ -132,6 +132,19 @@ export function beepCountTick(): void {
   play([{ frequency: 440, seconds: 0.07, gap: 0 }]);
 }
 
+/**
+ * One second gone from a rest's closing countdown (T30).
+ *
+ * Short and low, and deliberately *under* `beepCountTick`: both are ticks, and
+ * from the floor with the phone face down the pitch is the only thing that
+ * separates "the hold clock is about to start" from "the rest is about to end".
+ * The one that means get your hands on the edge is the lower of the two, because
+ * it is followed by the high three-tone rest cue rather than by a single go tone.
+ */
+export function beepRestCountTick(): void {
+  play([{ frequency: 350, seconds: 0.06, gap: 0 }]);
+}
+
 /** "Pull" — the count is over and the hold clock is running (T20, D33). */
 export function beepGo(): void {
   play([{ frequency: 990, seconds: 0.2, gap: 0 }]);

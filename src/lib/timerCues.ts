@@ -4,10 +4,17 @@ import {
   beepCountTick,
   beepGo,
   beepHoldEnd,
+  beepRestCountTick,
   beepRestEnd,
   resumeAudio,
 } from './beep';
-import { bandPipSeconds, countUtterance, pipFrequency, restDonePhrase } from './cues';
+import {
+  bandPipSeconds,
+  countUtterance,
+  pipFrequency,
+  restDonePhrase,
+  restReadyPhrase,
+} from './cues';
 import { say } from './speech';
 import {
   elapsedMs,
@@ -15,6 +22,7 @@ import {
   isLeadInStale,
   isRestComplete,
   leadInSecondsLeft,
+  restCountdownSecondsLeft,
   shouldAutoStop,
   type HoldSpec,
   type TimerState,
@@ -112,6 +120,32 @@ export function useTimerCues({
   useEffect(() => {
     if (!restDone) beepedFor.current = null;
   }, [restDone, state.restMs]);
+
+  // T30: the last five seconds of the rest, ticked out. `beepRestEnd` lands at
+  // the instant the owner should already have their hands on the edge, which is
+  // a second too late to start walking back to the board — this is the walk.
+  //
+  // Keyed on (this rest, this length, this second), and the length is in the key
+  // for a reason found in the same place T22's was: `+30s` moves `restMs` and
+  // not `startedAt`, so a window extended mid-count would otherwise be swallowed
+  // by the ticks it already fired. Extending re-arms the whole countdown.
+  const restCountSec = restCountdownSecondsLeft(state, now);
+  const restTickedFor = useRef<string | null>(null);
+  const spokeReadyFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (restCountSec <= 0) return;
+    const rest = `${state.startedAt}:${state.restMs}`;
+    if (restTickedFor.current === `${rest}:${restCountSec}`) return;
+    restTickedFor.current = `${rest}:${restCountSec}`;
+    beepRestCountTick();
+    // One heads-up per rest, on whichever second the window is *first* seen
+    // rather than on second five specifically: a phone that was throttled
+    // through the top of the window still says a number it can honour.
+    if (voice && spokeReadyFor.current !== rest) {
+      spokeReadyFor.current = rest;
+      say(restReadyPhrase(restCountSec));
+    }
+  }, [restCountSec, state.startedAt, state.restMs, voice]);
 
   // T20: one tick per second of the count, keyed on (this count, this second) so
   // a 100ms render loop fires each of them exactly once. The tick is the count
