@@ -52,12 +52,16 @@ export function FocusHold({
   timerHold,
   chainLabel,
   chainSpoken,
+  heldLabel = null,
   edgeLabel,
   lastSummary,
   prescriptionLine,
   reading,
   voice,
   timerExerciseName,
+  chainDone = false,
+  advanceLabel = null,
+  onAdvance,
   onExit,
   onStart,
   onStop,
@@ -74,6 +78,11 @@ export function FocusHold({
   timerHold: HoldSpec | null;
   chainLabel: string | null;
   chainSpoken: string | null;
+  /**
+   * T31: what the Log control will write, where a set is more than its last hold
+   * — "4 x 3.0s" for a rep-chained set. Null on every other exercise.
+   */
+  heldLabel?: string | null;
   /**
    * The edge the next set will be logged on ("20 mm"), or null where the
    * exercise records none.
@@ -99,6 +108,18 @@ export function FocusHold({
   voice: boolean;
   /** Named only when the timer belongs to a different exercise (AC9). */
   timerExerciseName: string | null;
+  /** T32: the prescription's top is logged — the app has no further set to offer. */
+  chainDone?: boolean;
+  /**
+   * T32: what "mark done and move on" would do, spelled out — "Mark done · next:
+   * Max Hang — Open-Hand", or the finish where nothing else is unmarked.
+   *
+   * Resolved by the session, which is the only thing that knows the routine's
+   * order. Null suppresses the control entirely, which is what a plain exercise
+   * page or a not-yet-started chain gets.
+   */
+  advanceLabel?: string | null;
+  onAdvance?: () => void;
   onExit: () => void;
   onStart: () => void;
   onStop: (auto?: boolean) => void;
@@ -111,7 +132,13 @@ export function FocusHold({
   useTimerCues({ state, now, hold: timerHold, voice, chainSpoken, onStop, onCountEnd });
 
   const restDone = isRestComplete(state, now);
-  const { action, otherRunning } = focusStep(state, exercise.id, restDone);
+  const offerAdvance = advanceLabel !== null && onAdvance !== undefined;
+  const { action, otherRunning } = focusStep(
+    state,
+    exercise.id,
+    restDone,
+    chainDone && offerAdvance,
+  );
   const mine = state.exerciseId === exercise.id;
   const holding = mine && state.phase === 'holding';
 
@@ -217,15 +244,37 @@ export function FocusHold({
           </button>
         )}
 
+        {/* T32, the two halves of one rule. Where the app still has a set to
+            offer, moving on is the small control and the set is the big one —
+            §4F's lighter week means stopping inside a range is a real choice,
+            and one it must not have to be hunted for. Where the prescription's
+            top is logged the two swap: `focusStep` hands the primary to the
+            move-on, and the sixth set drops to this row rather than off the
+            screen, because the app does not get to end an exercise (D23). */}
+        {offerAdvance && (action === 'start' || action === 'start-next' || action === 'wait') && (
+          <button onClick={onAdvance} className={`${btnSecondary} w-full py-2 text-[13px]`}>
+            {advanceLabel}
+          </button>
+        )}
+        {action === 'advance' && (
+          <button onClick={onStart} className={`${btnSecondary} w-full py-2 text-[13px]`}>
+            <Icon name="play" weight="fill" className="text-[11px]" />
+            Start {chainLabel ?? 'another hold'}
+          </button>
+        )}
+
         <PrimaryControl
           action={action}
           state={state}
           hold={hold}
           chainLabel={chainLabel}
+          heldLabel={heldLabel}
+          advanceLabel={advanceLabel}
           onStart={onStart}
           onStop={onStop}
           onSkip={onSkip}
           onLogHeld={onLogHeld}
+          onAdvance={onAdvance}
         />
       </footer>
     </div>
@@ -368,19 +417,26 @@ function PrimaryControl({
   state,
   hold,
   chainLabel,
+  heldLabel,
+  advanceLabel,
   onStart,
   onStop,
   onSkip,
   onLogHeld,
+  onAdvance,
 }: {
   action: FocusAction;
   state: TimerState;
   hold: HoldSpec;
   chainLabel: string | null;
+  /** T31: what the Log control will write, where a set is more than its last hold. */
+  heldLabel: string | null;
+  advanceLabel: string | null;
   onStart: () => void;
   onStop: (auto?: boolean) => void;
   onSkip: () => void;
   onLogHeld: (heldMs: number) => void;
+  onAdvance?: () => void;
 }) {
   const base = 'w-full !rounded-[14px] px-4 py-5 text-center text-[19px] leading-tight';
 
@@ -397,7 +453,7 @@ function PrimaryControl({
           onClick={() => onLogHeld(state.heldMs as number)}
           className={`${btnPrimary} ${base} text-[17px]`}
         >
-          Log {formatHold(state.heldMs as number)} as a set
+          Log {heldLabel ?? formatHold(state.heldMs as number)} as a set
         </button>
       );
     case 'cancel':
@@ -415,6 +471,16 @@ function PrimaryControl({
         >
           Rest — the app will tell you
         </div>
+      );
+    case 'advance':
+      // T32: the prescribed sets are logged, so the thing most likely to happen
+      // next is leaving — and on this surface the likeliest act is the one you
+      // can hit by feel. It says both halves of what it does, because it writes
+      // a completion as well as moving; the sixth set is the small control above.
+      return (
+        <button onClick={onAdvance} className={`${btnPrimary} ${base} text-[17px]`}>
+          {advanceLabel}
+        </button>
       );
     case 'start-next':
     case 'start':

@@ -1,4 +1,5 @@
 import type { Exercise } from '../types';
+import { variantsFor } from './block';
 
 /**
  * Where you are in an exercise's prescribed sets (T19).
@@ -24,10 +25,21 @@ export interface SetSpec {
   max: number;
 }
 
-/** The declared set count, or null where the plan states a duration or reps instead. */
-export function setSpecOf(exercise: Exercise | undefined): SetSpec | null {
-  if (!exercise?.prescribedSets) return null;
-  const [min, max] = exercise.prescribedSets;
+/**
+ * The declared set count, or null where the plan states a duration or reps
+ * instead.
+ *
+ * `week` is T31's addition and changes the answer for exactly one entry pair:
+ * §4B states "4–6 sets" for its peak protocol and "5 sets" for the
+ * rep-structured one, and `prescribedSets` describes the former. Without the
+ * week, weeks 1–4 read "set 3 of 4–6" against a protocol asking for five.
+ * Omitted or null → the exercise's own declaration, which is what every caller
+ * outside a dated session wants and what nineteen of twenty entries have anyway.
+ */
+export function setSpecOf(exercise: Exercise | undefined, week: number | null = null): SetSpec | null {
+  const declared = variantsFor(exercise, week).live?.sets ?? exercise?.prescribedSets;
+  if (!declared) return null;
+  const [min, max] = declared;
   return { min, max };
 }
 
@@ -52,6 +64,30 @@ export function chainPosition(loggedCount: number, spec: SetSpec | null): ChainP
     spec,
     beyond: spec !== null && logged >= spec.max,
   };
+}
+
+/**
+ * True once the prescription's *floor* is logged — the earliest point at which
+ * stopping is a choice the plan already allows (T32).
+ *
+ * The distinction from `beyond` is the whole reason both exist. `beyond` is the
+ * top: past it the app has no further set to offer, and the surfaces let the
+ * "move on" control take the position the start control had. This is the
+ * bottom: from four of §4B's "4–6 sets" the exercise is a legitimate place to
+ * stop, so the control is *offered* — small, beside the start — and the
+ * prescription's remaining sets keep the emphasis.
+ *
+ * Neither is a verdict (D23). §4F asks for a lighter week "regardless of the
+ * schedule", so this reports where the plan's own range begins and nothing else:
+ * no adherence figure, nothing blocked, nothing congratulated.
+ *
+ * With no declared count, one logged set is the floor — an exercise the plan
+ * states as a duration or a rep scheme still becomes finishable the moment it
+ * has a record, which is the same rule `isMeaningful` uses to keep the entry.
+ */
+export function chainSatisfied(position: ChainPosition): boolean {
+  const logged = Math.max(0, position.current - 1);
+  return logged >= (position.spec === null ? 1 : position.spec.min);
 }
 
 /** "5" for a fixed count, "4–6" for a range the plan deliberately left open. */

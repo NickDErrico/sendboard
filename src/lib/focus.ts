@@ -16,6 +16,12 @@ import type { TimerState } from './timer';
  *    small secondary control, because a primary button that quietly ends §4C's
  *    3 minutes is how a prescribed rest erodes (T19's rule, restated in a place
  *    where the button would be enormous).
+ * 3. **T32: past the prescription's top, "move on" takes the primary.** Once the
+ *    fifth of five is logged the app has no further set to *offer* — the big
+ *    button asking for a sixth is the wrong default for a surface whose whole
+ *    premise is that the likeliest next act is the one you can hit by feel. It
+ *    is a demotion, never a block (D23): the start control stays on screen,
+ *    small, exactly where Skip lives, and a sixth set is still one tap away.
  */
 export type FocusAction =
   | 'start' // begin this exercise's next set (a count, per D33)
@@ -23,6 +29,7 @@ export type FocusAction =
   | 'stop' // a hold is running — the only thing that ends it (D36)
   | 'log' // a measured hold is waiting to be recorded
   | 'start-next' // the rest is over
+  | 'advance' // the prescription's top is logged: mark done and move on (T32)
   | 'wait'; // the rest is running; nothing primary to do
 
 export interface FocusStep {
@@ -36,25 +43,36 @@ export interface FocusStep {
  * @param exerciseId the exercise the surface is focused on
  * @param restDone whether the running rest has reached zero (a clock reading,
  *        passed in rather than computed, so this stays free of `now`)
+ * @param chainDone whether the prescription's top is already logged
+ *        (`chainPosition().beyond`) — a count over the log, passed in for the
+ *        same reason, so this stays free of the log as well as of the clock
  */
 export function focusStep(
   state: TimerState,
   exerciseId: string,
   restDone: boolean,
+  chainDone = false,
 ): FocusStep {
   // Someone else's clock: this exercise can still be started (that takes the
   // timer, as it always has), but nothing here reports on the other one beyond
   // saying it is running.
   if (state.exerciseId !== null && state.exerciseId !== exerciseId) {
     const otherRunning = state.phase !== 'idle' || state.heldMs !== null;
-    return { action: 'start', otherRunning };
+    return { action: chainDone ? 'advance' : 'start', otherRunning };
   }
 
+  // An unrecorded set outranks everything, including a finished chain: the mark
+  // this surface would write is a completion, and completing an exercise around
+  // a measurement that was never logged is how a hang disappears (D16).
   if (state.heldMs !== null) return { action: 'log', otherRunning: false };
   if (state.phase === 'counting') return { action: 'cancel', otherRunning: false };
   if (state.phase === 'holding') return { action: 'stop', otherRunning: false };
   if (state.phase === 'resting') {
-    return { action: restDone ? 'start-next' : 'wait', otherRunning: false };
+    // A running rest still offers nothing large — rule 2 outranks rule 3, and a
+    // full-width "move on" would end §4C's 3 minutes as effectively as a Skip
+    // twice its size. It waits for the clock like everything else here.
+    if (!restDone) return { action: 'wait', otherRunning: false };
+    return { action: chainDone ? 'advance' : 'start-next', otherRunning: false };
   }
-  return { action: 'start', otherRunning: false };
+  return { action: chainDone ? 'advance' : 'start', otherRunning: false };
 }

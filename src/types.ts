@@ -151,10 +151,49 @@ export interface GripBlock {
   rounds: number;
 }
 
+/**
+ * A set built from several short efforts rather than one (T31).
+ *
+ * §4B's weeks-1–4 variant is the only protocol in the plan shaped this way:
+ * "5 sets x 4 reps x 3 sec at ~90% effort, ~10 sec between reps, 3 min between
+ * sets". Until T31 the app ran one effort and went straight to the three
+ * minutes, because `holdSeconds` and `restSeconds` describe the *peak* variant
+ * and a set has only ever had one hold.
+ *
+ * Typed on the variant rather than the exercise for D41's reason: the two
+ * protocols on one entry have different shapes, and an exercise-level field
+ * would have to describe whichever one the week happened to select.
+ */
+export interface RepChain {
+  reps: number; // 4
+  holdSec: number; // 3 — fixed, not a range: the plan states one number
+  /** Seconds between reps *inside* a set. Never the between-sets rest. */
+  betweenSec: number; // ~10
+}
+
 export interface PrescriptionVariant {
   weeks: [min: number, max: number];
   label: string; // "Weeks 1–4 · tendon variant"
   text: string; // transcribed from `prescription`, never reworded (D6)
+  /**
+   * The rep structure this variant prescribes, where it has one (T31).
+   *
+   * A variant declaring this drives the clock while it is live — its `holdSec`
+   * replaces the exercise's `holdSeconds`, and the gap between reps replaces the
+   * between-sets rest until the last one. Which is why declaring it also makes
+   * the variant count as `timed`: D41's "the timer follows the other protocol"
+   * note must not keep appearing once the timer follows this one.
+   */
+  repChain?: RepChain;
+  /**
+   * This variant's own set count, where it differs from `prescribedSets` (T31).
+   *
+   * §4B carries "4–6 sets" for the peak variant and "5 sets" for the
+   * rep-structured one. `prescribedSets` describes the former, so weeks 1–4 read
+   * "set 3 of 4–6" against a protocol that asks for five — the same
+   * wrong-number-by-luck D17 refuses regexes over prose to avoid.
+   */
+  sets?: [min: number, max: number];
   /**
    * True on the one variant that `holdSeconds` and `prescribedSets` describe.
    *

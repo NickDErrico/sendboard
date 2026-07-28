@@ -111,24 +111,32 @@ export const EXERCISES: Exercise[] = [
     ],
     prescription:
       'Peak: 4–6 sets x 3–5s @ 100% effort, 3 min rest. Tendon variant (weeks 1–4): 5 sets x 4 reps x 3s @ ~90%, ~10s between reps, 3 min between sets.',
+    // Both describe the *peak* variant. The weeks 1–4 protocol nests a second
+    // interval inside the set and states five sets, so it declares its own
+    // `repChain` and `sets` below rather than bending these (T31).
     prescribedSets: [4, 6], // T19
-    // Times the peak variant's 3–5s effort. The weeks 1–4 rep-structured variant
-    // nests a second interval (~10s between reps) inside the set; T10 explicitly
-    // does not build a cadence runner for it — the 3s rep is inside this range.
     holdSeconds: [3, 5],
     restSeconds: 180,
     // T24/D41: the two protocols the one string above carries, split at the week
     // the plan splits them ("use this variant for weeks 1–4, then the
     // single-max-effort version above for weeks 5–8", §4B). Each `text` is that
-    // string's own wording; the prefixes become labels. `timed` marks the peak
-    // variant because `holdSeconds` and `prescribedSets` describe it — so weeks
-    // 1–4 emphasise a protocol the clock does not run, and the app says so
-    // rather than switching timings (T23's fence).
+    // string's own wording; the prefixes become labels.
+    //
+    // T31 reverses T10's and T23's refusal to run the rep-structured variant.
+    // The refusal rested on a working set never starting itself (D39); T30's
+    // five-second rest countdown is what changed the argument, since a rep that
+    // begins in ten seconds is now announced before it begins rather than
+    // discovered once it has. `timed` still marks the peak variant, but a
+    // variant carrying a `repChain` is timed too — see `variantsFor`.
     variants: [
       {
         weeks: [1, 4],
         label: 'Weeks 1–4 · tendon variant',
         text: '5 sets x 4 reps x 3s @ ~90%, ~10s between reps, 3 min between sets.',
+        // Four numbers already in the sentence above, typed so the clock can run
+        // them (D17). Nothing authored: 4 reps, 3s, ~10s and 5 sets are §4B's.
+        repChain: { reps: 4, holdSec: 3, betweenSec: 10 },
+        sets: [5, 5],
       },
       {
         weeks: [5, 8],
@@ -171,12 +179,15 @@ export const EXERCISES: Exercise[] = [
     holdSeconds: [3, 5],
     restSeconds: 180,
     // Same two protocols as the half-crimp entry — §4B states them once for both
-    // grips, so both entries declare them (T24, D41).
+    // grips, so both entries declare them (T24, D41), including the rep chain
+    // (T31): a rotation to open-hand does not change the protocol's shape.
     variants: [
       {
         weeks: [1, 4],
         label: 'Weeks 1–4 · tendon variant',
         text: '5 sets x 4 reps x 3s @ ~90%, ~10s between reps, 3 min between sets.',
+        repChain: { reps: 4, holdSec: 3, betweenSec: 10 },
+        sets: [5, 5],
       },
       {
         weeks: [5, 8],

@@ -35,8 +35,12 @@ export function SessionTimer({
   hold,
   chainLabel = null,
   chainSpoken = null,
+  heldLabel = null,
   reading = null,
   voice = true,
+  chainDone = false,
+  advanceLabel = null,
+  onAdvance,
   onStop,
   onSkip,
   onExtend,
@@ -57,6 +61,13 @@ export function SessionTimer({
   /** T20: the same position, said out loud when a rest completes (`speakChain`). */
   chainSpoken?: string | null;
   /**
+   * T31: what the Log control will actually write, where that is not the last
+   * hold — a rep-chained set records "4 x 3.0s", and a button offering "3.0s"
+   * would name a quarter of it. Null everywhere else, which is every exercise
+   * outside §4B's weeks 1–4.
+   */
+  heldLabel?: string | null;
+  /**
    * T22: what the rest has to read — the deck, and the numbers its report card
    * shows. Resolved for the *timer's* exercise by the session, so it stays
    * correct wherever the bar happens to be rendered. Null outside a rest.
@@ -64,6 +75,16 @@ export function SessionTimer({
   reading?: RestReading | null;
   /** T20/D34: whether the *words* are on. Every tone fires either way. */
   voice?: boolean;
+  /** T32: the prescription's top is logged — the app has no further set to offer. */
+  chainDone?: boolean;
+  /**
+   * T32: what "mark done and move on" would do, spelled out — "Mark done · next:
+   * Max Hang — Open-Hand", or the finish where nothing else is unmarked. Null
+   * suppresses the control, which is what an exercise short of the plan's floor
+   * gets: the card's own Mark done is still there for stopping early.
+   */
+  advanceLabel?: string | null;
+  onAdvance?: () => void;
   /** `auto` distinguishes the timer ending the hold from the owner ending it — the
       first records the prescription, the second records real elapsed time. */
   onStop: (auto?: boolean) => void;
@@ -115,6 +136,7 @@ export function SessionTimer({
         {state.heldMs !== null && (
           <HeldResult
             heldMs={state.heldMs}
+            heldLabel={heldLabel}
             onLog={() => onLogHeld(state.heldMs as number)}
             onDismiss={state.phase === 'idle' ? onSkip : undefined}
           />
@@ -131,6 +153,9 @@ export function SessionTimer({
             chainLabel={chainLabel}
             holdTarget={hold ? formatHoldTarget(hold) : null}
             reading={reading}
+            chainDone={chainDone}
+            advanceLabel={state.heldMs === null ? advanceLabel : null}
+            onAdvance={onAdvance}
             onSkip={onSkip}
             onExtend={onExtend}
             onStartNext={onStartNext}
@@ -279,19 +304,27 @@ function HoldView({
 
 function HeldResult({
   heldMs,
+  heldLabel = null,
   onLog,
   onDismiss,
 }: {
   heldMs: number;
+  /**
+   * What the set will actually record, where that is not simply the last hold
+   * (T31): a rep-chained set writes "4 x 3.0s", and a button offering to log
+   * "3.0s" would name one rep of the four it is about to write.
+   */
+  heldLabel?: string | null;
   onLog: () => void;
   onDismiss?: () => void;
 }) {
+  const label = heldLabel ?? formatHold(heldMs);
   return (
     <div className="mb-2 flex items-center gap-2.5">
       <Icon name="check-circle" weight="fill" className="shrink-0 text-[18px] text-accent-400" />
       <p className="shrink-0 text-[13px] font-medium text-accent-300">Held {formatHold(heldMs)}</p>
       <button onClick={onLog} className={`${btnPrimary} min-w-0 flex-1 truncate !rounded-[10px] py-2.5 text-[13px]`}>
-        Log {formatHold(heldMs)} as a set
+        Log {label} as a set
       </button>
       {onDismiss && (
         <button onClick={onDismiss} aria-label="Dismiss timer" className={`${btnGhost} shrink-0 px-2`}>
@@ -312,6 +345,9 @@ function RestView({
   chainLabel,
   holdTarget,
   reading,
+  chainDone,
+  advanceLabel,
+  onAdvance,
   onSkip,
   onExtend,
   onStartNext,
@@ -326,6 +362,15 @@ function RestView({
   chainLabel: string | null;
   holdTarget: string | null;
   reading: RestReading | null;
+  /** T32: the prescription's top is logged, so the start control is the exception. */
+  chainDone: boolean;
+  /**
+   * T32: "Mark done · next: …", or null where the control is not offered — short
+   * of the plan's floor, or with a measured hold still waiting to be recorded
+   * (completing an exercise around an unlogged hang is how one disappears, D16).
+   */
+  advanceLabel: string | null;
+  onAdvance?: () => void;
   onSkip: () => void;
   onExtend: (seconds: number) => void;
   onStartNext?: () => void;
@@ -396,6 +441,24 @@ function RestView({
         />
       )}
 
+      {/* T32: the other end of the chain, and the same argument T19 AC4 made for
+          the button below it — this bar covers the card, so without a control
+          here "that exercise is done" costs an exit, a scroll, a Mark done and a
+          hunt for the next card. It sits above the start control rather than in
+          its place: the bar grows upward from a fixed edge, so the thumb that
+          has spent four rests finding "Start" at the bottom still finds it.
+          Emphasis moves instead — past the prescription's top the start button
+          reads as the secondary it now is, and nothing is removed (D23). */}
+      {advanceLabel && onAdvance && (
+        <button
+          onClick={onAdvance}
+          className={`${chainDone ? btnPrimary : btnSecondary} mt-2.5 w-full truncate !rounded-[10px] py-2.5 text-[13px]`}
+        >
+          <Icon name="check-circle" weight="fill" className="shrink-0 text-[13px]" />
+          <span className="min-w-0 truncate">{advanceLabel}</span>
+        </button>
+      )}
+
       {/* T19 AC4: the next hold, from here, once the rest is actually over. The
           bar covers the card, so without this the next set costs a scroll — and
           the thing that gets cut short to avoid the scroll is the rest §4C
@@ -404,7 +467,10 @@ function RestView({
           3 minute interval is how a prescribed rest erodes. It never starts by
           itself either (AC5) — the owner has to be on the board first. */}
       {done && onStartNext && (
-        <button onClick={onStartNext} className={`${btnPrimary} mt-2.5 w-full !rounded-[10px] py-[13px] text-[15px]`}>
+        <button
+          onClick={onStartNext}
+          className={`${chainDone ? btnSecondary : btnPrimary} mt-2.5 w-full !rounded-[10px] py-[13px] text-[15px]`}
+        >
           <Icon name="play" weight="fill" className="text-[13px]" />
           Start {chainLabel ?? 'next hold'}
           {holdTarget ? ` · ${holdTarget}` : ''}

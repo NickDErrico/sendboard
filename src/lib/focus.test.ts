@@ -61,3 +61,42 @@ describe('focusStep', () => {
     expect(focusStep(held, OTHER, false).action).toBe('log');
   });
 });
+
+describe('focusStep once the prescription is done (T32)', () => {
+  const finished = (state: TimerState, restDone = false) =>
+    focusStep(state, HANG, restDone, true);
+
+  it('offers the move-on where it would have offered a set', () => {
+    expect(finished(IDLE_TIMER).action).toBe('advance');
+    expect(finished(startRest(HANG, MIN_3, T0), true).action).toBe('advance');
+  });
+
+  // Rule 2 outranks rule 3: a full-width "move on" ends §4C's 3 minutes as
+  // effectively as a Skip twice its size, so the rest is still waited out.
+  it('still offers nothing large while the rest runs', () => {
+    expect(finished(startRest(HANG, MIN_3, T0), false).action).toBe('wait');
+  });
+
+  it('never moves on around an unrecorded hold', () => {
+    const stopped = stopHold(startHold(HANG, T0), T0 + 8400, MIN_3);
+    expect(finished(stopped).action).toBe('log');
+    expect(finished(stopped, true).action).toBe('log');
+  });
+
+  it('leaves a running count and a running hold exactly as they were', () => {
+    expect(finished(startLeadIn(HANG, 3000, T0)).action).toBe('cancel');
+    expect(finished(startHold(HANG, T0)).action).toBe('stop');
+  });
+
+  it('offers it against another exercise’s clock too, and still says so', () => {
+    expect(finished(startRest(OTHER, MIN_3, T0))).toEqual({
+      action: 'advance',
+      otherRunning: true,
+    });
+  });
+
+  it('changes nothing anywhere when the chain is not done', () => {
+    expect(focusStep(IDLE_TIMER, HANG, false, false).action).toBe('start');
+    expect(focusStep(startRest(HANG, MIN_3, T0), HANG, true, false).action).toBe('start-next');
+  });
+});

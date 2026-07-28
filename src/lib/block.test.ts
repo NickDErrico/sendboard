@@ -281,8 +281,26 @@ describe('variantsFor puts the live protocol first (AC8, AC9, AC10)', () => {
   });
 
   it('names the variant the timer follows only when it is not the live one (AC10)', () => {
-    expect(variantsFor(pima, 2).timedElsewhere!.label).toBe('Weeks 5–8 · peak');
+    // T31 reversed the answer for weeks 1–4. The clock used to follow the peak
+    // protocol in every week, so the app said so; now the rep-structured variant
+    // brings its own timings and is the one running, and the note would be
+    // contradicting a clock that agrees with the emphasised protocol.
+    expect(variantsFor(pima, 2).timedElsewhere).toBeNull();
     expect(variantsFor(pima, 6).timedElsewhere).toBeNull();
+  });
+
+  it('treats a variant carrying a rep chain as timed (T31)', () => {
+    // The note exists to stop the app implying the clock follows the emphasised
+    // protocol when it does not. A variant with no timings of its own still gets
+    // it — this is the case that must keep working.
+    const untimed = {
+      ...pima,
+      variants: [
+        { weeks: [1, 4] as [number, number], label: 'A', text: 'a' },
+        { weeks: [5, 8] as [number, number], label: 'B', text: 'b', timed: true },
+      ],
+    };
+    expect(variantsFor(untimed, 2).timedElsewhere!.label).toBe('B');
   });
 
   it('keeps the last variant live past week 8 rather than falling back to none', () => {

@@ -1,5 +1,11 @@
 import type { Exercise, GripBlock } from '../types';
-import { holdSpecOf, isRestComplete, restMsOf, type TimerState } from './timer';
+import {
+  holdSpecOf,
+  isAutoAdvanceStale,
+  restMsOf,
+  shouldAutoAdvance,
+  type TimerState,
+} from './timer';
 
 /**
  * The warm-up runner's decisions (T23).
@@ -110,17 +116,12 @@ export function formatRun(elapsedMs: number): string {
  */
 export const CYCLE_GRACE_MS = 3000;
 
-/** When the running rest was due to end. Meaningless outside a rest. */
-function restEndAt(state: TimerState): number {
-  return state.startedAt + state.restMs;
-}
-
 /**
  * True the moment an armed cycle should begin its next round.
  *
- * `visible` is passed in rather than read here for the same reason `restDone` is
- * passed to `focusStep`: this module stays free of the DOM and of `Date.now`, so
- * the rule is testable without either.
+ * The arithmetic is `shouldAutoAdvance`'s, shared with T31's rep chain so one
+ * grace window governs both. The *permission* is still this module's: nothing
+ * reaches here that `warmupPlanOf` did not gate on `category === 'warmup'`.
  */
 export function shouldStartNextRound(
   state: TimerState,
@@ -128,9 +129,7 @@ export function shouldStartNextRound(
   armed: boolean,
   visible: boolean,
 ): boolean {
-  if (!armed || !visible) return false;
-  if (!isRestComplete(state, now)) return false;
-  return now - restEndAt(state) <= CYCLE_GRACE_MS;
+  return shouldAutoAdvance(state, now, armed, visible, CYCLE_GRACE_MS);
 }
 
 /**
@@ -140,8 +139,7 @@ export function shouldStartNextRound(
  * five-minute background would run rounds against a board nobody is standing at.
  */
 export function isCycleStale(state: TimerState, now: number, armed: boolean): boolean {
-  if (!armed || state.phase !== 'resting') return false;
-  return now - restEndAt(state) > CYCLE_GRACE_MS;
+  return isAutoAdvanceStale(state, now, armed, CYCLE_GRACE_MS);
 }
 
 /** "round 3" — a count of what has been run, never a target to reach (D23). */

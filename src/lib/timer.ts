@@ -333,6 +333,52 @@ export function restCountdownSecondsLeft(state: TimerState, now: number): number
   return seconds <= REST_COUNTDOWN_SEC ? seconds : 0;
 }
 
+// ─── Auto-advance (T23's cycle, T31's rep chain) ─────────────────────────────
+
+/**
+ * The rule two cadences share: when may a completed rest start the next effort
+ * *without* a tap?
+ *
+ * The mechanism lives here so the warm-up cycle (T23) and the rep chain (T31)
+ * cannot drift apart — one grace window, one visibility rule, one place to
+ * change them. **What does not live here is permission.** Each caller keeps its
+ * own gate: `warmupPlanOf` will not build a cycle for anything outside
+ * `category === 'warmup'`, and a rep chain exists only on a variant that
+ * declares one. D39 is a statement about which exercises may advance
+ * themselves, and sharing the arithmetic does not widen it.
+ *
+ * `visible` is passed in rather than read here for the same reason nothing in
+ * this module reads `Date.now`: the rule stays testable without a DOM.
+ */
+export function shouldAutoAdvance(
+  state: TimerState,
+  now: number,
+  armed: boolean,
+  visible: boolean,
+  graceMs: number,
+): boolean {
+  if (!armed || !visible) return false;
+  if (!isRestComplete(state, now)) return false;
+  return now - (state.startedAt + state.restMs) <= graceMs;
+}
+
+/**
+ * True when an armed cadence has been left behind by a suspended app.
+ *
+ * The caller disarms rather than catching up: a backgrounded PWA can come back
+ * minutes after a rest ended, and starting an effort there would be one nobody
+ * heard begin — which is the failure mode the grace window exists to exclude.
+ */
+export function isAutoAdvanceStale(
+  state: TimerState,
+  now: number,
+  armed: boolean,
+  graceMs: number,
+): boolean {
+  if (!armed || state.phase !== 'resting') return false;
+  return now - (state.startedAt + state.restMs) > graceMs;
+}
+
 export type HoldStatus = 'under' | 'in' | 'over';
 
 /**

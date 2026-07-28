@@ -247,8 +247,22 @@ export function variantsFor(
   return {
     live,
     others,
-    timedElsewhere: live.timed ? null : (others.find((v) => v.timed) ?? null),
+    timedElsewhere: isTimed(live) ? null : (others.find(isTimed) ?? null),
   };
+}
+
+/**
+ * Whether the clock follows a variant.
+ *
+ * Two ways to be the timed one, and the second is T31's: `timed` marks the
+ * variant that the exercise's own `holdSeconds` and `prescribedSets` describe,
+ * and a variant carrying a `repChain` brings its timings with it. Both are the
+ * live protocol while they are live — which is what retires D41's "the timer
+ * follows the other one" note for §4B's weeks 1–4 rather than leaving it on
+ * screen contradicting a clock that now runs the reps.
+ */
+function isTimed(variant: PrescriptionVariant): boolean {
+  return variant.timed === true || variant.repChain !== undefined;
 }
 
 /**

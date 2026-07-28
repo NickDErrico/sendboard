@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { chainPosition, formatChain, formatSetTarget, setSpecOf, speakChain } from './chain';
+import {
+  chainPosition,
+  chainSatisfied,
+  formatChain,
+  formatSetTarget,
+  setSpecOf,
+  speakChain,
+} from './chain';
 import { EXERCISES } from '../data/exercises';
 import type { Exercise } from '../types';
 
@@ -94,6 +101,39 @@ describe('formatChain', () => {
     for (const p of phrases) {
       expect(p).not.toMatch(/%|complete|done|✓|remaining|left|good|nice/i);
     }
+  });
+});
+
+describe('chainSatisfied (T32)', () => {
+  const at = (logged: number, spec: { min: number; max: number } | null) =>
+    chainSatisfied(chainPosition(logged, spec));
+
+  it('turns on at the floor of a range, not at its top', () => {
+    const pima = { min: 4, max: 6 };
+    expect(at(3, pima)).toBe(false);
+    expect(at(4, pima)).toBe(true);
+    expect(at(6, pima)).toBe(true);
+    expect(at(7, pima)).toBe(true);
+  });
+
+  // Where the plan states one count, the floor and the top are the same instant
+  // — which is why the max hangs flip both this and `beyond` on the fifth set.
+  it('coincides with beyond for a fixed count', () => {
+    const hang = { min: 5, max: 5 };
+    expect(at(4, hang)).toBe(false);
+    expect(at(5, hang)).toBe(true);
+    expect(chainPosition(5, hang).beyond).toBe(true);
+  });
+
+  it('takes one logged set as the floor where the plan declares no count', () => {
+    expect(at(0, null)).toBe(false);
+    expect(at(1, null)).toBe(true);
+  });
+
+  it('is never true before anything is logged', () => {
+    expect(at(0, { min: 0, max: 3 })).toBe(true); // a floor of zero is already met
+    expect(at(0, { min: 1, max: 3 })).toBe(false);
+    expect(at(-2, { min: 1, max: 3 })).toBe(false);
   });
 });
 

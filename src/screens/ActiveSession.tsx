@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Exercise, Routine, SetEntry, WorkoutLog } from '../types';
+import type { Exercise, RepChain, Routine, SetEntry, WorkoutLog } from '../types';
 import {
   getAllExercises,
   getAllLogs,
@@ -45,15 +45,29 @@ import {
   startLeadIn,
   startRest,
   stopHold,
+  type HoldSpec,
   type TimerState,
 } from '../lib/timer';
 import { reasonApplies, reasonsFor } from '../lib/setReason';
 import { gearOf, type Gear } from '../lib/gear';
-import { chainPosition, formatChain, setSpecOf, speakChain } from '../lib/chain';
+import { chainPosition, chainSatisfied, formatChain, setSpecOf, speakChain } from '../lib/chain';
+import { advanceLabel, nextStepAfter } from '../lib/advance';
 import { restReading } from '../lib/rest';
 import { warmupPlanOf } from '../lib/warmup';
+import {
+  formatRep,
+  formatRepsDone,
+  isLastRep,
+  isRepChainStale,
+  repChainOf,
+  repHoldSpec,
+  restAfterRep,
+  shouldStartNextRep,
+  speakRep,
+} from '../lib/reps';
 import { blockPosition, livePrescription, type BlockPosition } from '../lib/block';
 import { leadInMsOf, voiceEnabled } from '../lib/cues';
+import { useNow } from '../lib/timerCues';
 import { primeAudio } from '../lib/beep';
 import { hush, primeSpeech } from '../lib/speech';
 import { useWakeLock } from '../lib/wakeLock';
@@ -117,6 +131,20 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   // one on screen) and supplies the week §4B's variants are chosen against. Read
   // only — nothing here is written back to the log.
   const [block, setBlock] = useState<BlockPosition | null>(null);
+  /**
+   * T31: the rep chain under way, or null. View state with the same lifetime as
+   * the timer itself (D18) — a set is four efforts and one record, and the count
+   * of efforts is not a thing any log contains.
+   *
+   * It outlives the chain by one step on purpose: after the last rep `armed` goes
+   * false but `rep` stays, because that number is what the set's record says it
+   * did. `handleLogHeld` reads it and clears it.
+   */
+  const [repState, setRepState] = useState<{
+    exerciseId: string;
+    rep: number;
+    armed: boolean;
+  } | null>(null);
   // Ref mirrors the latest log so rapid taps build from current state, never a
   // stale closure — otherwise concurrent "Add set" taps would drop entries.
   const logRef = useRef<WorkoutLog | null>(null);
@@ -196,6 +224,41 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   // primeAudio runs on these taps because they are the user gesture iOS requires
   // before an AudioContext will make any sound at all.
 
+  /** The derived block week §4B's variants are chosen against (T24). */
+  const week = block?.week ?? null;
+
+  /**
+   * The rep chain running on an exercise right now, with the rep it is on — or
+   * null, which is the answer for every exercise in the app except §4B's two
+   * PIMA entries during weeks 1–4.
+   *
+   * Both halves have to agree: a chain is only *active* if the catalog declares
+   * one for this week **and** a set of it is under way. That second condition is
+   * what stops a stale `repState` from another exercise steering this one's rest.
+   */
+  function activeChainFor(exerciseId: string | null): { chain: RepChain; rep: number } | null {
+    if (!exerciseId || repState === null || repState.exerciseId !== exerciseId) return null;
+    const chain = repChainOf(exercisesById.get(exerciseId), week);
+    return chain === null ? null : { chain, rep: repState.rep };
+  }
+
+  /**
+   * True while a running rest is a *gap between reps* rather than a rest between
+   * sets — the window in which the number worth showing is the rep about to run.
+   */
+  function restingBeforeNextRep(exerciseId: string): boolean {
+    const chained = activeChainFor(exerciseId);
+    if (chained === null || repState?.armed !== true) return false;
+    if (timer.exerciseId !== exerciseId || timer.phase !== 'resting') return false;
+    return !isLastRep(chained.chain, chained.rep);
+  }
+
+  /** The hold the clock runs: a chain's fixed rep, or the exercise's own spec. */
+  function liveHoldSpec(exercise: Exercise | undefined): HoldSpec | null {
+    const chain = repChainOf(exercise, week);
+    return chain ? repHoldSpec(chain) : holdSpecOf(exercise);
+  }
+
   // T20/D33: with a count-in configured this starts the *count*, and the hold
   // begins on "pull" — so `holdSec` measures the effort rather than the effort
   // plus however long it took to step up and load. With none it is the T13
@@ -204,11 +267,31 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   function beginHold(exerciseId: string) {
     primeAudio();
     primeSpeech();
+    // T31: a set on a rep-chained variant starts its chain here — on the tap,
+    // never on its own. What the chain automates is the interval *inside* a set
+    // already begun, which is the whole of D39's narrowing.
+    const chain = repChainOf(exercisesById.get(exerciseId), week);
+    setRepState(chain ? { exerciseId, rep: 1, armed: true } : null);
     setTimer(
       leadInMs > 0
         ? startLeadIn(exerciseId, leadInMs, Date.now())
         : startHold(exerciseId, Date.now()),
     );
+  }
+
+  /**
+   * T31: rep 2, 3, 4 — started by the chain rather than by a tap, and with no
+   * count-in.
+   *
+   * D33's count exists so `holdSec` measures the effort rather than the tap
+   * offset, and there is no tap here to offset. The warning it would duplicate
+   * has already run: T30 counts the last five seconds of the ten-second gap out
+   * loud, which is the reason this may auto-start at all.
+   */
+  function beginRepHold(exerciseId: string) {
+    primeAudio();
+    primeSpeech();
+    setTimer(startHold(exerciseId, Date.now()));
   }
 
   // T23/D39: a warm-up round starts its hold *directly*, with no count-in. D33's
@@ -244,19 +327,88 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   function dismissTimer() {
     hush();
     setTimer(clearTimer());
+    // T31: skipping the gap between reps ends the chain rather than leaving it
+    // armed against a timer that no longer exists. Nothing would fire — the
+    // advance needs a running rest — but an armed chain keeps a tick alive and
+    // keeps claiming a set is under way.
+    setRepState((s) => (s === null ? s : { ...s, armed: false }));
   }
 
   // `auto` means the timer reached the prescribed maximum rather than the owner
   // tapping Stop. Only then is the recorded duration the prescription: a manual
   // stop always measures what actually elapsed (T13 AC6).
   function handleStop(auto = false) {
+    // T31: whether this is a rep inside a chain, decided once and read by both
+    // the timer transition and the chain's own state.
+    const chained = activeChainFor(timer.exerciseId);
+    const midChain = chained !== null && !isLastRep(chained.chain, chained.rep);
+    // A manual Stop ends the *set*, not the rep: there is no control that cuts
+    // one effort short and continues, for the same reason the warm-up cycle has
+    // none. An auto-stop mid-chain leaves the chain armed for the next rep.
+    if (chained && (!auto || !midChain)) {
+      setRepState((s) => (s === null ? s : { ...s, armed: false }));
+    }
     setTimer((t) => {
       const exercise = exercisesById.get(t.exerciseId ?? '');
-      const restMs = restMsOf(exercise);
-      const hold = holdSpecOf(exercise);
-      return auto && hold ? autoStopHold(t, hold, restMs) : stopHold(t, Date.now(), restMs);
+      const setRest = restMsOf(exercise);
+      // The line this whole task turns on: between reps it is the chain's ten
+      // seconds, and only after the last one is it §4B's three minutes.
+      const restMs =
+        chained && auto && midChain ? restAfterRep(chained.chain, chained.rep, setRest) : setRest;
+      const hold = chained ? repHoldSpec(chained.chain) : holdSpecOf(exercise);
+      const next = auto && hold ? autoStopHold(t, hold, restMs) : stopHold(t, Date.now(), restMs);
+      // A rep is not a set. Holding its measurement back is what makes the Log
+      // control appear once, after the fourth — four rows for one prescribed set
+      // would put "set 3 of 5" in disagreement with the plan and double the
+      // record of every session (D21).
+      return auto && midChain ? { ...next, heldMs: null, heldAuto: false } : next;
     });
   }
+
+  // T31: the chain's own tick, running only while a chain is armed. Everything it
+  // reads is recomputed from the phase's absolute start instant (D18), so a
+  // throttled interval costs a stale frame and never a drifted gap.
+  const chainArmed = repState?.armed === true;
+  const repNow = useNow(chainArmed);
+  const armedChain = chainArmed ? activeChainFor(repState?.exerciseId ?? null) : null;
+  const chainVisible = typeof document === 'undefined' || document.visibilityState === 'visible';
+  const nextRepDue =
+    armedChain !== null &&
+    repState?.exerciseId === timer.exerciseId &&
+    !isLastRep(armedChain.chain, armedChain.rep) &&
+    shouldStartNextRep(timer, repNow, true, chainVisible);
+  const startedRepFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (!nextRepDue) return;
+    if (startedRepFor.current === timer.startedAt) return;
+    startedRepFor.current = timer.startedAt;
+    setRepState((s) => (s === null ? s : { ...s, rep: s.rep + 1 }));
+    beginRepHold(timer.exerciseId as string);
+    // beginRepHold is stable enough for this: it closes over nothing that can
+    // change between a rest completing and the tick that notices it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextRepDue, timer.startedAt, timer.exerciseId]);
+
+  // A gap the app slept through disarms the chain rather than firing a rep into
+  // an empty room — the same rule the warm-up cycle follows, and it matters more
+  // here, because this is ~90% effort rather than a warm-up. The set is not lost:
+  // what is on screen afterwards is a stopped chain with its reps recorded and
+  // the Log control available.
+  const chainStale = chainArmed && isRepChainStale(timer, repNow, true);
+  const staleHoldMs = armedChain ? armedChain.chain.holdSec * 1000 : 0;
+  useEffect(() => {
+    if (!chainStale) return;
+    setRepState((s) => (s === null ? s : { ...s, armed: false }));
+    // And hand back a measurement to log. The reps already done are real — each
+    // ended at the prescribed three seconds, which is *why* it auto-stopped — and
+    // a mid-chain rep withholds its `heldMs` so the Log control appears once, at
+    // the end. A chain that dies here would otherwise take the set's record with
+    // it, leaving the owner to retype what they just did (D16's whole point is
+    // that the app must not lose a set it watched happen).
+    setTimer((t) =>
+      t.heldMs === null ? { ...t, heldMs: staleHoldMs, heldAuto: true } : t,
+    );
+  }, [chainStale, staleHoldMs]);
 
   // Writes the measured hold as a set, carrying last time's load forward (T11
   // AC5) — the duration is the thing that was just measured, so it wins on reps.
@@ -274,6 +426,11 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
     // numeric field — that is the charted value, and the free-text `reps` has
     // been replaced there (D21). Everywhere else it keeps writing the text form.
     const tracksHold = exercisesById.get(exerciseId)?.metrics?.includes('holdSec') ?? false;
+    // T31: a chained set writes what it actually did — "4 x 3.0s", or "2 of 4 x
+    // 3.0s" where it was stopped early. §4F makes a short set as often correct as
+    // a full one, so the record reports the number rather than rounding it up to
+    // the prescription (D23).
+    const chained = activeChainFor(exerciseId);
     mutate((l) => {
       const seed = seedForNextSet(
         getSets(l, exerciseId),
@@ -282,10 +439,16 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
       );
       const measured = tracksHold
         ? { holdSec: Math.round((heldMs / 1000) * 10) / 10 }
-        : { reps: formatHold(heldMs) };
+        : {
+            reps: chained
+              ? formatRepsDone(chained.chain, chained.rep, heldMs / 1000)
+              : formatHold(heldMs),
+          };
       return addSet(l, exerciseId, { ...seed, ...measured, endReason });
     });
     setTimer(clearHeld);
+    // The chain ends with the record it produced: the next set starts a new one.
+    setRepState(null);
   }
 
   // Only exercises that actually record an edge get the standard-edge seed —
@@ -328,16 +491,105 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
    * that no record contains (D16).
    */
   function chainLabelFor(exerciseId: string): string | null {
-    const spec = setSpecOf(exercisesById.get(exerciseId));
+    // T31: the week decides the count — §4B's rep-structured variant asks for
+    // five sets where `prescribedSets` says 4–6.
+    const spec = setSpecOf(exercisesById.get(exerciseId), week);
     if (spec === null) return null;
-    return formatChain(chainPosition(getSets(log as WorkoutLog, exerciseId).length, spec));
+    const base = formatChain(chainPosition(getSets(log as WorkoutLog, exerciseId).length, spec));
+    const chained = activeChainFor(exerciseId);
+    // "set 3 of 5 · rep 2 of 4" — the set is what gets logged, the rep is where
+    // inside it the clock is. Neither is a quota (D23).
+    //
+    // During the gap the rep shown is the one about to run, not the one just
+    // finished: the bar already reads "next ·" there, and the whole point of the
+    // ten seconds is getting set for what comes next. Matches what the voice says.
+    //
+    // Dropped once the chain disarms: through the three minutes that follow the
+    // last rep the set is over, and "rep 4 of 4" beside "next ·" would describe
+    // something already finished.
+    return chained && base && repState?.armed
+      ? `${base} · ${formatRep(chained.chain, chained.rep + (restingBeforeNextRep(exerciseId) ? 1 : 0))}`
+      : base;
   }
 
   /** The same position said out loud (T20) — spoken once, when a rest completes. */
   function chainSpokenFor(exerciseId: string): string | null {
-    const spec = setSpecOf(exercisesById.get(exerciseId));
+    // T31: a gap *inside* a set announces the rep, because that is the number
+    // that moved — the set has not changed and saying it would be wrong. Only the
+    // between-sets rest speaks the set.
+    if (restingBeforeNextRep(exerciseId)) {
+      const chained = activeChainFor(exerciseId);
+      return chained && speakRep(chained.chain, chained.rep + 1);
+    }
+    const spec = setSpecOf(exercisesById.get(exerciseId), week);
     if (spec === null) return null;
     return speakChain(chainPosition(getSets(log as WorkoutLog, exerciseId).length, spec));
+  }
+
+  /**
+   * T32: what a "mark done and move on" control would say here, or null where
+   * one is not offered yet.
+   *
+   * Offered from the plan's *floor* (`chainSatisfied`) rather than its top,
+   * because §4F's lighter week makes four of "4–6 sets" a finished exercise —
+   * and `done` reports the top, which is what decides whether the control is the
+   * surface's primary or the small one beside the start (D23: an emphasis, never
+   * a block). Both surfaces read this one function, so the bar and the focus
+   * screen cannot disagree about what the tap will do.
+   */
+  function advanceOfferFor(exerciseId: string): { label: string; done: boolean } | null {
+    const order = routine?.exerciseIds ?? [];
+    const spec = setSpecOf(exercisesById.get(exerciseId), week);
+    const position = chainPosition(getSets(log as WorkoutLog, exerciseId).length, spec);
+    if (!chainSatisfied(position)) return null;
+    const step = nextStepAfter(order, exerciseId, completedIds());
+    const nextName =
+      step.kind === 'finish'
+        ? null
+        : (exercisesById.get(step.exerciseId)?.name ?? step.exerciseId);
+    return { label: advanceLabel(nextName), done: position.beyond };
+  }
+
+  function completedIds(): Set<string> {
+    const current = log as WorkoutLog;
+    return new Set((routine?.exerciseIds ?? []).filter((id) => isExerciseCompleted(current, id)));
+  }
+
+  /**
+   * The tap: mark this exercise done, then go where the routine says.
+   *
+   * The write is `setExerciseCompleted` — the same call the card's Mark done
+   * makes, from the same rule (D16: a completion is a tap, and this is the tap).
+   * The timer goes with it when it is this exercise's, because the clock it would
+   * leave running belongs to a set chain that just closed; a rest started by
+   * another exercise is left alone, exactly as every other control here treats it.
+   *
+   * Where it lands depends on where it was tapped (D35 — one act, two renderings):
+   * the focus surface stays in focus on the next exercise where that exercise is
+   * one focus can serve, and the session list scrolls the next card up to meet
+   * the eye. A warm-up is never focused into — T23 gave it a runner instead, and
+   * dropping the owner onto the wrong full-screen surface would be worse than a
+   * scroll.
+   */
+  function advanceFrom(exerciseId: string) {
+    const order = routine?.exerciseIds ?? [];
+    const step = nextStepAfter(order, exerciseId, completedIds());
+    mutate((l) => setExerciseCompleted(l, exerciseId, true));
+    hush();
+    setTimer((t) => (t.exerciseId === exerciseId ? clearTimer() : t));
+
+    if (step.kind === 'finish') {
+      handleFinish();
+      return;
+    }
+    const next = exercisesById.get(step.exerciseId);
+    const focusable = !warmupPlanOf(next) && liveHoldSpec(next) !== null;
+    if (focusId !== null && focusable) {
+      setFocusId(step.exerciseId);
+      return;
+    }
+    setFocusId(null);
+    scrollToExercise(step.exerciseId);
   }
 
   const timerExercise = timer.exerciseId ? exercisesById.get(timer.exerciseId) : undefined;
@@ -349,6 +601,15 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
     ? chainLabelFor(timer.exerciseId)
     : null;
   const timerChainSpoken = timer.exerciseId ? chainSpokenFor(timer.exerciseId) : null;
+  // T31: the Log control names what it will write. A chained set writes four
+  // reps, and a button reading "Log 3.0s as a set" would name one of them —
+  // which is the label the owner checks the record against afterwards.
+  const timerHeldLabel = (() => {
+    if (timer.heldMs === null || !timer.exerciseId) return null;
+    const chained = activeChainFor(timer.exerciseId);
+    return chained ? formatRepsDone(chained.chain, chained.rep, timer.heldMs / 1000) : null;
+  })();
+  const timerAdvance = timer.exerciseId ? advanceOfferFor(timer.exerciseId) : null;
   // T22: what the prescribed rest has to read. Resolved once, here, for the
   // exercise the *timer* belongs to — so it is the same deck whichever view is
   // mounted, and a rest running on one exercise still reports that one while
@@ -366,18 +627,28 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
     <SessionTimer
       state={timer}
       exerciseName={timerExercise?.name ?? timer.exerciseId ?? ''}
-      hold={holdSpecOf(timerExercise)}
+      hold={liveHoldSpec(timerExercise)}
       chainLabel={timerChainLabel}
       chainSpoken={timerChainSpoken}
+      heldLabel={timerHeldLabel}
       reading={timerReading}
       voice={voice}
+      // T32: the bar covers the card, so it carries the card's Mark done — plus
+      // where the routine goes next, which the card never knew.
+      chainDone={timerAdvance?.done ?? false}
+      advanceLabel={timerAdvance?.label ?? null}
+      onAdvance={
+        timer.exerciseId && timerAdvance
+          ? () => advanceFrom(timer.exerciseId as string)
+          : undefined
+      }
       onStop={handleStop}
       onSkip={dismissTimer}
       onExtend={(seconds) => setTimer((t) => extendRest(t, seconds))}
       onLogHeld={handleLogHeld}
       onCountEnd={handleCountEnd}
       onStartNext={
-        timer.exerciseId && holdSpecOf(timerExercise)
+        timer.exerciseId && liveHoldSpec(timerExercise)
           ? () => beginHold(timer.exerciseId as string)
           : undefined
       }
@@ -397,7 +668,7 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
         exercise={warmupExercise}
         plan={warmupPlan}
         state={timer}
-        timerHold={holdSpecOf(timerExercise)}
+        timerHold={liveHoldSpec(timerExercise)}
         completed={isExerciseCompleted(log, warmupExercise.id)}
         voice={voice}
         onExit={() => setWarmupId(null)}
@@ -424,9 +695,10 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   // of them is mounted. Every control below is the same handler the card uses
   // (D35): a set logged here is byte-identical to one logged there.
   const focusExercise = focusId === null ? undefined : exercisesById.get(focusId);
-  const focusHold = holdSpecOf(focusExercise);
+  const focusHold = liveHoldSpec(focusExercise);
   if (focusExercise && focusHold) {
     const last = lastByExercise.get(focusExercise.id) ?? null;
+    const focusAdvance = advanceOfferFor(focusExercise.id);
     return (
       <FocusHold
         exercise={focusExercise}
@@ -435,9 +707,10 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
         // The cues read the *timer's* exercise, not the focused one, so leaving
         // a rest running on one exercise and opening focus on another still
         // sounds correctly (AC5, AC9).
-        timerHold={holdSpecOf(timerExercise)}
+        timerHold={liveHoldSpec(timerExercise)}
         chainLabel={chainLabelFor(focusExercise.id)}
         chainSpoken={timerChainSpoken}
+        heldLabel={timerHeldLabel}
         // The edge the next set will carry, resolved through the same seed the
         // set logger uses — so the tag on the board and the number that gets
         // written can't disagree. Null on the exercises that record no edge.
@@ -463,6 +736,12 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
             ? (timerExercise?.name ?? timer.exerciseId)
             : null
         }
+        // T32: read for the *focused* exercise, not the timer's — this control
+        // finishes the exercise on screen, which is the one whose sets the owner
+        // has been counting. Same function the bar reads (D35).
+        chainDone={focusAdvance?.done ?? false}
+        advanceLabel={focusAdvance?.label ?? null}
+        onAdvance={focusAdvance ? () => advanceFrom(focusExercise.id) : undefined}
         onExit={() => setFocusId(null)}
         onStart={() => beginHold(focusExercise.id)}
         onStop={handleStop}
@@ -564,7 +843,7 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
           const entryNotes = log.entries.find((e) => e.exerciseId === exId)?.notes ?? '';
           const done = isExerciseCompleted(log, exId);
           const last = lastByExercise.get(exId) ?? null;
-          const holdSpec = holdSpecOf(exercise);
+          const holdSpec = liveHoldSpec(exercise);
           const restMs = restMsOf(exercise);
           const isTiming = timer.exerciseId === exId && timer.phase !== 'idle';
           const chainLabel = chainLabelFor(exId);
@@ -577,6 +856,8 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
           return (
             <section
               key={exId}
+              // T32: what "move on to the next one" scrolls to.
+              id={exerciseAnchorId(exId)}
               // The card's edge is its state: accent-tinted with an accent ring
               // once it is done, a brighter neutral ring while its timer runs,
               // and the ordinary edge otherwise. Three weights of one line.
@@ -807,3 +1088,30 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
     </div>
   );
 }
+
+/**
+ * Brings the next exercise's card up to meet the eye (T32).
+ *
+ * Deferred by a task rather than run inline: the tap that calls this also marks
+ * an exercise done and clears the timer, and the bar leaving takes its ~250px of
+ * bottom padding with it — centring the card before that commit lands would aim
+ * at a layout that is about to move. A macrotask is after the commit.
+ *
+ * `setTimeout` rather than `requestAnimationFrame` for one reason found in a
+ * hidden tab: frames stop being produced when the page is not visible, so a rAF
+ * would sit queued and fire whenever the owner came back, scrolling the page
+ * under them minutes later. A timeout runs (late, clamped) or is harmless.
+ *
+ * Silent where the element is missing. The scroll is a courtesy, and a session
+ * whose next card cannot be found is not a session that should throw.
+ */
+function scrollToExercise(exerciseId: string): void {
+  if (typeof window === 'undefined') return;
+  window.setTimeout(() => {
+    document
+      .getElementById(exerciseAnchorId(exerciseId))
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 0);
+}
+
+const exerciseAnchorId = (exerciseId: string) => `exercise-${exerciseId}`;
