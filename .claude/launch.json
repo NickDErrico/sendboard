@@ -158,6 +158,19 @@
       "port": 5202
     },
     {
+      "name": "dev-t33",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5203",
+        "--strictPort"
+      ],
+      "port": 5203
+    },
+    {
       "name": "preview-t25",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

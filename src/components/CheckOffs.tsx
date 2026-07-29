@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Check } from '../types';
+import type { Check, Exercise } from '../types';
 import {
   dateKey,
   deleteCheck,
   getAllChecks,
+  getAllExercises,
   getChecksForDay,
   getChecksForWeek,
   mondayOf,
@@ -16,6 +17,8 @@ import {
   weekClimbingStatus,
   weekEndKey,
 } from '../lib/checks';
+import { describeGtgToday, gtgToday, type GtgKindToday } from '../lib/gtg';
+import { go } from '../lib/routes';
 import { Icon, card, kicker } from './ui';
 
 // T5b's climbing week and T14's daily greasing-the-groove, in one card.
@@ -28,9 +31,15 @@ import { Icon, card, kicker } from './ui';
 // Behaviour is unchanged from the two components this replaces: tapping an
 // unchecked tile records a check for today, tapping a checked one confirms
 // before removing it.
+//
+// T33 changed the GtG half only. Two tiles that toggled a whole category became
+// two rows that *open* the routine, because the tile was answering "did you do
+// the thing" about a thing the app never named — the movements, their doses and
+// their triggers live on `#/gtg` now, and a category-level tick here would be a
+// second way to record the same day that names none of them (D11a). The climbing
+// week above the rule is untouched: a climbing day is a day, not a list (D9).
 
 type ClimbingKind = 'climbing-volume' | 'climbing-limit';
-type GtgKind = 'gtg-general' | 'gtg-pull';
 
 function fmt(key: string): string {
   return keyToLocalDate(key).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -40,19 +49,22 @@ export function CheckOffs() {
   const [week, setWeek] = useState<Check[] | null>(null);
   const [today, setToday] = useState<Check[] | null>(null);
   const [all, setAll] = useState<Check[]>([]);
+  const [exercises, setExercises] = useState<Exercise[]>([]);
 
   // Every read recomputes from `new Date()`, so leaving the app open across
   // midnight (or across a Monday) and refocusing rolls over rather than showing
   // yesterday's day or last week's week.
   const refresh = useCallback(async () => {
-    const [weekChecks, dayChecks, allChecks] = await Promise.all([
+    const [weekChecks, dayChecks, allChecks, exs] = await Promise.all([
       getChecksForWeek(new Date()),
       getChecksForDay(new Date()),
       getAllChecks(),
+      getAllExercises(),
     ]);
     setWeek(weekChecks);
     setToday(dayChecks);
     setAll(allChecks);
+    setExercises(exs);
   }, []);
 
   useEffect(() => {
@@ -67,7 +79,10 @@ export function CheckOffs() {
   }, [refresh]);
 
   const climbing = weekClimbingStatus(week ?? []);
-  const gtg = dailyGtgStatus(today ?? []);
+  const gtg = gtgToday(today ?? [], exercises);
+  // The kind-level roll-up stays the one every week summary is built on, rather
+  // than a second reading of "the kind happened today" that could disagree.
+  const kindDone = dailyGtgStatus(today ?? []);
   const counts = last7DayGtgCounts(all, new Date());
   const mondayKey = dateKey(mondayOf(new Date()));
   const weekDone = Number(climbing.volume) + Number(climbing.limit);
@@ -76,19 +91,6 @@ export function CheckOffs() {
     const existing = (week ?? []).filter((c) => c.kind === kind);
     if (existing.length > 0) {
       if (window.confirm('Remove this check for the week?')) {
-        await Promise.all(existing.map((c) => deleteCheck(c.id)));
-        await refresh();
-      }
-    } else {
-      await saveCheck({ id: crypto.randomUUID(), kind, date: dateKey(new Date()), notes: '' });
-      await refresh();
-    }
-  }
-
-  async function toggleDay(kind: GtgKind) {
-    const existing = (today ?? []).filter((c) => c.kind === kind);
-    if (existing.length > 0) {
-      if (window.confirm('Remove today’s check?')) {
         await Promise.all(existing.map((c) => deleteCheck(c.id)));
         await refresh();
       }
@@ -114,22 +116,57 @@ export function CheckOffs() {
 
       <hr className="hr my-0.5" />
 
-      <h2 className={kicker}>Today’s GtG</h2>
-      <div className="grid grid-cols-2 gap-2">
-        <Tile
-          label="General"
-          sub={`${counts.general}/7 days`}
-          done={gtg.general}
-          onClick={() => void toggleDay('gtg-general')}
-        />
-        <Tile
-          label="Pull"
-          sub={`${counts.pull}/7 days`}
-          done={gtg.pull}
-          onClick={() => void toggleDay('gtg-pull')}
-        />
+      <div className="flex items-baseline">
+        <h2 className={kicker}>Today’s GtG</h2>
+        <span className="ml-auto text-[11px] text-neutral-600">§8’s list · tap to open</span>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <GtgRow label="General" today={gtg['gtg-general']} done={kindDone.general} days={counts.general} />
+        <GtgRow label="Pull" today={gtg['gtg-pull']} done={kindDone.pull} days={counts.pull} />
       </div>
     </section>
+  );
+}
+
+/**
+ * One kind's line into the routine (T33).
+ *
+ * It reports and navigates; it does not tick. The mark is filled when the day
+ * holds anything for the kind — a movement, or one of the whole-kind checks the
+ * check-log still writes — so the reading agrees with `dailyGtgStatus` and with
+ * every week summary built on it.
+ */
+function GtgRow({
+  label,
+  today,
+  done,
+  days,
+}: {
+  label: string;
+  today: GtgKindToday;
+  done: boolean;
+  days: number;
+}) {
+  return (
+    <button
+      onClick={() => go({ name: 'gtg' })}
+      className={`flex items-center gap-2.5 rounded-[10px] border px-2.5 py-[11px] text-left text-[13px] font-medium transition-colors ${
+        done ? 'border-accent bg-accent/[.12] text-accent-200' : 'border-neutral-800 text-neutral-400 hover:border-white/[.34]'
+      }`}
+    >
+      <Icon
+        name={done ? 'check-circle' : 'circle'}
+        weight={done ? 'fill' : 'regular'}
+        className={`shrink-0 text-[18px] ${done ? 'text-accent-400' : 'text-neutral-600'}`}
+      />
+      <span className="min-w-0 flex-1">
+        {label}
+        <span className={`block text-[10px] font-normal ${done ? 'text-neutral-500' : 'text-neutral-600'}`}>
+          {describeGtgToday(today)} · {days} of last 7 days
+        </span>
+      </span>
+      <Icon name="caret-right" className="shrink-0 text-[13px] text-neutral-600" />
+    </button>
   );
 }
 

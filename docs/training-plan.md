@@ -262,3 +262,16 @@ Run the grips in that order. The two-finger positions come last and are the ones
 ### B. Grip in the finger warm-up
 
 §4A ends the warm-up with "2–3 sub-maximal hangs on your training edge" and names no grip. Take those hangs in **the grips that session trains** — half-crimp and open-hand, per §4B and §4C. Warming up in a grip you are not about to load, and not warming up one you are, is the gap this closes. Nothing else about §4A changes: it is still 10–15 minutes, still jugs first, still no countdown on any stage.
+
+### C. Scapular pull-ups and dead hangs
+
+§8's committed list names "Scapular pull-ups / dead hangs on jugs" and gives its dose (**5–8**), its trigger (walking under the bar) and its risk class (**watch**) — and then names it as the pulling stimulus to *prefer* over full pull-ups. No section says how to perform it: §5 covers the pull day and does not include it, so it is the one movement on §8's list that is prescribed here and described nowhere.
+
+**This addendum writes the execution down and adds no prescription.** The dose, the trigger, the risk class, and the drop order (full pull-ups first, these second, at any elbow or shoulder symptom) are §8's, unchanged. It supersedes nothing.
+
+- Hang from a bar — or from jugs — with straight arms and shoulders relaxed into a passive hang, ears near the biceps.
+- Without bending the elbows, pull the shoulder blades down and back. The body rises an inch or two; the arms do not work.
+- Hold the top for a moment, then let the shoulders return to the passive hang under control.
+- **5–8 reps.** Never near failure — §8's rule for the whole list applies here too.
+
+A plain relaxed dead hang on jugs is the same item's easier form, and is what "dead hangs on jugs" means where §8 names it. §8 gives no duration for it and none is invented here: hang for as long as it stays easy, and come off well before the grip is the reason you did.

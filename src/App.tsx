@@ -17,6 +17,7 @@ import { Plan } from './screens/Plan';
 import { Settings } from './screens/Settings';
 import { InstallGuide } from './screens/InstallGuide';
 import { CheckLog } from './screens/CheckLog';
+import { GtgToday } from './screens/GtgToday';
 import { CheckOffs } from './components/CheckOffs';
 import { TabBar } from './components/TabBar';
 import { btnGhost, btnPrimary, btnSecondary } from './components/ui';
@@ -93,6 +94,8 @@ function renderRoute(route: Route): ReactNode {
       return <ChecksRoute />;
     case 'checklog':
       return <CheckLog onExit={() => go({ name: 'checks' })} />;
+    case 'gtg':
+      return <GtgToday onExit={() => go({ name: 'home' })} />;
     case 'settings':
       return (
         <Settings

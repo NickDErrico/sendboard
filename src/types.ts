@@ -115,6 +115,35 @@ export interface Exercise {
    */
   planRefs?: string[];
   gtgEligible: boolean; // true = suitable for greasing-the-groove use; drives a badge in T3
+  /**
+   * This movement's row in §8's committed GtG list (T33, D11a).
+   *
+   * Typed rather than regexed out of the `prescription` string beside it, for
+   * D17's reason: those strings carry a session protocol *and* a GtG dose in one
+   * line ("Session: 3 x 10. GtG: 10–15 reps, morning and evening"), and a split
+   * on "GtG:" would hand a max-protocol number to a daily habit the first time an
+   * entry is worded differently. Every field is the §8 table cell, transcribed
+   * (D6) — the app never rewords a dose and never invents one.
+   *
+   * Present on exactly the entries `gtgEligible` marks; the two declarations are
+   * asserted to agree rather than trusted to.
+   */
+  gtg?: GtgDose;
+}
+
+/**
+ * One row of the training plan's §8 committed list (T33).
+ *
+ * `riskClass` is §8's own column, and it is carried because it is the field the
+ * plan acts on: **free** items load tissue nothing else in the week touches,
+ * **watch** items load the elbows and finger flexors that climbing days, Day 3
+ * and every hangboard session already load, and §8's drop order runs through the
+ * watch items first. It groups the surface; it never blocks anything (D23).
+ */
+export interface GtgDose {
+  dose: string; // "8–12 (about half your max)"
+  trigger: string; // "Whenever you walk past a clear floor"
+  riskClass: 'free' | 'watch';
 }
 
 export interface Routine {
@@ -277,13 +306,27 @@ export interface Check {
   kind: CheckKind;
   date: string; // ISO 8601 date, local day it happened
   notes: string; // optional free text, may be empty
+  /**
+   * Which movement of the kind this check is (T33, D11a).
+   *
+   * A catalog id, always one whose entry declares `gtg`. Optional, and absent is
+   * a supported state that is still written today: the check-log form records a
+   * whole category on a past day, and every check T5b wrote before T33 has no
+   * movement at all. Both read as "this kind happened, no movement named", which
+   * is what keeps the kind-level roll-up — `dailyGtgStatus`, `last7DayGtgCounts`,
+   * `summarizePastWeeks` — reading identically before and after this task, with
+   * no migration, no `DB_VERSION` bump and no `BACKUP_SCHEMA_VERSION` bump.
+   *
+   * Never set on `climbing-*`, which name a day, not a movement (D9).
+   */
+  exerciseId?: string;
 }
 
 export const CHECK_SCOPE: Record<CheckKind, CheckScope> = {
   'climbing-volume': 'weekly',
   'climbing-limit': 'weekly',
   'gtg-general': 'daily', // push-ups, squats, wrist extensors, external rotations, wall press
-  'gtg-pull': 'daily', // scapular pull-ups, dead hangs, full pull-ups — dose-limited, see D13
+  'gtg-pull': 'daily', // scapular pull-ups / dead hangs, full pull-ups — dose-limited, see D13
 };
 
 export interface Settings {

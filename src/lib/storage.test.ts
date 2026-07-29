@@ -24,10 +24,10 @@ function makeCheck(id: string, kind: CheckKind, date: string): Check {
 }
 
 describe('catalog (AC1, AC4, AC5)', () => {
-  // 20 training entries + T16's five §4E test-only entries; 2 training routines
-  // + T16's non-rotating battery.
-  it('exposes all 25 exercises and 3 routines from an empty database', async () => {
-    expect(await storage.getAllExercises()).toHaveLength(25);
+  // 21 training entries (T33 added §8's scapular pull-ups / dead hangs) + T16's
+  // five §4E test-only entries; 2 training routines + T16's non-rotating battery.
+  it('exposes all 26 exercises and 3 routines from an empty database', async () => {
+    expect(await storage.getAllExercises()).toHaveLength(26);
     expect(await storage.getAllRoutines()).toHaveLength(3);
   });
 
@@ -60,7 +60,12 @@ describe('catalog (AC1, AC4, AC5)', () => {
     }
   });
 
-  it('marks exactly the six GtG-eligible general movements (D13)', () => {
+  // T33 added the seventh: §8 names scapular pull-ups / dead hangs on the same
+  // committed list — and names it as the pulling movement to *prefer* — but no
+  // section described it, so the catalog had the option the plan warns about and
+  // not the one it recommends. §10C writes the execution down; the dose, trigger
+  // and risk class are still §8's.
+  it('marks exactly §8s seven committed movements (D13, T33)', () => {
     const eligible = EXERCISES.filter((e) => e.gtgEligible).map((e) => e.id).sort();
     expect(eligible).toEqual(
       [
@@ -69,6 +74,7 @@ describe('catalog (AC1, AC4, AC5)', () => {
         'kb-goblet-squat',
         'oi-wall-press',
         'pushups-or-dips',
+        'scapular-pullups-dead-hangs',
         'wrist-extensor-work',
       ].sort(),
     );

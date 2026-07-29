@@ -5,8 +5,10 @@ import type { Exercise } from '../types';
 // do not invent content. That includes §10, the addenda: content the plan referred
 // to but never wrote down goes *into the document first*, with its source and any
 // section it supersedes stated there, and only then into this file. A grip, a
-// cadence or a set count that exists only here is the failure mode D6 names. gtgEligible is true for exactly six general movements
-// (D13); no Day 1 max protocol is eligible (plan §8). Per D14, no summary/cue
+// cadence or a set count that exists only here is the failure mode D6 names. gtgEligible is true for exactly the seven
+// movements of §8's committed list (D13, T33) — five general and two pulling,
+// each carrying that row's dose and trigger in `gtg` — and no Day 1 max protocol
+// is eligible (plan §8). Per D14, no summary/cue
 // claims GtG strengthens tendons — that is the isometrics protocol's job (plan §4B).
 export const EXERCISES: Exercise[] = [
   {
@@ -73,6 +75,33 @@ export const EXERCISES: Exercise[] = [
     planRefs: ['4A', '8', '10A'], // T25/D42
   },
   {
+    id: 'scapular-pullups-dead-hangs',
+    name: 'Scapular Pull-ups / Dead Hangs',
+    category: 'pulling',
+    isoType: 'dynamic',
+    equipment: ['pullup-bar'],
+    summary: 'Shoulder-blade pull-ups and easy jug hangs — the GtG pulling stimulus §8 says to prefer over full pull-ups.',
+    // §10C. §8 named this movement and gave its dose without describing it; the
+    // addendum writes the execution down and states that it adds no prescription.
+    howTo: [
+      'Hang from a bar — or from jugs — with straight arms and shoulders relaxed into a passive hang, ears near the biceps.',
+      'Without bending the elbows, pull the shoulder blades down and back. The body rises an inch or two; the arms do not work.',
+      'Hold the top for a moment, then let the shoulders return to the passive hang under control.',
+      '5–8 reps, never near failure.',
+    ],
+    prescription: 'GtG: 5–8 reps, walking under the bar',
+    cues: [
+      'Elbows stay straight — this is the shoulder blade moving, not the arm.',
+      'A relaxed dead hang on jugs is the same item, easier: §8 gives it no duration, so come off well before the grip is the reason you did (§10C).',
+    ],
+    safetyNotes: [
+      'Second out, after full pull-ups, if elbow or shoulder symptoms persist (plan §8).',
+    ],
+    gtgEligible: true,
+    gtg: { dose: '5–8', trigger: 'Walking under the bar', riskClass: 'watch' }, // T33
+    planRefs: ['8', '10C'], // T25/D42
+  },
+  {
     id: 'bodyweight-pullups',
     name: 'Bodyweight Pull-ups',
     category: 'pulling',
@@ -94,6 +123,11 @@ export const EXERCISES: Exercise[] = [
       'Pull-ups load the same elbows, shoulders, and finger flexors as climbing and hangboarding. Daily pull-up volume on top of that is a known path into medial elbow tendinopathy — keep them trivial and be first to cut them (plan §8).',
     ],
     gtgEligible: true,
+    gtg: {
+      dose: '3–5 (well under half your max)',
+      trigger: 'Walking under the bar, max 3–4x/day',
+      riskClass: 'watch',
+    }, // T33
     planRefs: ['8'], // T25/D42
   },
   {
@@ -399,6 +433,7 @@ export const EXERCISES: Exercise[] = [
     ],
     safetyNotes: [],
     gtgEligible: true,
+    gtg: { dose: '10–15', trigger: 'Morning, evening', riskClass: 'free' }, // T33
     planRefs: ['5C', '8'], // T25/D42
   },
   {
@@ -441,6 +476,11 @@ export const EXERCISES: Exercise[] = [
     ],
     safetyNotes: [],
     gtgEligible: true,
+    gtg: {
+      dose: '8–12 (about half your max)',
+      trigger: 'Whenever you walk past a clear floor',
+      riskClass: 'free',
+    }, // T33
     planRefs: ['5D', '8'], // T25/D42
   },
   {
@@ -468,6 +508,7 @@ export const EXERCISES: Exercise[] = [
     ],
     safetyNotes: [],
     gtgEligible: true,
+    gtg: { dose: '5s x 1–2', trigger: 'Any doorway', riskClass: 'free' }, // T33
     planRefs: ['5D', '8'], // T25/D42
   },
   {
@@ -488,6 +529,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Light load, strict form — this is prehab, not a strength lift.'],
     safetyNotes: [],
     gtgEligible: true,
+    gtg: { dose: '10–12/side', trigger: 'Morning and evening', riskClass: 'free' }, // T33
     planRefs: ['5D', '8'], // T25/D42
   },
   {
@@ -508,6 +550,7 @@ export const EXERCISES: Exercise[] = [
     cues: ['Directly offsets the finger-flexor load from Day 1 — protects the elbow.'],
     safetyNotes: [],
     gtgEligible: true,
+    gtg: { dose: '10–15 reps', trigger: 'Every time you make coffee', riskClass: 'free' }, // T33
     planRefs: ['5D', '8'], // T25/D42
   },
   {
