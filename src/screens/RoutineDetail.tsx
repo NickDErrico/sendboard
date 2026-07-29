@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { Exercise, Routine, WorkoutLog } from '../types';
-import { createLog } from '../lib/session';
-import { getAllExercises, getAllLogs, saveLog } from '../lib/storage';
+import { resumable } from '../lib/session';
+import { startSession } from '../lib/openSession';
+import { getAllExercises, getAllLogs } from '../lib/storage';
 import { go } from '../lib/routes';
 import { ExerciseDetail } from './ExerciseDetail';
 import { Icon, btnPrimary } from '../components/ui';
@@ -23,7 +24,7 @@ export function RoutineDetail({ routine }: { routine: Routine }) {
     void (async () => {
       const [all, logs] = await Promise.all([getAllExercises(), getAllLogs()]);
       setExercisesById(new Map(all.map((e) => [e.id, e])));
-      setInProgress(logs.find((l) => l.completedAt === null) ?? null);
+      setInProgress(resumable(logs));
     })();
   }, [routine.id]);
 
@@ -35,8 +36,7 @@ export function RoutineDetail({ routine }: { routine: Routine }) {
   }
 
   async function start() {
-    const log = createLog(routine.id, crypto.randomUUID(), new Date().toISOString());
-    await saveLog(log);
+    await startSession(routine.id);
     go({ name: 'session' });
   }
 
@@ -58,9 +58,12 @@ export function RoutineDetail({ routine }: { routine: Routine }) {
       {inProgress && (
         <div className="mb-4 rounded-md border border-accent/40 bg-accent/[.08] p-4">
           <p className="text-[13px] font-medium text-accent-200">You have an unfinished session</p>
+          {/* Says only what this screen can do. It used to offer a discard it
+              had no button for — and the sessions that made the owner want one
+              were the empty ones, which D46 now never shows here at all. */}
           <p className="mt-0.5 text-xs text-accent-200/80">
-            Started {new Date(inProgress.startedAt).toLocaleString()}. Finish or discard it before
-            starting another.
+            Started {new Date(inProgress.startedAt).toLocaleString()}. Finish it before starting
+            another.
           </p>
           <button
             onClick={() => go({ name: 'session' })}

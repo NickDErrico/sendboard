@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { Routine, WorkoutLog } from '../types';
-import { createLog } from '../lib/session';
-import { getAllExercises, getAllLogs, getAllRoutines, getSettings, saveLog } from '../lib/storage';
+import { resumable } from '../lib/session';
+import { startSession } from '../lib/openSession';
+import { getAllExercises, getAllLogs, getAllRoutines, getSettings } from '../lib/storage';
 import {
   describeLastCompleted,
   rotates,
@@ -66,8 +67,10 @@ export function Home() {
         getAllExercises(),
       ]);
       setRoutines(rs);
-      // getAllLogs is sorted by startedAt descending.
-      setInProgress(logs.find((l) => l.completedAt === null) ?? null);
+      // getAllLogs is sorted by startedAt descending. D46: only a session that
+      // recorded something is in progress — a routine opened, read and backed
+      // out of leaves a log behind, and that is not a thing to resume.
+      setInProgress(resumable(logs));
       setLastCompleted(logs.find((l) => l.completedAt !== null) ?? null);
       setRotation(routineRotation(rs, logs, new Date()));
       setOccasions(batteryOccasions(logs));
@@ -116,8 +119,7 @@ export function Home() {
       go({ name: 'routine', routineId });
       return;
     }
-    const log = createLog(routineId, crypto.randomUUID(), new Date().toISOString());
-    await saveLog(log);
+    await startSession(routineId);
     go({ name: 'session' });
   }
 

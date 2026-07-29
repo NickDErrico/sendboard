@@ -9,10 +9,10 @@ import {
   getSettings,
   saveLog,
 } from '../lib/storage';
+import { finishSession, leaveSession } from '../lib/openSession';
 import {
   addSet,
   deleteSet,
-  finishLog,
   getSets,
   isExerciseCompleted,
   setExerciseCompleted,
@@ -210,12 +210,25 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
     }
   }
 
-  function handleFinish() {
+  // Both exits await their write before navigating: Home reads the log store on
+  // mount, and a discard still in flight would be a session that is over showing
+  // as in progress until the next refocus.
+  async function handleFinish() {
     const cur = logRef.current;
-    if (cur) {
-      void saveLog(finishLog(cur, new Date().toISOString()));
-    }
+    // D46: a session that recorded nothing is discarded rather than completed.
+    // Nothing is lost that was ever written, and the alternative is a blank row
+    // in History that marks the routine done for the week.
+    if (cur) await finishSession(cur, new Date().toISOString());
     onFinish();
+  }
+
+  // Back to Home leaves a real session exactly where it is, to be resumed — and
+  // takes an empty one with it, so opening a routine, reading it and backing out
+  // leaves nothing behind to resume or to be rid of (D46).
+  async function handleLeave() {
+    const cur = logRef.current;
+    if (cur) await leaveSession(cur);
+    go({ name: 'home' });
   }
 
   // ─── Timer (T10) ───────────────────────────────────────────────────────────
@@ -579,7 +592,7 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
     setTimer((t) => (t.exerciseId === exerciseId ? clearTimer() : t));
 
     if (step.kind === 'finish') {
-      handleFinish();
+      void handleFinish();
       return;
     }
     const next = exercisesById.get(step.exerciseId);
@@ -791,7 +804,7 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
           glance at mid-session, and they should not scroll away. */}
       <header className="flex items-center gap-2.5 px-4 pb-3 pt-[50px] shadow-[0_1px_0_#292b31]">
         <button
-          onClick={() => go({ name: 'home' })}
+          onClick={() => void handleLeave()}
           aria-label="Back home"
           className={`${btnGhost} h-[30px] w-[30px] shrink-0 px-0`}
         >
@@ -808,7 +821,7 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
             {doneCount} of {routine.exerciseIds.length} done
           </p>
         </div>
-        <button onClick={handleFinish} className={`${btnGhost} shrink-0 text-[13px]`}>
+        <button onClick={() => void handleFinish()} className={`${btnGhost} shrink-0 text-[13px]`}>
           Finish
         </button>
       </header>
@@ -1079,7 +1092,10 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
           />
         </section>
 
-        <button onClick={handleFinish} className={`${btnPrimary} mt-1 w-full !rounded-[10px] py-[13px] text-[15px]`}>
+        <button
+          onClick={() => void handleFinish()}
+          className={`${btnPrimary} mt-1 w-full !rounded-[10px] py-[13px] text-[15px]`}
+        >
           Finish session
         </button>
       </div>

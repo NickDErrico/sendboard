@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { BodyweightEntry, Settings, WorkoutLog } from '../types';
-import { createLog } from '../lib/session';
-import { getAllBodyweights, getAllLogs, getSettings, saveLog } from '../lib/storage';
+import { resumable } from '../lib/session';
+import { startSession } from '../lib/openSession';
+import { getAllBodyweights, getAllLogs, getSettings } from '../lib/storage';
 import { go } from '../lib/routes';
 import {
   BATTERY_ROUTINE_ID,
@@ -39,7 +40,7 @@ export function Retest({ onExit }: { onExit: () => void }) {
   }
 
   const occasions = batteryOccasions(logs, bodyweights);
-  const inProgress = logs.find((l) => l.completedAt === null) ?? null;
+  const inProgress = resumable(logs);
   const inProgressIsBattery = inProgress?.routineId === BATTERY_ROUTINE_ID;
   const baseline = occasions[0] ?? null;
   const latest = occasions.length > 1 ? occasions[occasions.length - 1] : null;
@@ -47,12 +48,13 @@ export function Retest({ onExit }: { onExit: () => void }) {
 
   async function start() {
     // Same single-in-progress invariant every other start path obeys: an open
-    // session is resumed rather than shadowed by a second log.
+    // session is resumed rather than shadowed by a second log. D46 narrows what
+    // counts as one, and `startSession` sweeps the rest.
     if (inProgress) {
       go({ name: 'session' });
       return;
     }
-    await saveLog(createLog(BATTERY_ROUTINE_ID, crypto.randomUUID(), new Date().toISOString()));
+    await startSession(BATTERY_ROUTINE_ID);
     go({ name: 'session' });
   }
 

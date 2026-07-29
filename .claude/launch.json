@@ -171,6 +171,19 @@
       "port": 5203
     },
     {
+      "name": "dev-d46",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5204",
+        "--strictPort"
+      ],
+      "port": 5204
+    },
+    {
       "name": "preview-t25",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

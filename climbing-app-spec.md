@@ -2600,3 +2600,24 @@ The owner's report was one sentence — *"The GTG general and pull daily exercis
 | Is a "5 of 7 movements" reading allowed? | **No.** §8's doses are triggers, not a quota, and §8's last paragraph calls the pulling half optional. The app reports which movements a day holds and never divides that by seven (D23). The one number §8 states, `max 3–4x/day`, is a ceiling rendered in §8's words and enforced by nobody. |
 
 **Net effect on scope:** one new pure module, one new screen, one new route, one new catalog entry, one plan addendum, one optional field on `Check` and one on `Exercise`. No new dependency, no new store, no migration, and no `DB_VERSION` or `BACKUP_SCHEMA_VERSION` movement. No reversal of D6, D9, D13, D14, D17, D23, D28 or D42. T17 remains the one item of the v1.8 backlog still unbuilt.
+
+---
+
+**2026-07-28 — D46 added: a log is not a session. Owner-reported defect, no new screen, one new module.**
+
+The report: *"Once you tap a finger routine like Day 1 or Day 3, even if just to look at the routine it shows as in progress and asks you to resume or discard but you cannot discard the active routine."* Both halves were true, and the second half was the app's own words — `RoutineDetail` said *"Finish or discard it before starting another"* under a card carrying exactly one button, Resume. The one deliberate discard in the app lives in `RoutineList`, which no tab reaches.
+
+The cause was that Start writes a log before anything has happened, because `ActiveSession` needs somewhere to write. So the log created by a look-and-back-out was byte-indistinguishable from a session in the middle of §4C's max hangs: `completedAt === null`, and every surface asking "is a session open" asked exactly that. It was also unfinishable in the honest sense — tapping Finish on it would have written a blank session into History, marked the routine done for the week, and been eligible to anchor the 8-week block (D25).
+
+**D46: an in-progress session is one that has recorded something.** `isStarted` — any surviving entry, or session notes — and `entries` is already pruned to entries carrying signal (T4 AC6, T9/D16), so the predicate is exact rather than a heuristic: a set added and deleted leaves nothing, and a lone Mark done counts because D16 makes that tap a thing that happened.
+
+| Question | Answer | Why |
+|---|---|---|
+| Create the log later instead? | **No** | Lazy creation moves the write into every one of `ActiveSession`'s ~dozen mutation paths and makes the first one of them fallible. The log is a write target; what was wrong was reading it as a claim. |
+| So who cleans up? | **The three moments, not a sweeper** | `startSession` / `leaveSession` / `finishSession` in `openSession.ts`. Leaving takes an empty log with you, finishing discards it rather than completing it, and starting sweeps whatever a force-close left behind. A boot-time or on-focus sweep was the obvious alternative and is rejected: it can race the tap that just created a log, and deleting the session someone is standing in is a worse defect than the one being fixed. |
+| Does the owner get a discard button? | **No — the owner's own reading** | *"I don't think you should be able to discard once it's actually started."* Under D46 the sessions that made one feel necessary are exactly the ones that no longer exist. `RoutineDetail` now says only what it can do, and `RoutineList`'s Resume/Discard/Cancel modal (T4's edge case) survives untouched for the session that is genuinely in the way. |
+| Does `#/session` filter too? | **No, deliberately** | The log a Start tap just created is unstarted by definition. D46 governs the screens that *ask* whether a session is open; the route that *opens* one still resolves any `completedAt === null` log, or it would refuse to open the session the tap opened. |
+
+**Net effect on scope:** one decision, one new storage-facing module (`openSession.ts`), three new pure predicates in `session.ts`, one line of copy. No new screen, no new route, no type change, no catalog change, no stored field, no migration, and no `DB_VERSION` or `BACKUP_SCHEMA_VERSION` movement. Four start paths lost their duplicated `createLog`/`saveLog` pair.
+
+**Verified in a browser** on an empty store, asserting the log store rather than the banner alone: Start → back leaves `logCount: 0` and no card on Home; Start → Mark done → back leaves one open log and *"In progress · tap to resume"* on Home and in History; un-marking that same completion and leaving discards it, because the log is empty again by the same rule that filled it; and Start → Finish leaves History reading *"No sessions yet"* with the block card still *"Not started"* — where before it would have counted a session nobody had.

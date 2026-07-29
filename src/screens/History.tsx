@@ -4,6 +4,7 @@ import { getAllExercises, getAllLogs, getAllRoutines, getSettings } from '../lib
 import { blockPosition, formatPhaseWeeks, type BlockPosition } from '../lib/block';
 import { describeSessionFacts, groupByStory, sessionFacts, type StoryGroup } from '../lib/sigil';
 import { rotates } from '../lib/rotation';
+import { resumable } from '../lib/session';
 import { SessionSigil } from '../components/SessionSigil';
 import { LogDetail } from './LogDetail';
 import { Icon } from '../components/ui';
@@ -63,8 +64,10 @@ export function History({
     return routine !== undefined && !rotates(routine);
   };
 
-  // getAllLogs is already sorted by startedAt descending (newest-first).
-  const inProgress = (logs ?? []).filter((l) => l.completedAt === null);
+  // getAllLogs is already sorted by startedAt descending (newest-first). D46:
+  // one unfinished session at most, and only if it recorded something — a log
+  // opened and backed out of is not a session this list owes a row to.
+  const open = resumable(logs ?? []);
   const groups = groupByStory(logs ?? [], position);
 
   return (
@@ -91,30 +94,25 @@ export function History({
         <div className="space-y-5">
           {/* AC13: unchanged from T5 — pinned above the story, outside the week
               grouping, because an unfinished session has not happened yet. */}
-          {inProgress.length > 0 && (
-            <section className="space-y-2">
-              {inProgress.map((l) => (
-                <button
-                  key={l.id}
-                  onClick={() => onResume(l.id)}
-                  className="w-full rounded-md border border-accent/40 bg-accent/[.08] p-3 text-left"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-accent-300">
-                      In progress
-                    </span>
-                    <span className="flex items-center gap-1 text-xs font-medium text-accent-200">
-                      Tap to resume
-                      <Icon name="caret-right" className="text-[11px]" />
-                    </span>
-                  </div>
-                  <p className="mt-1 font-medium text-ink">{routineName(l.routineId)}</p>
-                  <p className="text-xs text-neutral-400">
-                    Started {new Date(l.startedAt).toLocaleString()}
-                  </p>
-                </button>
-              ))}
-            </section>
+          {open && (
+            <button
+              onClick={() => onResume(open.id)}
+              className="w-full rounded-md border border-accent/40 bg-accent/[.08] p-3 text-left"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-accent-300">
+                  In progress
+                </span>
+                <span className="flex items-center gap-1 text-xs font-medium text-accent-200">
+                  Tap to resume
+                  <Icon name="caret-right" className="text-[11px]" />
+                </span>
+              </div>
+              <p className="mt-1 font-medium text-ink">{routineName(open.routineId)}</p>
+              <p className="text-xs text-neutral-400">
+                Started {new Date(open.startedAt).toLocaleString()}
+              </p>
+            </button>
           )}
 
           {groups.map((group) => (

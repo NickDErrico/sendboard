@@ -142,9 +142,15 @@ function useInstallOnboarding() {
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 function SessionRoute() {
-  // Relies on the single-in-progress-log invariant (enforced in RoutineList):
-  // there is at most one log with completedAt === null. Resolve it and hand its
-  // id to ActiveSession; if none exists (already finished), fall back home.
+  // Relies on the single-open-log invariant (`startSession` sweeps, every exit
+  // path cleans up after itself): there is at most one log with completedAt ===
+  // null. Resolve it and hand its id to ActiveSession; if none exists (already
+  // finished), fall back home.
+  //
+  // Deliberately *not* `resumable`: D46 governs which sessions are offered on
+  // the screens that ask, and the log a Start tap just created is unstarted by
+  // definition. Filtering it out here would refuse to open the session the tap
+  // opened.
   const [logId, setLogId] = useState<string | null | undefined>(undefined);
   useEffect(() => {
     void (async () => {

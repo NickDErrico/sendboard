@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { Routine, WorkoutLog } from '../types';
-import { deleteLog, getAllLogs, getAllRoutines, saveLog } from '../lib/storage';
-import { createLog } from '../lib/session';
+import { deleteLog, getAllLogs, getAllRoutines } from '../lib/storage';
+import { resumable } from '../lib/session';
+import { startSession } from '../lib/openSession';
 import { rotates } from '../lib/rotation';
 import { go } from '../lib/routes';
 import { btnPrimary } from '../components/ui';
@@ -21,7 +22,10 @@ export function RoutineList({
     void (async () => {
       const [rs, logs] = await Promise.all([getAllRoutines(), getAllLogs()]);
       setRoutines(rs);
-      setInProgress(logs.find((l) => l.completedAt === null) ?? null);
+      // D46: an unfinished session is one that recorded something. The modal
+      // below is the app's one deliberate discard, and it exists for a session
+      // that is genuinely in the way — never for a log nobody wrote in.
+      setInProgress(resumable(logs));
     })();
   }, []);
 
@@ -34,8 +38,7 @@ export function RoutineList({
   const startable = routines?.filter(rotates) ?? null;
 
   async function startNew(routineId: string) {
-    const log = createLog(routineId, crypto.randomUUID(), new Date().toISOString());
-    await saveLog(log);
+    const log = await startSession(routineId);
     onOpenSession(log.id);
   }
 

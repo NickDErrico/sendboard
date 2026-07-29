@@ -7,9 +7,12 @@ import {
   getSets,
   isExerciseCompleted,
   isInProgress,
+  isStarted,
+  resumable,
   setExerciseCompleted,
   setExerciseNotes,
   setSessionNotes,
+  unstarted,
   updateSet,
 } from './session';
 
@@ -129,6 +132,60 @@ describe('setExerciseCompleted (T9 AC7/AC8, D16)', () => {
     expect(isExerciseCompleted(log, 'pushups-or-dips')).toBe(false);
     // …and it must not be pruned by the new predicate — its notes still count.
     expect(setExerciseNotes(log, 'pushups-or-dips', 'ok').entries).toHaveLength(1);
+  });
+});
+
+describe('isStarted (D46)', () => {
+  it('is false for a log nobody has written in', () => {
+    expect(isStarted(base())).toBe(false);
+  });
+
+  it('is true once a set is added', () => {
+    expect(isStarted(addSet(base(), 'max-hang-half-crimp'))).toBe(true);
+  });
+
+  it('is true on a completion mark alone — D16 makes that tap a thing that happened', () => {
+    expect(isStarted(setExerciseCompleted(base(), 'kb-turkish-getup', true))).toBe(true);
+  });
+
+  it('is true on exercise notes alone', () => {
+    expect(isStarted(setExerciseNotes(base(), 'oi-wall-press', 'left side tender'))).toBe(true);
+  });
+
+  it('is true on session notes alone, and not on whitespace', () => {
+    expect(isStarted(setSessionNotes(base(), 'felt strong'))).toBe(true);
+    expect(isStarted(setSessionNotes(base(), '   '))).toBe(false);
+  });
+
+  it('goes back to false when the only thing recorded is taken away again', () => {
+    // The pruning in `mapEntry` is what makes this exact: a set added and
+    // deleted leaves no entry, so backing out is as empty as never starting.
+    let log = addSet(base(), 'max-hang-half-crimp');
+    log = deleteSet(log, 'max-hang-half-crimp', 0);
+    expect(isStarted(log)).toBe(false);
+  });
+});
+
+describe('resumable / unstarted (D46)', () => {
+  const empty = { ...base(), id: 'empty' };
+  const started = addSet({ ...base(), id: 'started' }, 'max-hang-half-crimp');
+  const done = finishLog(addSet({ ...base(), id: 'done' }, 'max-hang-half-crimp'), '2026-07-23T19:00:00.000Z');
+
+  it('offers only an unfinished session that recorded something', () => {
+    expect(resumable([empty, started, done])?.id).toBe('started');
+    expect(resumable([empty])).toBeNull();
+    expect(resumable([done])).toBeNull();
+    expect(resumable([])).toBeNull();
+  });
+
+  it('collects the unfinished logs that recorded nothing, and no others', () => {
+    expect(unstarted([empty, started, done]).map((l) => l.id)).toEqual(['empty']);
+  });
+
+  it('never treats a completed session as sweepable, however empty', () => {
+    // Pre-D46 builds could complete an empty log; it is history now, not litter.
+    const emptyCompleted = finishLog({ ...base(), id: 'old' }, '2026-07-23T19:00:00.000Z');
+    expect(unstarted([emptyCompleted])).toEqual([]);
   });
 });
 

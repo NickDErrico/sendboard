@@ -12,6 +12,36 @@ export function isInProgress(log: WorkoutLog): boolean {
   return log.completedAt === null;
 }
 
+/**
+ * Has this session recorded anything at all? (D46)
+ *
+ * The line between "I opened the routine to read it" and "I am training". A log
+ * exists from the Start tap because the session screen needs somewhere to write
+ * — but a log is not a session, and until something lands in it there is nothing
+ * under way and nothing to resume.
+ *
+ * `entries` is already pruned to entries that carry signal (see isMeaningful),
+ * so its emptiness is exact rather than approximate: a set typed and deleted
+ * leaves nothing behind, and a lone Mark done counts, because D16 makes that tap
+ * a thing that happened.
+ */
+export function isStarted(log: WorkoutLog): boolean {
+  return log.entries.length > 0 || log.sessionNotes.trim() !== '';
+}
+
+/** The unfinished session worth offering Resume for, or null (D46). */
+export function resumable(logs: WorkoutLog[]): WorkoutLog | null {
+  return logs.find((l) => isInProgress(l) && isStarted(l)) ?? null;
+}
+
+/**
+ * Unfinished logs holding nothing — discardable by definition, since there is
+ * nothing in them to discard.
+ */
+export function unstarted(logs: WorkoutLog[]): WorkoutLog[] {
+  return logs.filter((l) => isInProgress(l) && !isStarted(l));
+}
+
 export function getSets(log: WorkoutLog, exerciseId: string): SetEntry[] {
   return log.entries.find((e) => e.exerciseId === exerciseId)?.sets ?? [];
 }
