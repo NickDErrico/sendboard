@@ -184,6 +184,19 @@
       "port": 5204
     },
     {
+      "name": "dev-t34",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5205",
+        "--strictPort"
+      ],
+      "port": 5205
+    },
+    {
       "name": "preview-t25",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

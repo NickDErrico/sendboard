@@ -25,10 +25,12 @@ function makeCheck(id: string, kind: CheckKind, date: string): Check {
 
 describe('catalog (AC1, AC4, AC5)', () => {
   // 21 training entries (T33 added §8's scapular pull-ups / dead hangs) + T16's
-  // five §4E test-only entries; 2 training routines + T16's non-rotating battery.
-  it('exposes all 26 exercises and 3 routines from an empty database', async () => {
+  // five §4E test-only entries; 2 training routines, T34's §10D daily, and T16's
+  // non-rotating battery. No new exercise: the daily is the two entries Day 1
+  // already opens with.
+  it('exposes all 26 exercises and 4 routines from an empty database', async () => {
     expect(await storage.getAllExercises()).toHaveLength(26);
-    expect(await storage.getAllRoutines()).toHaveLength(3);
+    expect(await storage.getAllRoutines()).toHaveLength(4);
   });
 
   it('is stable across a re-init and never overwritten', async () => {

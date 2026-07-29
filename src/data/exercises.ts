@@ -32,7 +32,7 @@ export const EXERCISES: Exercise[] = [
     ],
     safetyNotes: ['Warm fingers thoroughly before any hangboard work (plan §7).'],
     gtgEligible: false,
-    planRefs: ['4A', '10B'], // T25/D42
+    planRefs: ['4A', '10B', '10D'], // T25/D42
   },
   {
     id: 'abrahangs-no-hang',
@@ -48,9 +48,10 @@ export const EXERCISES: Exercise[] = [
       'Work through the six grips in order — 20 hangs, about 10 minutes.',
     ],
     // T29: §10A's cadence, which supersedes §8's 10s/50s — see that addendum for
-    // why the two disagree. The twice-daily / ≥6h spacing is still §8's.
+    // why the two disagree. The twice-daily / ≥6h spacing is still §8's, and T34
+    // dropped the "optionally": §10D makes the two runs the prescription.
     prescription:
-      '10s on / 20s off, 20 hangs (~10 min) across six grips @ ~40% max on an 18–22mm edge; optionally twice daily, ≥6h apart',
+      '10s on / 20s off, 20 hangs (~10 min) across six grips @ ~40% max on an 18–22mm edge; twice daily, ≥6h apart',
     holdSeconds: [10, 10],
     restSeconds: 20,
     // T29: §10A's table, in its order. `rounds` sums to 20, which against the
@@ -68,11 +69,16 @@ export const EXERCISES: Exercise[] = [
       'Keep it genuinely easy — this primes connective tissue, it is not a strength set.',
       'Feet stay on the floor the whole way through; load until you feel a small strain, no more.',
       'The two-finger grips come last and are the first to drop — highest strain per unit of load.',
-      'Use it as a warm-up before Day 1 and climbing days, not as a daily habit.',
+      'Twice a day, at least six hours apart — the tissue is responsive again on roughly that spacing (§10D).',
+      'A Day 1 or climbing-day session that opens with this has had one of that day’s two.',
     ],
     safetyNotes: [],
+    // Still false, and §10D says why: a daily schedule is not §8's committed
+    // list. That list is 40–70% work on tissue nothing else in the week loads,
+    // and fingers are excluded from it by §8 and by D13 — neither of which this
+    // reverses.
     gtgEligible: false,
-    planRefs: ['4A', '8', '10A'], // T25/D42
+    planRefs: ['4A', '8', '10A', '10D'], // T25/D42
   },
   {
     id: 'scapular-pullups-dead-hangs',

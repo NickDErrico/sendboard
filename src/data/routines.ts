@@ -1,6 +1,6 @@
 import type { Routine } from '../types';
 
-// Exactly two routines (D9): the climbing days are check-offs, not routines.
+// Two training routines (D9): the climbing days are check-offs, not routines.
 // dayOfWeek is null for both — no day-of-week scheduling exists (D2a); the owner
 // picks the day. Exercise ordering follows the training plan's section order.
 export const ROUTINES: Routine[] = [
@@ -34,6 +34,22 @@ export const ROUTINES: Routine[] = [
       'external-rotations',
       'wrist-extensor-work',
     ],
+  },
+  // T34: §10D's daily. The same two entries Day 1 opens with, as a routine of
+  // their own — so the ten minutes the addendum prescribes twice a day are run
+  // with the warm-up runner and §10A's grip sequence rather than remembered.
+  //
+  // `inRotation: false` for D29's reason, applied to a habit instead of a test:
+  // running the daily must not change which *training* routine is up next (D15),
+  // must not anchor or count toward the 8-week block (D25), and must not appear
+  // in the week's routine balance. It is still started like any other routine and
+  // its results are ordinary logs.
+  {
+    id: 'daily-fingers',
+    name: 'Daily — Warm-up + Abrahangs',
+    dayOfWeek: null,
+    inRotation: false,
+    exerciseIds: ['finger-warmup-progression', 'abrahangs-no-hang'],
   },
   // T16: §4E's baseline/retest battery, run once before week 1 and again at the
   // end. A routine so its results are ordinary WorkoutLogs — the same set logger,

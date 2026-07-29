@@ -11,6 +11,13 @@ import {
 } from '../lib/rotation';
 import { batteryOccasions, type Occasion } from '../lib/retest';
 import {
+  DAILY_ROUTINE_ID,
+  dailyStatus,
+  describeRunsToday,
+  describeSpacing,
+  type DailyStatus,
+} from '../lib/daily';
+import {
   BLOCK_WEEKS,
   blockPosition,
   formatPhaseWeeks,
@@ -54,6 +61,9 @@ export function Home() {
   // what keeps the entry point below from ever being a control with nothing
   // behind it (AC10).
   const [tension, setTension] = useState<EdgeWeekGrid | null>(null);
+  // T34: §10D's daily, derived from the same logs as everything else on this
+  // screen — no stored flag, no schedule (D2a).
+  const [daily, setDaily] = useState<DailyStatus | null>(null);
 
   // Reloads on mount and refocus, so a session finished elsewhere (or a resume
   // after force-close) is reflected — and so "days ago" rolls over at midnight
@@ -78,6 +88,9 @@ export function Home() {
       // `routineRotation` follows. The session screen numbers the live one.
       setBlock(blockPosition({ logs, routines: rs, settings, today: new Date() }));
       setTension(buildEdgeWeekGrid({ logs, routines: rs, exercises, settings, today: new Date() }));
+      // Recomputed on every refocus, like T5b's daily status, so leaving the app
+      // open across midnight rolls the count over rather than showing yesterday's.
+      setDaily(dailyStatus(logs, new Date()));
     };
     void load();
     const onFocus = () => void load();
@@ -110,6 +123,9 @@ export function Home() {
     (a, b) => Number(statusFor(b.id)?.isNextUp ?? false) - Number(statusFor(a.id)?.isNextUp ?? false),
   );
   const [hero, ...rest] = sortedRoutines;
+  // Excluded from `sortedRoutines` by the same `rotates` filter that drops the
+  // battery, and surfaced on its own card below (T34).
+  const dailyRoutine = routines?.find((r) => r.id === DAILY_ROUTINE_ID);
 
   async function start(routineId: string) {
     // One-tap start (AC1). If a session is already in progress, defer to the
@@ -203,6 +219,41 @@ export function Home() {
               </button>
             </div>
           ))}
+        </section>
+      )}
+
+      {/* 2b. T34: §10D's daily — the §4A warm-up and §10A's abrahangs, twice a
+             day, at least six hours apart. Its own card rather than a row on
+             the one above, because it is not in the rotation and never competes
+             with it: doing this does not change what is up next (D15).
+
+             It reports and it starts. What it never does is say the day owes a
+             run — no "1 of 2", no meter, no colour that reads as incomplete.
+             The spacing line is §10D's own interval and a clock time, which is
+             a fact about the last run, not a schedule (D2a, D23). */}
+      {dailyRoutine !== undefined && (
+        <section className={`${card} flex items-center gap-3 shadow-edge`}>
+          <div className="min-w-0 flex-1">
+            <p className={kicker}>Today · daily</p>
+            <button
+              onClick={() => go({ name: 'routine', routineId: dailyRoutine.id })}
+              className="mt-0.5 block max-w-full text-left text-[15px] font-medium leading-tight"
+            >
+              {dailyRoutine.name}
+            </button>
+            {daily !== null && (
+              <p className="mt-0.5 text-[11px] text-neutral-500">
+                {describeRunsToday(daily)} · {describeSpacing(daily)}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={() => void start(dailyRoutine.id)}
+            className={`${btnGhost} shrink-0 text-[13px]`}
+          >
+            <Icon name="play" weight="fill" className="text-[13px]" />
+            Start
+          </button>
         </section>
       )}
 

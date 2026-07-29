@@ -4,6 +4,7 @@ import { deleteLog, getAllLogs, getAllRoutines } from '../lib/storage';
 import { resumable } from '../lib/session';
 import { startSession } from '../lib/openSession';
 import { rotates } from '../lib/rotation';
+import { DAILY_ROUTINE_ID } from '../lib/daily';
 import { go } from '../lib/routes';
 import { btnPrimary } from '../components/ui';
 
@@ -32,10 +33,14 @@ export function RoutineList({
   // Names resolve against every routine, including the battery — an unfinished
   // battery must still be named in the resume banner rather than showing its id.
   const routineName = (id: string) => routines?.find((r) => r.id === id)?.name ?? id;
-  // Started from here: training routines only. The §4E battery is a measurement,
-  // not a training session, and it has its own screen where its protocol and its
-  // conditions live (D29).
-  const startable = routines?.filter(rotates) ?? null;
+  // Started from here: the rotating training routines, plus §10D's daily (T34).
+  // `rotates` is the wrong question for this list — it answers "does finishing
+  // this change what is up next", and the daily's answer is no while it remains
+  // an ordinary session someone starts here. The §4E battery stays out: it is a
+  // measurement, not a session, and it has its own screen where its protocol and
+  // its conditions live (D29).
+  const startable =
+    routines?.filter((r) => rotates(r) || r.id === DAILY_ROUTINE_ID) ?? null;
 
   async function startNew(routineId: string) {
     const log = await startSession(routineId);

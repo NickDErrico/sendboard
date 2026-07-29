@@ -3,7 +3,7 @@ import type { Exercise, Routine, WorkoutLog } from '../types';
 import { getAllExercises, getAllLogs, getAllRoutines, getSettings } from '../lib/storage';
 import { blockPosition, formatPhaseWeeks, type BlockPosition } from '../lib/block';
 import { describeSessionFacts, groupByStory, sessionFacts, type StoryGroup } from '../lib/sigil';
-import { rotates } from '../lib/rotation';
+import { BATTERY_ROUTINE_ID } from '../lib/retest';
 import { resumable } from '../lib/session';
 import { SessionSigil } from '../components/SessionSigil';
 import { LogDetail } from './LogDetail';
@@ -57,12 +57,15 @@ export function History({
   }
 
   const routineName = (id: string) => routinesById.get(id)?.name ?? id;
-  // A log against a non-rotating routine is a §4E battery: a measurement, not a
-  // session the block counts (D29). It still appears, in the week it happened.
-  const isBattery = (log: WorkoutLog) => {
-    const routine = routinesById.get(log.routineId);
-    return routine !== undefined && !rotates(routine);
-  };
+  // The §4E battery: a measurement, not a session the block counts (D29). It
+  // still appears, in the week it happened.
+  //
+  // T34 narrowed this from "any non-rotating routine" to the battery by id. Both
+  // readings were the same set until §10D's daily became the second routine
+  // outside the rotation — and a daily warm-up marked as a *test* would put a
+  // §4E badge on ten minutes of abrahangs. Non-rotating is why the block does not
+  // count a log; it is not what the log is.
+  const isBattery = (log: WorkoutLog) => log.routineId === BATTERY_ROUTINE_ID;
 
   // getAllLogs is already sorted by startedAt descending (newest-first). D46:
   // one unfinished session at most, and only if it recorded something — a log

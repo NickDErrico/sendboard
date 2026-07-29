@@ -275,3 +275,18 @@ Run the grips in that order. The two-finger positions come last and are the ones
 - **5–8 reps.** Never near failure — §8's rule for the whole list applies here too.
 
 A plain relaxed dead hang on jugs is the same item's easier form, and is what "dead hangs on jugs" means where §8 names it. §8 gives no duration for it and none is invented here: hang for as long as it stays easy, and come off well before the grip is the reason you did.
+
+### D. Abrahangs as a daily routine
+
+§8 retains Abrahangs "only as a warm-up before Day 1 and climbing days, not as a daily habit," and §10A repeats that sentence. **This addendum reverses that one clause on the owner's decision of 2026-07-29: the finger warm-up and the Abrahang routine are run every day.** It changes nothing else — §10A's routine is untouched, and so is every restriction §8 places on the max protocols.
+
+**Where the reversal comes from.** §8's own sources describe a daily protocol and always did. The 10s/50s figure §8 cites is Emil Abrahamsson's *thirty consecutive days*, run twice a day. Baar's collagen work — the mechanism §8 gives for both the ten minutes and the six hours — describes tissue that becomes responsive again roughly every six hours, which is an argument for frequency, not against it. And the routine Gilmore et al. (2024) measured, the one §10A adopts, was a daily intervention: that is the protocol that matched Max Hangs for grip strength and stacked additively on top of them. The warm-up-only restriction was an *allocation* choice made under §8's "GtG the things you're not maxing" rule — and fingers are the case §8 itself names as the deliberate exception to that rule, "because the research supports combining."
+
+- **Dose:** §10A's routine, unchanged — 18–22mm, 10s on / 20s off, six grips in order, 20 hangs, about 10 minutes, at roughly 40% of max with the feet on the floor throughout.
+- **Frequency:** twice a day, **at least six hours apart** (§8, Baar). The spacing is the whole reason the session is short: inside six hours the tissue has not become responsive again, so a third run in a day adds load without adding the adaptation it was run for.
+- **The warm-up leads it.** §4A's progression comes first, for §7's reason — cold pulleys are the injury this document is most concerned with — and the sub-maximal hangs that end it are taken in the grips about to be run (§10B).
+- **On Day 1 and climbing days it is still the warm-up, and it still counts.** A day that opens a session with §4A and Abrahangs has had one of that day's two. It is not owed a third.
+
+**What this does not change.** Abrahangs stay off §8's committed GtG list. That list is movements at 40–70% loading tissue nothing else in the week touches, and fingers are excluded from it by §8 and for the reasons §8 gives; this addendum moves one finger protocol onto a daily schedule, it does not move it onto that list. §4B and §4C are unchanged, and §8's rule that adding frequency to max work is how a plateau becomes a pulley injury stands exactly as written — Abrahangs are the exception because they are ~40% of max, not because frequency stopped mattering.
+
+**Stop signals are §8's, unchanged, and two of them were already about this.** Forearm or finger stiffness that does not clear with a normal warm-up, and Day 1 max hang numbers trending down for two consecutive sessions, are the readings that say the daily load is no longer free. Drop the second session of the day first.
