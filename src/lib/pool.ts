@@ -190,10 +190,16 @@ export interface SlotStatus {
   due: boolean;
 }
 
-// The stalest of `candidates`: never-loaded first (in catalog order), then oldest
-// day first. Mirrors `pickNextUp` in rotation.ts, including the `<` that makes
-// catalog order the tie-break among equals.
-function stalest(candidates: Exercise[], lastLoaded: Map<string, string>): Exercise | null {
+/**
+ * The stalest of `candidates`: never-loaded first (in catalog order), then oldest
+ * day first. Mirrors `pickNextUp` in rotation.ts, including the `<` that makes
+ * catalog order the tie-break among equals.
+ *
+ * Exported for `variation.ts`, which applies the identical rule to the grip pairs
+ * §4B and §4C alternate between. One implementation, so "what is up next" cannot
+ * mean two different things in two places.
+ */
+export function stalest(candidates: Exercise[], lastLoaded: Map<string, string>): Exercise | null {
   let best: Exercise | null = null;
   let bestDay: string | undefined;
   for (const candidate of candidates) {

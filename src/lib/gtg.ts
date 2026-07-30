@@ -100,6 +100,9 @@ export function gtgToday(dayChecks: Check[], exercises: Exercise[]): Record<Chec
     // holds none of them and this roll-up has nothing to count. `pool.ts` is
     // where a joint check is read.
     joint: empty,
+    // A symptom names a reading, not a movement done — it can never contribute
+    // to a "what did you train today" roll-up. `symptoms.ts` reads these.
+    symptom: empty,
   };
 }
 

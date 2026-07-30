@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Check, Exercise, Tier, WorkoutLog } from '../types';
+import type { Check, Exercise, SymptomKind, Tier, WorkoutLog } from '../types';
 import {
   dateKey,
   deleteCheck,
@@ -15,6 +15,13 @@ import {
   poolToday,
   type SlotStatus,
 } from '../lib/pool';
+import {
+  SYMPTOM_KINDS,
+  SYMPTOM_SIGNALS,
+  activeSymptoms,
+  describeDropPosition,
+  dropPositions,
+} from '../lib/symptoms';
 import { Icon, card, kicker, tagNeutral } from '../components/ui';
 
 // The joint/tendon rotation (docs/joint-rotation-research.md), as the two things
@@ -63,6 +70,10 @@ export function Joints({ onExit }: { onExit?: () => void }) {
   const today = new Date();
   const daily = dailyIsometricsToday(exercises, logs, checks ?? [], today);
   const pool = poolToday(exercises, logs, checks ?? [], today);
+  const symptoms = activeSymptoms(checks ?? []);
+  // The whole point of recording a signal: §8's and §10D's drop orders name
+  // movements, and those movements are on this screen.
+  const drops = dropPositions(symptoms);
 
   // Un-ticking is silent, as on the GtG screen and for the same reason: a check
   // names one movement on one day, so a mis-tap costs one tap to undo and a
@@ -83,6 +94,27 @@ export function Joints({ onExit }: { onExit?: () => void }) {
         exerciseId: exercise.id,
       });
     }
+    await refresh();
+  }
+
+  async function recordSymptom(kind: SymptomKind) {
+    await saveCheck({
+      id: crypto.randomUUID(),
+      kind: 'symptom',
+      date: dateKey(today),
+      notes: '',
+      symptom: kind,
+    });
+    await refresh();
+  }
+
+  // Clearing confirms, unlike un-ticking a movement. A symptom is not a daily
+  // yes/no that costs one tap to redo — it is the record that changed what the
+  // plan says to do, and losing it by a mis-tap loses the reason a movement was
+  // dropped.
+  async function clearSymptom(kind: SymptomKind, checkIds: string[]) {
+    if (!window.confirm(`Clear “${SYMPTOM_SIGNALS[kind].label}”?`)) return;
+    await Promise.all(checkIds.map((id) => deleteCheck(id)));
     await refresh();
   }
 
@@ -127,7 +159,7 @@ export function Joints({ onExit }: { onExit?: () => void }) {
             <ul className="flex flex-col gap-1.5">
               {daily.map((slot) => (
                 <li key={slot.target}>
-                  <SlotRow slot={slot} tier="daily-isometric" onToggle={toggle} />
+                  <SlotRow slot={slot} tier="daily-isometric" drops={drops} onToggle={toggle} />
                 </li>
               ))}
             </ul>
@@ -148,10 +180,79 @@ export function Joints({ onExit }: { onExit?: () => void }) {
             <ul className="flex flex-col gap-1.5">
               {pool.map((slot) => (
                 <li key={slot.target}>
-                  <SlotRow slot={slot} tier="pool" onToggle={toggle} />
+                  <SlotRow slot={slot} tier="pool" drops={drops} onToggle={toggle} />
                 </li>
               ))}
             </ul>
+          </section>
+
+          <section className={`${card} flex flex-col gap-2.5 shadow-edge`}>
+            <div className="flex items-baseline gap-2">
+              <h2 className={kicker}>Stop signals</h2>
+              <span className="ml-auto text-[11px] text-neutral-600">§7 · §8 · §10D</span>
+            </div>
+
+            {symptoms.length === 0 ? (
+              <p className="px-0.5 text-[11px] leading-snug text-neutral-500">
+                Nothing flagged. Record one when you notice it — the plan attaches a drop order to
+                each, and it can’t apply one it doesn’t know about.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {symptoms.map((symptom) => (
+                  <li
+                    key={symptom.kind}
+                    className="rounded-[10px] border border-amber-500/40 bg-amber-500/[.08] px-2.5 py-[11px]"
+                  >
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-[13px] font-medium text-amber-200">
+                        {symptom.signal.label}
+                      </span>
+                      <span className="text-[11px] text-neutral-500">
+                        since{' '}
+                        {new Date(`${symptom.since}T00:00`).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </span>
+                      <button
+                        onClick={() => void clearSymptom(symptom.kind, symptom.checkIds)}
+                        className="ml-auto rounded-md px-1 py-0.5 text-[11px] font-medium text-accent hover:bg-accent/10"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    {/* The plan's own instruction, quoted rather than summarised —
+                        it is the reason the record exists. */}
+                    <ul className="mt-1.5 flex flex-col gap-1">
+                      {symptom.signal.response.map((line) => (
+                        <li key={line} className="flex items-start gap-1.5">
+                          <Icon
+                            name="caret-right"
+                            className="mt-[3px] shrink-0 text-[10px] text-amber-400/70"
+                          />
+                          <span className="text-[11px] leading-snug text-neutral-300">{line}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-1 text-[10px] text-neutral-600">plan {symptom.signal.source}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="flex flex-wrap gap-1.5">
+              {SYMPTOM_KINDS.filter((k) => !symptoms.some((s) => s.kind === k)).map((kind) => (
+                <button
+                  key={kind}
+                  onClick={() => void recordSymptom(kind)}
+                  title={SYMPTOM_SIGNALS[kind].reading}
+                  className="rounded-[8px] border border-neutral-800 px-2 py-1 text-[11px] text-neutral-400 transition-colors hover:border-amber-500/50 hover:text-amber-200"
+                >
+                  + {SYMPTOM_SIGNALS[kind].label}
+                </button>
+              ))}
+            </div>
           </section>
         </>
       )}
@@ -168,10 +269,13 @@ export function Joints({ onExit }: { onExit?: () => void }) {
 function SlotRow({
   slot,
   tier,
+  drops,
   onToggle,
 }: {
   slot: SlotStatus;
   tier: Tier;
+  /** Exercise id → drop position, from whichever stop signals are up. */
+  drops: Map<string, number>;
   onToggle: (exercise: Exercise) => Promise<void>;
 }) {
   const exercise = slot.doneToday ?? slot.exercise;
@@ -192,6 +296,10 @@ function SlotRow({
   }
 
   const dose = exercise.tiers?.find((t) => t.tier === tier);
+  // A movement §8's or §10D's drop order names while a signal is up. Marked, not
+  // removed: the plan says drop it, and saying so is the app's job — deciding is
+  // not (D23).
+  const dropPosition = drops.get(exercise.id);
 
   return (
     <button
@@ -216,6 +324,11 @@ function SlotRow({
             {JOINT_TARGET_LABELS[slot.target]}
           </span>
           <span className="text-[11px] text-neutral-500">{exercise.name}</span>
+          {dropPosition !== undefined && (
+            <span className="shrink-0 rounded-[5px] border border-amber-500/40 bg-amber-500/[.12] px-1.5 py-px text-[10px] font-medium text-amber-200">
+              {describeDropPosition(dropPosition)}
+            </span>
+          )}
           {dose && <span className={`${tagNeutral} shrink-0`}>{dose.text}</span>}
         </span>
         {/* Muscle length is part of the prescription, not a form cue (Oranchuk

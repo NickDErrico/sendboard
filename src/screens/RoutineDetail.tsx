@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import type { Exercise, Routine, WorkoutLog } from '../types';
 import { resumable } from '../lib/session';
 import { startSession } from '../lib/openSession';
-import { getAllExercises, getAllLogs } from '../lib/storage';
+import { getAllChecks, getAllExercises, getAllLogs } from '../lib/storage';
+import { variationStatus } from '../lib/variation';
 import { go } from '../lib/routes';
 import { ExerciseDetail } from './ExerciseDetail';
-import { Icon, btnPrimary } from '../components/ui';
+import { Icon, btnPrimary, tagNeutral } from '../components/ui';
 import { RowRule, readList } from '../components/ReadList';
 
 // T9 (AC4/AC5): the `#/routine/:id` screen. Replaces T6's inline start block in
@@ -19,12 +20,21 @@ export function RoutineDetail({ routine }: { routine: Routine }) {
   const [exercisesById, setExercisesById] = useState<Map<string, Exercise>>(new Map());
   const [inProgress, setInProgress] = useState<WorkoutLog | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  // §4B/§4C's alternating grips: which of each pair is up this session. A map
+  // rather than a filter — the alternate stays in the list and stays startable
+  // (D23), it is only marked.
+  const [variations, setVariations] = useState<Map<string, boolean>>(new Map());
 
   useEffect(() => {
     void (async () => {
-      const [all, logs] = await Promise.all([getAllExercises(), getAllLogs()]);
+      const [all, logs, checks] = await Promise.all([
+        getAllExercises(),
+        getAllLogs(),
+        getAllChecks(),
+      ]);
       setExercisesById(new Map(all.map((e) => [e.id, e])));
       setInProgress(resumable(logs));
+      setVariations(variationStatus(all, logs, checks));
     })();
   }, [routine.id]);
 
@@ -80,18 +90,34 @@ export function RoutineDetail({ routine }: { routine: Routine }) {
       <ol className={`${readList} mb-4`}>
         {routine.exerciseIds.map((exId, i) => {
           const exercise = exercisesById.get(exId);
+          // undefined = not part of a rotation, so neither marked nor dimmed.
+          const upNext = variations.get(exId);
           return (
             <li key={exId}>
               {i > 0 && <RowRule />}
               <button
                 onClick={() => exercise && setDetailId(exId)}
                 disabled={!exercise}
-                className="flex w-full items-center gap-3 rounded-md px-1 py-3 text-left transition-colors hover:bg-white/5 disabled:opacity-60 disabled:hover:bg-transparent"
+                className={`flex w-full items-center gap-3 rounded-md px-1 py-3 text-left transition-colors hover:bg-white/5 disabled:opacity-60 disabled:hover:bg-transparent ${
+                  upNext === false ? 'opacity-55' : ''
+                }`}
               >
                 <span className="w-4 shrink-0 text-[11px] tabular-nums text-neutral-600">{i + 1}</span>
                 <span className="min-w-0 flex-1">
                   {/* Missing catalog entry → raw id, never crash (T2 edge case). */}
-                  <span className="block text-[13px] font-medium">{exercise?.name ?? exId}</span>
+                  <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span className="text-[13px] font-medium">{exercise?.name ?? exId}</span>
+                    {/* Marked, never enforced: the alternate below is still one
+                        tap from its full protocol and still runs in the session.
+                        §4B/§4C say alternate; §7 caps max finger work at one
+                        session a week, which running both pairs would double. */}
+                    {upNext === true && (
+                      <span className="shrink-0 rounded-[5px] border border-accent/40 bg-accent/[.12] px-1.5 py-px text-[10px] font-medium text-accent-200">
+                        Grip up this session
+                      </span>
+                    )}
+                    {upNext === false && <span className={`${tagNeutral} shrink-0`}>alternates</span>}
+                  </span>
                   {exercise && (
                     <span className="mt-0.5 block break-words text-[11px] leading-snug text-neutral-500">
                       {exercise.summary}

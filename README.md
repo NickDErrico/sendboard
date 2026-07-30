@@ -1,12 +1,49 @@
 # Sendboard
 
-A personal, installable PWA for a single climber following the 8-week
-overcoming-isometrics training block in [`docs/training-plan.md`](docs/training-plan.md).
-It answers three questions: *what am I training today*, *how do I do this exercise*,
-and *what did I actually do*. 100% on-device (IndexedDB), no backend, no accounts.
+A personal, installable PWA for a single climber: **climbing training and
+tendon/joint strengthening**, in one place. It answers three questions: *what am
+I training today*, *how do I do this exercise*, and *what did I actually do*.
+100% on-device (IndexedDB), no backend, no accounts.
 
-The full build specification and its decision log live in
-[`climbing-app-spec.md`](climbing-app-spec.md) — that file is the source of truth.
+Two documents drive the content. The 8-week overcoming-isometrics block is in
+[`docs/training-plan.md`](docs/training-plan.md); the standing joint and tendon
+program — and the research behind it — is in
+[`docs/joint-rotation-research.md`](docs/joint-rotation-research.md). The build
+specification and its decision log live in
+[`climbing-app-spec.md`](climbing-app-spec.md).
+
+## The four tiers
+
+Training is organised by *loading mechanism*, because the mechanisms have
+incompatible frequency requirements — one schedule cannot serve all of them.
+
+| Tier | What | How often | Rotates? |
+|---|---|---|---|
+| **Collagen** | Abrahangs + finger warm-up | up to 2x/day, ≥6h apart | No — the spacing *is* the prescription |
+| **Daily tendon isometrics** | one slot per non-finger tendon @ ~70% MVC, 30–45s | daily, ~8–10 min | The slot is fixed; the movement in it rotates |
+| **Block-fixed max** | Day 1 fingerboard, Day 3 pull, §4E battery | 1–2x/week per pattern | Only at block boundaries, so retests compare |
+| **Rotating pool** | GtG + dynamic and proprioceptive prehab | 2–3x/week per target | Yes — stalest target first |
+
+Fingers are deliberately absent from the daily isometric tier: they already carry
+the abrahangs plus two sessions a week, and plan §7/§8 forbid adding frequency
+there. The six tendon slots are finger/wrist extensors, elbow, rotator cuff,
+adductor, hamstring, and Achilles.
+
+Nothing in the rotation grades you. There is no streak, no compliance figure and
+no "overdue" label — an interval is a schedule, not a debt, and §4F makes a
+lighter week correct as often as the table is. Order carries the urgency; the
+words stay factual.
+
+## Stop signals
+
+The plan attaches a *response* to four readings — sharp finger pain (§7), elbow
+and shoulder symptoms (§8, §10C), and stiffness that does not clear with a warm-up
+(§10D). Recording one on `#/joints` surfaces the plan's own drop order and marks
+the affected movements in place: full pull-ups **first out**, the scapular work
+**second**, the day's second abrahang session first when stiffness is the signal.
+
+A signal stays up until you clear it. The plan gives no duration for any of them,
+so the app does not invent one.
 
 ## Status
 
@@ -19,6 +56,13 @@ a % of bodyweight view.
 
 T16–T28 are a prioritized backlog in the spec — capture before comfort, because the
 8-week block has not started and a missing measurement cannot be backfilled.
+
+Since then: the joint/tendon rotation at `#/joints` (six daily isometric slots and
+a pool queue over six targets), stop-signal recording with the plan's drop orders,
+and grip-pair alternation on Day 1 — §4B and §4C say to alternate half-crimp and
+open-hand, and listing all four made it easy to run twice the max finger volume §7
+caps at one session a week. Catalog coverage is now a test: a tendon with no
+movement fails the build rather than going unnoticed.
 
 Remaining is the on-device acceptance pass: export/import on iOS Safari (T7), the T8
 criterion-5 walkthrough, and four things that can only be confirmed on the phone —

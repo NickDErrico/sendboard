@@ -120,6 +120,26 @@ export interface Exercise {
    * states — every pre-existing entry therefore reads exactly as before.
    */
   tiers?: TierPrescription[];
+  /**
+   * Entries the plan says to *alternate between* rather than run together.
+   *
+   * §4B: "half-crimp (rotate in open-hand every other session)". §4C: "half-crimp,
+   * alternate open-hand". Both pairs sit in Day 1's list side by side, and until
+   * this field nothing said they were a choice — so the routine read as four
+   * protocols, which is twice the max finger load §7 caps at one session a week.
+   *
+   * A shared string is the group. Members are ranked by `variation.ts` on the
+   * same least-recently-loaded rule the rotations use, and the one that comes up
+   * is *marked*, never enforced: the others stay in the list, fully startable
+   * (D23, and the demotion T32 already applies to a sixth set).
+   *
+   * Note for whoever revisits this: Lattice — whose coaches build Crimpd —
+   * advise the opposite, "once you have selected and tested in an arm position
+   * stick with it throughout the rest of the plan", which would make the pair a
+   * per-block choice rather than a per-session alternation. That is a training
+   * decision, not an app one, so the app runs what §4B and §4C actually say.
+   */
+  rotationGroup?: string;
   isoType: IsoType;
   equipment: Equipment[];
   summary: string; // one line, shown in list view
@@ -409,7 +429,24 @@ export type CheckKind =
   | 'climbing-limit'
   | 'gtg-general'
   | 'gtg-pull'
-  | 'joint';
+  | 'joint'
+  | 'symptom';
+
+/**
+ * The training plan's own stop signals — the readings it says to act on.
+ *
+ * Four, because the plan names four, and each has a *response* attached that
+ * until now could never fire: §8 puts full pull-ups first out and the scapular
+ * work second at any elbow or shoulder symptom, and §10D says to drop the second
+ * daily abrahang session first when stiffness does not clear. Both rules were
+ * written into the catalog as safety notes and neither had an input.
+ *
+ * `finger-pain` is the one that ends a session rather than changing a schedule —
+ * §7's sharp-or-pulley-specific pain, "the difference between a plateau and a
+ * torn A2". `SetEndReason: 'pain'` already records that a *hold* ended that way;
+ * this records that the day did.
+ */
+export type SymptomKind = 'finger-pain' | 'elbow' | 'shoulder' | 'forearm-stiffness';
 export type CheckScope = 'weekly' | 'daily'; // climbing-* are weekly; the rest are daily
 
 export interface Check {
@@ -431,6 +468,21 @@ export interface Check {
    * Never set on `climbing-*`, which name a day, not a movement (D9).
    */
   exerciseId?: string;
+  /**
+   * Which stop signal this is. Set on `kind: 'symptom'` and on nothing else.
+   *
+   * Carried on `Check` rather than in a store of its own because a symptom is
+   * exactly what a check already is — a thing that happened on a local day, with
+   * optional notes — and a second store would cost a `DB_VERSION` bump and a
+   * `BACKUP_SCHEMA_VERSION` bump to model no new shape. Optional, so every check
+   * ever written still reads without a migration.
+   *
+   * There is deliberately no "resolved" flag and no expiry window: the plan gives
+   * no duration for any of these, and inventing one would decide on the owner's
+   * behalf when an elbow has stopped hurting. A signal stays up until it is
+   * cleared, and clearing deletes the record.
+   */
+  symptom?: SymptomKind;
 }
 
 export const CHECK_SCOPE: Record<CheckKind, CheckScope> = {
@@ -442,6 +494,9 @@ export const CHECK_SCOPE: Record<CheckKind, CheckScope> = {
   // is the granularity a check is *recorded* at, not how often the movement comes
   // up. `pool.ts` owns the interval; nothing here needs to know it.
   joint: 'daily',
+  // Recorded against the day it was noticed. The scope is not how long it lasts —
+  // a stop signal stays up until cleared, see `Check.symptom`.
+  symptom: 'daily',
 };
 
 export interface Settings {

@@ -12,6 +12,7 @@ export const CHECK_KIND_LABELS: Record<CheckKind, string> = {
   'gtg-general': 'GtG — General',
   'gtg-pull': 'GtG — Pull',
   joint: 'Joints & tendons',
+  symptom: 'Stop signal',
 };
 
 export function keyToLocalDate(key: string): Date {

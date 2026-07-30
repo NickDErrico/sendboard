@@ -25,13 +25,16 @@ function makeCheck(id: string, kind: CheckKind, date: string): Check {
 
 describe('catalog (AC1, AC4, AC5)', () => {
   // 21 training entries (T33 added §8's scapular pull-ups / dead hangs) + T16's
-  // five §4E test-only entries + the joint rotation's ten (six daily tendon
-  // isometrics and four pool movements covering the targets the catalog left
-  // uncovered — elbow, wrist, knee, ankle). 2 training routines, T34's §10D
-  // daily, and T16's non-rotating battery. The rotation adds no routine: it is
-  // scheduled by target rather than by session (see pool.ts).
-  it('exposes all 36 exercises and 4 routines from an empty database', async () => {
-    expect(await storage.getAllExercises()).toHaveLength(36);
+  // five §4E test-only entries + the joint rotation's 23: seven daily tendon
+  // isometrics and sixteen pool movements across the six non-finger targets.
+  // 2 training routines, T34's §10D daily, and T16's non-rotating battery. The
+  // rotation adds no routine: it is scheduled by target, not by session (pool.ts).
+  //
+  // A bare count is a weak assertion — `pool.test.ts` is what holds the shape,
+  // asserting every slot and pool target has a movement. This one only catches an
+  // accidental duplicate or deletion.
+  it('exposes all 49 exercises and 4 routines from an empty database', async () => {
+    expect(await storage.getAllExercises()).toHaveLength(49);
     expect(await storage.getAllRoutines()).toHaveLength(4);
   });
 

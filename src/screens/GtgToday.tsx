@@ -46,6 +46,9 @@ const SECTION_COPY: Record<CheckKind, { title: string; note: string; refs: strin
   // is not where it lives. Undefined so this screen renders nothing for it,
   // rather than a third section that would duplicate `#/joints`.
   joint: undefined,
+  // A stop signal is a reading, not a movement — §8's list holds none. It is
+  // recorded and answered on `#/joints`.
+  symptom: undefined,
 };
 
 export function GtgToday({ onExit }: { onExit?: () => void }) {
