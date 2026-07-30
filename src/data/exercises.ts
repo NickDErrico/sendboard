@@ -38,6 +38,16 @@ export const EXERCISES: Exercise[] = [
     id: 'abrahangs-no-hang',
     name: 'Abrahangs (No-Hang)',
     category: 'warmup',
+    target: 'fingers',
+    tiers: [
+      {
+        tier: 'collagen',
+        text: '10s on / 20s off, 20 hangs (~10 min) across six grips @ ~40% max; twice daily, ≥6h apart',
+        holdSeconds: [10, 10],
+        restSeconds: 20,
+        source: 'Plan §10A / §10D (Crimpd–Gilmore et al. 2024 cadence, Baar spacing)',
+      },
+    ],
     isoType: 'yielding',
     equipment: ['hangboard'],
     summary: 'Light no-hangs with feet on the ground — a collagen-priming warm-up, not a max effort.',
@@ -84,6 +94,15 @@ export const EXERCISES: Exercise[] = [
     id: 'scapular-pullups-dead-hangs',
     name: 'Scapular Pull-ups / Dead Hangs',
     category: 'pulling',
+    // The movement is the shoulder blade, not the arm — §10C's own first cue.
+    target: 'shoulder',
+    tiers: [
+      {
+        tier: 'pool',
+        text: 'GtG: 5–8 reps, walking under the bar',
+        source: 'Plan §8 committed list / §10C',
+      },
+    ],
     isoType: 'dynamic',
     equipment: ['pullup-bar'],
     summary: 'Shoulder-blade pull-ups and easy jug hangs — the GtG pulling stimulus §8 says to prefer over full pull-ups.',
@@ -111,6 +130,17 @@ export const EXERCISES: Exercise[] = [
     id: 'bodyweight-pullups',
     name: 'Bodyweight Pull-ups',
     category: 'pulling',
+    // Targeted at the elbow because that is the tissue §8 tracks it by: its own
+    // safety note names medial elbow tendinopathy as the risk and puts it first
+    // in the drop order. The target is the thing to watch, not the prime mover.
+    target: 'elbow',
+    tiers: [
+      {
+        tier: 'pool',
+        text: 'GtG: 3–5 reps, well under half your max, max 3–4x/day',
+        source: 'Plan §8 committed list',
+      },
+    ],
     isoType: 'dynamic',
     equipment: ['pullup-bar'],
     summary: 'Standard full pull-ups — a greasing-the-groove pulling option kept deliberately easy.',
@@ -422,6 +452,10 @@ export const EXERCISES: Exercise[] = [
     id: 'kb-goblet-squat',
     name: 'Kettlebell Goblet Squat',
     category: 'lower-body',
+    target: 'hip',
+    tiers: [
+      { tier: 'pool', text: 'GtG: 10–15 reps, morning and evening', source: 'Plan §8 / §5C' },
+    ],
     isoType: 'dynamic',
     equipment: ['kettlebell'],
     summary: 'Goblet squat for leg drive — it matters more for hard bouldering than people think.',
@@ -465,6 +499,14 @@ export const EXERCISES: Exercise[] = [
     id: 'pushups-or-dips',
     name: 'Push-ups or Dips',
     category: 'antagonist',
+    target: 'shoulder',
+    tiers: [
+      {
+        tier: 'pool',
+        text: 'GtG: 8–12 (about half your max) whenever you pass a clear floor',
+        source: 'Plan §8 / §5D',
+      },
+    ],
     isoType: 'dynamic',
     equipment: ['bodyweight'],
     summary: 'Push-ups or dips — pushing strength to balance the pullers; a free GtG movement.',
@@ -493,6 +535,8 @@ export const EXERCISES: Exercise[] = [
     id: 'oi-wall-press',
     name: 'Overcoming Isometric Wall Press',
     category: 'antagonist',
+    target: 'shoulder',
+    tiers: [{ tier: 'pool', text: 'GtG: 5s x 1–2 in any doorway', source: 'Plan §8 / §5D' }],
     isoType: 'overcoming',
     equipment: ['bodyweight'],
     summary: 'Push into a wall at max effort — shoulder and pushing strength with zero equipment; a free GtG movement.',
@@ -521,6 +565,10 @@ export const EXERCISES: Exercise[] = [
     id: 'external-rotations',
     name: 'External Rotations',
     category: 'antagonist',
+    target: 'shoulder',
+    tiers: [
+      { tier: 'pool', text: 'GtG: 10–12 per side, morning and evening', source: 'Plan §8 / §5D' },
+    ],
     isoType: 'dynamic',
     equipment: ['band', 'kettlebell'],
     summary: 'Rotator-cuff external rotations — shoulder health and prehab; a free GtG movement.',
@@ -542,6 +590,14 @@ export const EXERCISES: Exercise[] = [
     id: 'wrist-extensor-work',
     name: 'Wrist Extensor Work',
     category: 'antagonist',
+    target: 'extensors',
+    tiers: [
+      {
+        tier: 'pool',
+        text: 'GtG: 10–15 reps, e.g. every time you make coffee',
+        source: 'Plan §8 / §5D',
+      },
+    ],
     isoType: 'dynamic',
     equipment: ['kettlebell'],
     summary: 'Wrist extensor work — protects the elbow from finger-flexor-heavy training; a free GtG movement.',
@@ -747,5 +803,356 @@ export const EXERCISES: Exercise[] = [
     safetyNotes: ['Come off before the elbow takes over from the back; §7 names pulling volume as the first thing to cut at any elbow symptom.'],
     gtgEligible: false,
     planRefs: ['4E'], // T25/D42
+  },
+
+  // ─── Daily tendon isometrics (docs/joint-rotation-research.md §6, tier 2) ───
+  //
+  // One slot per major non-finger tendon, ~70% MVC, 30–45s, daily. Fingers are
+  // deliberately absent: that tissue already carries the abrahangs twice daily
+  // and two finger routines a week, and plan §7/§8 forbid adding frequency to it.
+  //
+  // No `planRefs`: these are sourced from the literature rather than from
+  // docs/training-plan.md, and an address that does not resolve is worse than
+  // none (D42). Each dose names its source on the tier prescription instead.
+  //
+  // Every entry holds at the *long* muscle length, which is a prescribed variable
+  // and not a detail of execution — Oranchuk et al. (2019) found longer lengths
+  // produce greater adaptation than equal volume at short lengths, and Baar
+  // reports lengthened holds improving compliance by up to 50%.
+  //
+  // None declares `restSeconds`: the 70% MVC / 30–45s standard prescribes hold
+  // and rep count but no rest interval, and inventing one is the fabrication D17
+  // exists to prevent — the same reason `oi-wall-press` has none.
+  {
+    id: 'iso-extensor-hold',
+    name: 'Finger Extensor Isometric Hold',
+    category: 'antagonist',
+    target: 'extensors',
+    tiers: [
+      {
+        tier: 'daily-isometric',
+        text: '2 x 30–45s @ ~70% effort',
+        holdSeconds: [30, 45],
+        prescribedSets: [2, 2],
+        position: 'Fingers spread to full extension — the end of range, not mid-way',
+        source: '70% MVC / 30–45s isometric standard; long-length per Oranchuk 2019',
+      },
+    ],
+    isoType: 'overcoming',
+    equipment: ['band', 'bodyweight'],
+    summary: 'Sustained finger-extension hold — the daily counter-load to a flexor-heavy week.',
+    howTo: [
+      'Loop a band around the fingers and thumb, or press the fingertips into a flat surface.',
+      'Open the hand to full extension against the resistance.',
+      'Hold at roughly 70% of a hard effort — firm, not straining.',
+      'Hold 30–45 seconds, twice.',
+    ],
+    prescription: 'Daily: 2 x 30–45s @ ~70% effort, fingers at full extension',
+    cues: [
+      'Extension is the position, not just the direction — finish with the fingers straight.',
+      'Climbers get more flexor-dominant with experience, which is what this offsets.',
+    ],
+    safetyNotes: [],
+    gtgEligible: false,
+  },
+  {
+    id: 'iso-elbow-neutral-hold',
+    name: 'Neutral-Grip Mid-Range Hold',
+    category: 'pulling',
+    target: 'elbow',
+    tiers: [
+      {
+        tier: 'daily-isometric',
+        text: '2 x 30–45s @ ~70% effort',
+        holdSeconds: [30, 45],
+        prescribedSets: [2, 2],
+        position: 'Mid-range elbow bend — roughly 90°, the angle that loads the tendon most',
+        source: "Hörst's climber's-elbow density hold, extended to the 30–45s standard",
+      },
+    ],
+    isoType: 'yielding',
+    equipment: ['pullup-bar'],
+    summary: 'Mid-range neutral-grip hold — daily load for the elbow tendons climbing never rests.',
+    howTo: [
+      'Take a neutral (palms-facing) grip on a bar or rings.',
+      'Pull to a mid-range elbow bend, around 90°, and hold there.',
+      'Keep the effort around 70% — assist with the feet if a free hang is harder than that.',
+      'Hold 30–45 seconds, twice.',
+    ],
+    prescription: 'Daily: 2 x 30–45s at ~90° elbow, neutral grip, ~70% effort',
+    cues: [
+      'Neutral grip, not pronated — this is the elbow, not a pull-up.',
+      'Use the feet to keep it at 70%; a maximal version belongs in a session, not a daily slot.',
+    ],
+    safetyNotes: [
+      'Stop at any sharp medial or lateral elbow pain. This is capacity work, not treatment for a symptom you already have.',
+    ],
+    gtgEligible: false,
+  },
+  {
+    id: 'iso-shoulder-er-hold',
+    name: 'External Rotation Isometric Hold',
+    category: 'antagonist',
+    target: 'shoulder',
+    tiers: [
+      {
+        tier: 'daily-isometric',
+        text: '2 x 30–45s per side @ ~70% effort',
+        holdSeconds: [30, 45],
+        prescribedSets: [2, 2],
+        position: 'Elbow at the ribs, forearm rotated out to end range',
+        source: '70% MVC / 30–45s isometric standard; rotator cuff per climbing-PT consensus',
+      },
+    ],
+    isoType: 'overcoming',
+    equipment: ['band'],
+    summary: 'Held external rotation — daily rotator-cuff load for climbing’s second-worst overuse site.',
+    howTo: [
+      'Anchor a band at elbow height and stand side-on, elbow pinned to the ribs at 90°.',
+      'Rotate the forearm outward to the end of its range.',
+      'Hold there at roughly 70% effort.',
+      'Hold 30–45 seconds per side, twice each.',
+    ],
+    prescription: 'Daily: 2 x 30–45s per side @ ~70% effort, forearm at end range',
+    cues: [
+      'The elbow stays pinned — if it drifts off the ribs the lats are doing this.',
+      'Hold at the end of the range, not halfway: length is part of the prescription.',
+    ],
+    safetyNotes: [],
+    gtgEligible: false,
+  },
+  {
+    id: 'iso-copenhagen-hold',
+    name: 'Copenhagen Adductor Hold',
+    category: 'lower-body',
+    target: 'hip',
+    tiers: [
+      {
+        tier: 'daily-isometric',
+        text: '2 x 30–45s per side, short lever',
+        holdSeconds: [30, 45],
+        prescribedSets: [2, 2],
+        position: 'Top knee on the bench — short lever until the position is familiar',
+        source: 'Copenhagen adduction (meta-analysis, groin injury), held rather than repped',
+      },
+    ],
+    isoType: 'yielding',
+    equipment: ['bodyweight'],
+    summary: 'Side-plank adductor hold — the groin work that heel hooks load and nothing else trains.',
+    howTo: [
+      'Lie on your side with the top leg resting on a bench or chair, knee bent (short lever).',
+      'Prop up on the bottom elbow and lift the hips until the body is in line.',
+      'Drive the top knee down into the bench to hold the position.',
+      'Hold 30–45 seconds per side, twice each.',
+    ],
+    prescription: 'Daily: 2 x 30–45s per side, top knee on the bench (short lever)',
+    cues: [
+      'Start short-lever and stay there for weeks — the straight-leg version is a large jump.',
+      'Hips in line with the shoulders; a sagging hip makes this a different exercise.',
+    ],
+    safetyNotes: [
+      'This produces real soreness if started long-lever or at volume. Short lever, two holds, no more.',
+    ],
+    gtgEligible: false,
+  },
+  {
+    id: 'iso-knee-flexion-hold',
+    name: 'Mid-Range Knee Flexion Hold',
+    category: 'lower-body',
+    target: 'knee',
+    tiers: [
+      {
+        tier: 'daily-isometric',
+        text: '2 x 30–45s per side @ ~70% effort',
+        holdSeconds: [30, 45],
+        prescribedSets: [2, 2],
+        position: 'Knee near-extended — the long end of the hamstring range, as in a heel hook',
+        source: '70% MVC / 30–45s isometric standard; heel-hook position per climbing-PT sources',
+      },
+    ],
+    isoType: 'overcoming',
+    equipment: ['bodyweight'],
+    summary: 'Held hamstring contraction near full knee extension — the heel-hook position.',
+    howTo: [
+      'Sit or lie with the heel on the floor and the knee only slightly bent.',
+      'Pull the heel back into the ground as if dragging it toward you — nothing moves.',
+      'Hold at roughly 70% effort.',
+      'Hold 30–45 seconds per side, twice each.',
+    ],
+    prescription: 'Daily: 2 x 30–45s per side, knee near-extended, ~70% effort',
+    cues: [
+      'Near-straight knee, not bent — that long position is where a heel hook actually loads.',
+      'Actively engaging the hamstring is what makes a heel hook stable; passive hanging is not.',
+    ],
+    safetyNotes: [],
+    gtgEligible: false,
+  },
+  {
+    id: 'iso-calf-raise-hold',
+    name: 'Isometric Calf Raise Hold',
+    category: 'lower-body',
+    target: 'ankle',
+    tiers: [
+      {
+        tier: 'daily-isometric',
+        text: '2 x 30–45s, straight and bent knee on alternate days',
+        holdSeconds: [30, 45],
+        prescribedSets: [2, 2],
+        position: 'Heel below the step — the Achilles at length, not at the top of the raise',
+        source: '70% MVC / 30–45s isometric standard; long-length per Oranchuk 2019 and Baar',
+      },
+    ],
+    isoType: 'yielding',
+    equipment: ['bodyweight'],
+    summary: 'Held calf raise with the heel low — Achilles load for the joint boulderers land on.',
+    howTo: [
+      'Stand with the forefoot on a step, heel hanging below the level of the toes.',
+      'Rise to a mid-range position and hold — or hold at the bottom for more length.',
+      'Straight knee loads the gastrocnemius; a bent knee shifts it to the soleus.',
+      'Hold 30–45 seconds, twice.',
+    ],
+    prescription: 'Daily: 2 x 30–45s, heel below the step; alternate straight and bent knee',
+    cues: [
+      'Heel below the toes — a hold at the top of the raise trains the short position instead.',
+      'Alternate straight and bent knee day to day; they are different tissues.',
+    ],
+    safetyNotes: [],
+    gtgEligible: false,
+  },
+
+  // ─── Pool additions (docs/joint-rotation-research.md §4, tier 4) ────────────
+  //
+  // One per target the existing catalog left uncovered — elbow, wrist, knee and
+  // ankle. The remaining pool movements in §4 are variety on top of this; these
+  // four are what make the coverage assertion in pool.test.ts hold.
+  {
+    id: 'pronator-eccentric',
+    name: 'Pronator Lower (Eccentric)',
+    category: 'antagonist',
+    target: 'elbow',
+    tiers: [
+      {
+        tier: 'pool',
+        text: '2 x 15–20 per hand, 5s eccentric',
+        prescribedSets: [2, 2],
+        source: "Hörst, climber's-elbow rehab/prehab protocol",
+      },
+    ],
+    isoType: 'dynamic',
+    equipment: ['kettlebell'],
+    summary: 'Slow-lowering pronation with an offset weight — the highest-yield elbow prehab there is.',
+    howTo: [
+      'Sit with the forearm supported, elbow at 90°, holding a hammer or kettlebell by the horn.',
+      'Start with the weight vertical and rotate the palm downward (pronate).',
+      'Lower slowly — a five-count on the way down.',
+      'Use the free hand to return it to the top. 15–20 reps per hand, twice.',
+    ],
+    prescription: 'Pool: 2 x 15–20 per hand, 5s lowering; every other day',
+    cues: [
+      'The five-second lower is the exercise — returning it under load is not the point.',
+      'Adjust the load by choking up or down the handle rather than changing weight.',
+    ],
+    safetyNotes: [],
+    gtgEligible: false,
+  },
+  {
+    id: 'wide-pinch-wrist-extension',
+    name: 'Wide Pinch with Wrist Extension',
+    category: 'antagonist',
+    target: 'wrist',
+    tiers: [
+      {
+        tier: 'pool',
+        text: 'Strength: 10s x 3 per hand, 30s between, 3 min between sets. Endurance: 30s x 3 per hand, 1 min rest.',
+        holdSeconds: [10, 30],
+        prescribedSets: [3, 3],
+        source: 'Hörst, wrist stabilizer training',
+      },
+    ],
+    isoType: 'yielding',
+    equipment: ['hangboard'],
+    summary: 'Wide pinch held with the wrist extended — the most overlooked wrist exercise for climbers.',
+    howTo: [
+      'Take a wide pinch on a block or the edge of a bumper plate.',
+      'Hold it with the wrist extended and the fingers straight rather than curled.',
+      'Strength: 10-second holds, three per hand, 30 seconds between.',
+      'Endurance: 30-second holds, three per hand, a minute between.',
+    ],
+    prescription:
+      'Pool: strength 10s x 3/hand (30s between, 3 min between sets); or endurance 30s x 3/hand, 1 min rest',
+    cues: [
+      'Fingers extended, not crimped — this trains the extensors in the open-hand position.',
+      'Wrist stability takes load off the fingers; this is the position climbing never trains.',
+    ],
+    safetyNotes: [
+      'A genuine strength exercise rather than prehab — start at the low end of the range.',
+    ],
+    gtgEligible: false,
+  },
+  {
+    id: 'nordic-hamstring-curl',
+    name: 'Nordic Hamstring Curl',
+    category: 'lower-body',
+    target: 'knee',
+    tiers: [
+      {
+        tier: 'pool',
+        // Low volume is the *prescription*, not a concession: high vs low volume
+        // showed no significant difference in eccentric strength or fascicle
+        // adaptation, so there is no cost to starting and staying small.
+        text: '2 x 5, assisted or partial range',
+        prescribedSets: [2, 2],
+        source: 'NHE injury-prevention meta-analysis (RR 0.49); volume per high-vs-low review',
+      },
+    ],
+    isoType: 'dynamic',
+    equipment: ['bodyweight'],
+    summary: 'Eccentric hamstring lowering — halves hamstring injury rate, and heel hooks load exactly this.',
+    howTo: [
+      'Kneel with the ankles anchored under something solid.',
+      'Keeping the hips extended and the body in one line, lower forward as slowly as you can.',
+      'Catch yourself with the hands and push back to the start.',
+      '5 reps, twice. Use a band or a partial range until the full lower is controllable.',
+    ],
+    prescription: 'Pool: 2 x 5, assisted or partial range; 2x/week',
+    cues: [
+      'Hips stay extended — folding at the hip turns this into a much easier exercise.',
+      'Control the lower for as long as possible; the last third is where the adaptation is.',
+    ],
+    safetyNotes: [
+      'Severe soreness if started at full range and volume. Begin assisted or partial — the evidence says low volume works as well as high, so there is nothing to gain by rushing.',
+    ],
+    gtgEligible: false,
+  },
+  {
+    id: 'single-leg-balance',
+    name: 'Single-Leg Balance',
+    category: 'lower-body',
+    target: 'ankle',
+    tiers: [
+      {
+        tier: 'pool',
+        text: '3 x 30s per side, eyes closed or on an unstable surface',
+        holdSeconds: [30, 30],
+        prescribedSets: [3, 3],
+        source: 'Proprioceptive training meta-analysis, ankle sprain incidence RR 0.65 (NNT 17)',
+      },
+    ],
+    isoType: 'none',
+    equipment: ['bodyweight'],
+    summary: 'Single-leg balance work — the cheapest injury reduction available for a boulderer’s ankles.',
+    howTo: [
+      'Stand on one leg with a soft knee.',
+      'Close the eyes, or stand on a cushion or wobble board — progress by removing input, not by adding time.',
+      'Hold 30 seconds per side, three times each.',
+      'Add a task — passing a ball hand to hand — once it is easy.',
+    ],
+    prescription: 'Pool: 3 x 30s per side, eyes closed or unstable surface; 1–2x/week',
+    cues: [
+      'Program length matters more than session length here — a small weekly dose sustained beats a big one abandoned.',
+      'Pair it with the calf work; balance plus strengthening beats either alone.',
+    ],
+    safetyNotes: [],
+    gtgEligible: false,
   },
 ];

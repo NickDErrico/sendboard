@@ -21,6 +21,7 @@ export type Route =
   | { name: 'retest' }
   | { name: 'checks' }
   | { name: 'gtg' }
+  | { name: 'joints' }
   | { name: 'checklog' }
   | { name: 'plan'; sectionRef: string | null }
   | { name: 'settings' }
@@ -55,6 +56,8 @@ export function parseHash(hash: string): Route {
       return { name: 'checks' };
     case 'gtg':
       return { name: 'gtg' };
+    case 'joints':
+      return { name: 'joints' };
     case 'checklog':
       return { name: 'checklog' };
     case 'plan':

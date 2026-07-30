@@ -95,6 +95,11 @@ export function gtgToday(dayChecks: Check[], exercises: Exercise[]): Record<Chec
     // Present so the record is total and callers need no fallback.
     'climbing-volume': empty,
     'climbing-limit': empty,
+    // Empty for the same reason, by a different route: joint checks *do* name a
+    // movement, but none of those movements carries a §8 `gtg` row, so §8's list
+    // holds none of them and this roll-up has nothing to count. `pool.ts` is
+    // where a joint check is read.
+    joint: empty,
   };
 }
 

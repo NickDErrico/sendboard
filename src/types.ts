@@ -20,10 +20,106 @@ export type Category =
   | 'climbing'
   | 'warmup';
 
+/**
+ * The joint or tendon group a movement loads (docs/joint-rotation-research.md).
+ *
+ * Deliberately *not* `Category`, which mixes body region with training role —
+ * 'antagonist' and 'warmup' are roles, 'fingers' and 'lower-body' are regions,
+ * and neither axis alone can answer "when did I last load a rotator cuff". That
+ * question is the whole point of the rotation, so it gets its own field.
+ *
+ * The split between 'extensors' and 'wrist' is not anatomical pedantry: the
+ * finger/wrist extensors carry a daily isometric slot, while wrist *stability*
+ * work is rep-based pool work on its own interval. They are loaded differently
+ * and are due at different times, which is exactly what a target is for.
+ *
+ * 'fingers' means the flexors, and it is the one target with no daily-isometric
+ * slot — that tissue is already covered by the abrahangs and the two weekly
+ * finger routines, and adding a seventh daily hold to it is the double-dosing
+ * the research file's §6 refuses.
+ */
+export type JointTarget =
+  | 'fingers'
+  | 'extensors'
+  | 'wrist'
+  | 'elbow'
+  | 'shoulder'
+  | 'hip'
+  | 'knee'
+  | 'ankle';
+
+/**
+ * Which of the four programs a prescription belongs to
+ * (docs/joint-rotation-research.md §6).
+ *
+ * A tier is a property of a *dose*, never of an exercise, because the same
+ * movement is a different protocol in different tiers: a Copenhagen held 40s at
+ * ~70% MVC and a Copenhagen run for reps are different mechanisms with different
+ * recovery costs. Splitting those into two catalog entries would put two
+ * unrelated series on one movement's chart, which is D22's refusal to draw an
+ * invalid comparison arriving by a new route.
+ *
+ * - `collagen` — abrahangs and the finger warm-up. Up to 2x/day, >=6h apart.
+ * - `daily-isometric` — one non-finger tendon slot per day, ~70% MVC, 30-45s.
+ * - `block-max` — max protocols: the two weekly finger routines, Day 3, §4E.
+ * - `pool` — dynamic and proprioceptive prehab, 2-3x/week per target.
+ */
+export type Tier = 'collagen' | 'daily-isometric' | 'block-max' | 'pool';
+
+/**
+ * One tier's dose for a movement that carries more than one (D41's shape,
+ * applied to tiers instead of weeks).
+ *
+ * `PrescriptionVariant` cannot serve this: it is keyed by *block week*, and a
+ * tier is orthogonal to the week — a pool movement is the same dose in week 2
+ * and week 7. An exercise may in principle carry both, and the week variant is
+ * read within whichever tier is being run.
+ *
+ * `text` is transcribed from the cited source, never reworded, for D6's reason —
+ * that discipline survives the decision to source from research rather than from
+ * the plan document, because its point was never the document. It was that no
+ * number in this app should be untraceable.
+ */
+export interface TierPrescription {
+  tier: Tier;
+  text: string;
+  holdSeconds?: [min: number, max: number];
+  prescribedSets?: [min: number, max: number];
+  restSeconds?: number;
+  /**
+   * The position the hold is taken in, where the source names one.
+   *
+   * Present because muscle length is a prescribed variable rather than a detail
+   * of execution: isometrics at longer muscle lengths produce greater adaptation
+   * than equal volume at short lengths (Oranchuk et al. 2019), and Baar reports
+   * lengthened holds improving compliance by up to 50%. An entry that says only
+   * "hold" has dropped half its prescription.
+   */
+  position?: string;
+  /** Where this dose comes from. Free text — a paper, a coach, a plan section. */
+  source: string;
+}
+
 export interface Exercise {
   id: string; // stable kebab-case slug, never reused
   name: string;
   category: Category;
+  /**
+   * The joint/tendon group this movement loads, where it belongs to one.
+   *
+   * Optional, and absent is a real state rather than an omission: the climbing
+   * days, the finger warm-up and the §4E tests load plenty but belong to no
+   * rotation slot, and giving them a target would put a test battery into the
+   * pool's "what is stalest" arithmetic.
+   */
+  target?: JointTarget;
+  /**
+   * Per-tier doses, for movements that appear in more than one program.
+   *
+   * Absent means the entry runs one protocol, which `prescription` already
+   * states — every pre-existing entry therefore reads exactly as before.
+   */
+  tiers?: TierPrescription[];
   isoType: IsoType;
   equipment: Equipment[];
   summary: string; // one line, shown in list view
@@ -298,8 +394,23 @@ export interface BodyweightEntry {
   lb: number;
 }
 
-export type CheckKind = 'climbing-volume' | 'climbing-limit' | 'gtg-general' | 'gtg-pull';
-export type CheckScope = 'weekly' | 'daily'; // climbing-* are weekly; gtg-* are daily
+/**
+ * `joint` is the joint/tendon rotation's record (docs/joint-rotation-research.md).
+ *
+ * One kind for both the daily isometric slots and the pool, rather than two: the
+ * tier is already declared on the movement's `tiers`, and the target on its
+ * `target`, so a second kind would restate in the check what the catalog knows —
+ * and would then be free to disagree with it. Every `joint` check names a
+ * movement, unlike the GtG kinds, which still support the whole-category form
+ * that T5b wrote and the check-log form still writes for past days.
+ */
+export type CheckKind =
+  | 'climbing-volume'
+  | 'climbing-limit'
+  | 'gtg-general'
+  | 'gtg-pull'
+  | 'joint';
+export type CheckScope = 'weekly' | 'daily'; // climbing-* are weekly; the rest are daily
 
 export interface Check {
   id: string; // uuid
@@ -327,6 +438,10 @@ export const CHECK_SCOPE: Record<CheckKind, CheckScope> = {
   'climbing-limit': 'weekly',
   'gtg-general': 'daily', // push-ups, squats, wrist extensors, external rotations, wall press
   'gtg-pull': 'daily', // scapular pull-ups / dead hangs, full pull-ups — dose-limited, see D13
+  // Daily in scope even for pool movements on a 3- or 4-day interval: the scope
+  // is the granularity a check is *recorded* at, not how often the movement comes
+  // up. `pool.ts` owns the interval; nothing here needs to know it.
+  joint: 'daily',
 };
 
 export interface Settings {

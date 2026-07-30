@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Check, Exercise } from '../types';
+import type { Check, Exercise, WorkoutLog } from '../types';
 import {
   dateKey,
   deleteCheck,
   getAllChecks,
   getAllExercises,
+  getAllLogs,
   getChecksForDay,
   getChecksForWeek,
   mondayOf,
@@ -18,6 +19,7 @@ import {
   weekEndKey,
 } from '../lib/checks';
 import { describeGtgToday, gtgToday, type GtgKindToday } from '../lib/gtg';
+import { dailyIsometricsToday, poolToday } from '../lib/pool';
 import { go } from '../lib/routes';
 import { Icon, card, kicker } from './ui';
 
@@ -50,21 +52,26 @@ export function CheckOffs() {
   const [today, setToday] = useState<Check[] | null>(null);
   const [all, setAll] = useState<Check[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
+  // The joint rotation counts a movement done inside a session as well as one
+  // ticked, so the logs are needed here as well as the checks (see pool.ts).
+  const [logs, setLogs] = useState<WorkoutLog[]>([]);
 
   // Every read recomputes from `new Date()`, so leaving the app open across
   // midnight (or across a Monday) and refocusing rolls over rather than showing
   // yesterday's day or last week's week.
   const refresh = useCallback(async () => {
-    const [weekChecks, dayChecks, allChecks, exs] = await Promise.all([
+    const [weekChecks, dayChecks, allChecks, exs, allLogs] = await Promise.all([
       getChecksForWeek(new Date()),
       getChecksForDay(new Date()),
       getAllChecks(),
       getAllExercises(),
+      getAllLogs(),
     ]);
     setWeek(weekChecks);
     setToday(dayChecks);
     setAll(allChecks);
     setExercises(exs);
+    setLogs(allLogs);
   }, []);
 
   useEffect(() => {
@@ -86,6 +93,11 @@ export function CheckOffs() {
   const counts = last7DayGtgCounts(all, new Date());
   const mondayKey = dateKey(mondayOf(new Date()));
   const weekDone = Number(climbing.volume) + Number(climbing.limit);
+  // Read from `pool.ts` rather than counted here, so this card and the joints
+  // screen answer "how many today" the same way.
+  const daily = dailyIsometricsToday(exercises, logs, all, new Date());
+  const dailyDone = daily.filter((s) => s.doneToday !== null).length;
+  const poolDue = poolToday(exercises, logs, all, new Date()).filter((s) => s.due).length;
 
   async function toggleWeek(kind: ClimbingKind) {
     const existing = (week ?? []).filter((c) => c.kind === kind);
@@ -124,6 +136,39 @@ export function CheckOffs() {
         <GtgRow label="General" today={gtg['gtg-general']} done={kindDone.general} days={counts.general} />
         <GtgRow label="Pull" today={gtg['gtg-pull']} done={kindDone.pull} days={counts.pull} />
       </div>
+
+      <hr className="hr my-0.5" />
+
+      {/* The joint rotation's line in. Its own screen owns which movement is up
+          and what is due; this reports the two counts and navigates, exactly as
+          the GtG rows above do — one place decides, so the two cannot disagree. */}
+      <div className="flex items-baseline">
+        <h2 className={kicker}>Joints &amp; tendons</h2>
+        <span className="ml-auto text-[11px] text-neutral-600">daily + queue · tap to open</span>
+      </div>
+      <button
+        onClick={() => go({ name: 'joints' })}
+        className={`flex items-center gap-2.5 rounded-[10px] border px-2.5 py-[11px] text-left text-[13px] font-medium transition-colors ${
+          dailyDone === daily.length && daily.length > 0
+            ? 'border-accent bg-accent/[.12] text-accent-200'
+            : 'border-neutral-800 text-neutral-400 hover:border-white/[.34]'
+        }`}
+      >
+        <Icon
+          name={dailyDone === daily.length && daily.length > 0 ? 'check-circle' : 'circle'}
+          weight={dailyDone === daily.length && daily.length > 0 ? 'fill' : 'regular'}
+          className={`shrink-0 text-[18px] ${
+            dailyDone === daily.length && daily.length > 0 ? 'text-accent-400' : 'text-neutral-600'
+          }`}
+        />
+        <span className="min-w-0 flex-1">
+          Daily isometrics
+          <span className="block text-[10px] font-normal text-neutral-600">
+            {dailyDone} of {daily.length} today · {poolDue} in the queue
+          </span>
+        </span>
+        <Icon name="caret-right" className="shrink-0 text-[13px] text-neutral-600" />
+      </button>
     </section>
   );
 }

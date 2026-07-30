@@ -11,6 +11,7 @@ export const CHECK_KIND_LABELS: Record<CheckKind, string> = {
   'climbing-limit': 'Climbing — Limit day',
   'gtg-general': 'GtG — General',
   'gtg-pull': 'GtG — Pull',
+  joint: 'Joints & tendons',
 };
 
 export function keyToLocalDate(key: string): Date {

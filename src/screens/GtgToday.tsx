@@ -42,6 +42,10 @@ const SECTION_COPY: Record<CheckKind, { title: string; note: string; refs: strin
   },
   'climbing-volume': undefined,
   'climbing-limit': undefined,
+  // The joint rotation has its own screen and its own ordering rules; §8's list
+  // is not where it lives. Undefined so this screen renders nothing for it,
+  // rather than a third section that would duplicate `#/joints`.
+  joint: undefined,
 };
 
 export function GtgToday({ onExit }: { onExit?: () => void }) {
