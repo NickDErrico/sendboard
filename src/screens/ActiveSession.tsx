@@ -48,6 +48,12 @@ import {
   type HoldSpec,
   type TimerState,
 } from '../lib/timer';
+import {
+  autoStartPermitted,
+  restAfterLoggedSet,
+  shouldAutoStartSet,
+  type AutoStartGate,
+} from '../lib/autoset';
 import { reasonApplies, reasonsFor } from '../lib/setReason';
 import { gearOf, type Gear } from '../lib/gear';
 import { chainPosition, chainSatisfied, formatChain, setSpecOf, speakChain } from '../lib/chain';
@@ -325,6 +331,30 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   }
 
   /**
+   * T35: the interval after a set that was *counted* rather than timed.
+   *
+   * A rep scheme goes at the owner's pace — there is no clock the app could run
+   * during a set of rows — but the rest after one is still prescribed, and the
+   * tap that records the set is the only moment the app learns that the set is
+   * over. So logging starts it, where the entry declares a number to start;
+   * where it declares none, `restAfterLoggedSet` returns null and nothing
+   * happens, because inventing the interval is the fabrication D17 prevents.
+   */
+  function startRestAfterLog(exerciseId: string) {
+    primeAudio();
+    primeSpeech();
+    // The decision goes *inside* the update, not around it: whether this may
+    // take the timer slot depends on what is running right now, and a tap that
+    // followed another tap in the same frame would otherwise read the clock as
+    // it was before the first one — the stale-closure rule this whole section
+    // is written to, and the one `logRef` exists for on the log side.
+    setTimer((t) => {
+      const restMs = restAfterLoggedSet(exercisesById.get(exerciseId), t);
+      return restMs === null ? t : startRest(exerciseId, restMs, Date.now());
+    });
+  }
+
+  /**
    * The count reached zero: become the hold — unless the app slept through it.
    *
    * A backgrounded PWA is suspended, so a count can finish while nothing is
@@ -378,18 +408,41 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
     });
   }
 
-  // T31: the chain's own tick, running only while a chain is armed. Everything it
-  // reads is recomputed from the phase's absolute start instant (D18), so a
-  // throttled interval costs a stale frame and never a drifted gap.
+  /**
+   * T35: everything outside the clock that decides whether the running rest may
+   * start the next set on its own.
+   *
+   * Rebuilt every render because every input to it is — which exercise the timer
+   * belongs to, how many of its sets are logged, the week its variant is chosen
+   * against. Nothing here is stored: the decision is a reading, like every other
+   * one the timer makes (D18).
+   */
+  const autoStartGate: AutoStartGate = (() => {
+    const id = timer.exerciseId;
+    const exercise = id ? exercisesById.get(id) : undefined;
+    return {
+      exercise,
+      position: chainPosition(id && log ? getSets(log, id).length : 0, setSpecOf(exercise, week)),
+      repArmed: repState?.armed === true && repState.exerciseId === id,
+      completed: id !== null && log !== null && isExerciseCompleted(log, id),
+      warmup: Boolean(warmupPlanOf(exercise)),
+    };
+  })();
+
+  // T31/T35: the tick both self-advancing cadences read, running only while one
+  // of them is armed. Everything it reads is recomputed from the phase's
+  // absolute start instant (D18), so a throttled interval costs a stale frame
+  // and never a drifted gap.
   const chainArmed = repState?.armed === true;
-  const repNow = useNow(chainArmed);
+  const autoStartArmed = timer.phase === 'resting' && autoStartPermitted(timer, autoStartGate);
+  const cadenceNow = useNow(chainArmed || autoStartArmed);
   const armedChain = chainArmed ? activeChainFor(repState?.exerciseId ?? null) : null;
   const chainVisible = typeof document === 'undefined' || document.visibilityState === 'visible';
   const nextRepDue =
     armedChain !== null &&
     repState?.exerciseId === timer.exerciseId &&
     !isLastRep(armedChain.chain, armedChain.rep) &&
-    shouldStartNextRep(timer, repNow, true, chainVisible);
+    shouldStartNextRep(timer, cadenceNow, true, chainVisible);
   const startedRepFor = useRef<number | null>(null);
   useEffect(() => {
     if (!nextRepDue) return;
@@ -402,12 +455,38 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nextRepDue, timer.startedAt, timer.exerciseId]);
 
+  /**
+   * T35: the next *set*, started by the finished rest rather than by a tap.
+   *
+   * Keyed on the rest's own start instant so it fires exactly once per rest, and
+   * it goes through `beginHold` — the same call the card's Start button makes —
+   * so the count-in runs, the cue sounds, and the measurement means what it
+   * always meant. Those three seconds are also the abort window: a count is
+   * cancellable, and an owner who is not on the board yet has somewhere to press.
+   *
+   * Nothing needs a stale branch here. A rest the app slept through simply never
+   * fires, and what is on screen afterwards is a finished rest with its manual
+   * Start control — which is where the app stood before T35 and is the right
+   * place to land.
+   */
+  const autoSetDue = shouldAutoStartSet(timer, cadenceNow, autoStartGate, chainVisible);
+  const startedSetFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (!autoSetDue) return;
+    if (startedSetFor.current === timer.startedAt) return;
+    startedSetFor.current = timer.startedAt;
+    beginHold(timer.exerciseId as string);
+    // beginHold closes over nothing that can change between a rest completing and
+    // the tick that notices it — the same argument beginRepHold makes above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSetDue, timer.startedAt, timer.exerciseId]);
+
   // A gap the app slept through disarms the chain rather than firing a rep into
   // an empty room — the same rule the warm-up cycle follows, and it matters more
   // here, because this is ~90% effort rather than a warm-up. The set is not lost:
   // what is on screen afterwards is a stopped chain with its reps recorded and
   // the Log control available.
-  const chainStale = chainArmed && isRepChainStale(timer, repNow, true);
+  const chainStale = chainArmed && isRepChainStale(timer, cadenceNow, true);
   const staleHoldMs = armedChain ? armedChain.chain.holdSec * 1000 : 0;
   useEffect(() => {
     if (!chainStale) return;
@@ -1041,11 +1120,14 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
                 endReasons={reasonsFor(exercise)}
                 gear={gear}
                 nextSetLabel={chainLabel}
-                onAdd={() =>
+                onAdd={() => {
                   mutate((l) =>
                     addSet(l, exId, seedForNextSet(getSets(l, exId), last, edgeSeedFor(exId))),
-                  )
-                }
+                  );
+                  // T35: a counted set has no clock of its own, so the tap that
+                  // records it is where its rest begins.
+                  startRestAfterLog(exId);
+                }}
                 onUpdate={(index, patch: Partial<SetEntry>) =>
                   mutate((l) => updateSet(l, exId, index, patch))
                 }
