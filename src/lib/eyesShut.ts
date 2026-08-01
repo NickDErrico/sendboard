@@ -1,7 +1,12 @@
 import type { TimerState } from './timer';
 
 /**
- * Which single control the focus surface offers right now (T21).
+ * Which single control the eyes-shut surface offers right now (T21).
+ *
+ * Named for the surface the app already calls "eyes-shut" — this module was
+ * `focus.ts` until D48 gave `Focus` in `types.ts` to the training axis a movement
+ * declares. The two subjects shared nothing but a word, and the word belongs to
+ * the axis: a catalog field is read far more often than a view's control state.
  *
  * The whole point of the surface is that there is exactly *one* thing to hit at
  * any moment, big enough to find by feel — so "which one" is a decision worth
@@ -23,7 +28,7 @@ import type { TimerState } from './timer';
  *    is a demotion, never a block (D23): the start control stays on screen,
  *    small, exactly where Skip lives, and a sixth set is still one tap away.
  */
-export type FocusAction =
+export type EyesShutAction =
   | 'start' // begin this exercise's next set (a count, per D33)
   | 'cancel' // a count is running
   | 'stop' // a hold is running — the only thing that ends it (D36)
@@ -32,27 +37,27 @@ export type FocusAction =
   | 'advance' // the prescription's top is logged: mark done and move on (T32)
   | 'wait'; // the rest is running; nothing primary to do
 
-export interface FocusStep {
-  action: FocusAction;
+export interface EyesShutStep {
+  action: EyesShutAction;
   /** True when the timer belongs to a *different* exercise (AC9). */
   otherRunning: boolean;
 }
 
 /**
  * @param state the session's one timer, whoever it belongs to
- * @param exerciseId the exercise the surface is focused on
+ * @param exerciseId the exercise the surface is showing
  * @param restDone whether the running rest has reached zero (a clock reading,
  *        passed in rather than computed, so this stays free of `now`)
  * @param chainDone whether the prescription's top is already logged
  *        (`chainPosition().beyond`) — a count over the log, passed in for the
  *        same reason, so this stays free of the log as well as of the clock
  */
-export function focusStep(
+export function eyesShutStep(
   state: TimerState,
   exerciseId: string,
   restDone: boolean,
   chainDone = false,
-): FocusStep {
+): EyesShutStep {
   // Someone else's clock: this exercise can still be started (that takes the
   // timer, as it always has), but nothing here reports on the other one beyond
   // saying it is running.

@@ -92,7 +92,7 @@ import { PlanRefLinks } from '../components/PlanRefLinks';
 import { PrescriptionVariants } from '../components/PrescriptionVariants';
 import { SetLogger } from '../components/SetLogger';
 import { SessionTimer } from '../components/SessionTimer';
-import { FocusHold } from '../components/FocusHold';
+import { EyesShutHold } from '../components/EyesShutHold';
 import { WarmupRunner } from '../components/WarmupRunner';
 import { ExerciseDetail } from './ExerciseDetail';
 import { Plan } from './Plan';
@@ -792,7 +792,7 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
     const last = lastByExercise.get(focusExercise.id) ?? null;
     const focusAdvance = advanceOfferFor(focusExercise.id);
     return (
-      <FocusHold
+      <EyesShutHold
         exercise={focusExercise}
         state={timer}
         hold={focusHold}

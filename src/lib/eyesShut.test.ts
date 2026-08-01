@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { focusStep } from './focus';
+import { eyesShutStep } from './eyesShut';
 import {
   IDLE_TIMER,
   startHold,
@@ -14,9 +14,9 @@ const MIN_3 = 180_000;
 const HANG = 'max-hang-half-crimp';
 const OTHER = 'max-hang-open-hand';
 
-const step = (state: TimerState, restDone = false) => focusStep(state, HANG, restDone);
+const step = (state: TimerState, restDone = false) => eyesShutStep(state, HANG, restDone);
 
-describe('focusStep', () => {
+describe('eyesShutStep', () => {
   it('offers a start when nothing is running', () => {
     expect(step(IDLE_TIMER)).toEqual({ action: 'start', otherRunning: false });
   });
@@ -57,14 +57,14 @@ describe('focusStep', () => {
 
   it('never offers to log a hold measured on a different exercise', () => {
     const held = stopHold(startHold(OTHER, T0), T0 + 5000, null);
-    expect(focusStep(held, HANG, false).action).toBe('start');
-    expect(focusStep(held, OTHER, false).action).toBe('log');
+    expect(eyesShutStep(held, HANG, false).action).toBe('start');
+    expect(eyesShutStep(held, OTHER, false).action).toBe('log');
   });
 });
 
-describe('focusStep once the prescription is done (T32)', () => {
+describe('eyesShutStep once the prescription is done (T32)', () => {
   const finished = (state: TimerState, restDone = false) =>
-    focusStep(state, HANG, restDone, true);
+    eyesShutStep(state, HANG, restDone, true);
 
   it('offers the move-on where it would have offered a set', () => {
     expect(finished(IDLE_TIMER).action).toBe('advance');
@@ -96,7 +96,7 @@ describe('focusStep once the prescription is done (T32)', () => {
   });
 
   it('changes nothing anywhere when the chain is not done', () => {
-    expect(focusStep(IDLE_TIMER, HANG, false, false).action).toBe('start');
-    expect(focusStep(startRest(HANG, MIN_3, T0), HANG, true, false).action).toBe('start-next');
+    expect(eyesShutStep(IDLE_TIMER, HANG, false, false).action).toBe('start');
+    expect(eyesShutStep(startRest(HANG, MIN_3, T0), HANG, true, false).action).toBe('start-next');
   });
 });

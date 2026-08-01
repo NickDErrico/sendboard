@@ -1,5 +1,5 @@
 import type { Exercise } from '../types';
-import { focusStep, type FocusAction } from '../lib/focus';
+import { eyesShutStep, type EyesShutAction } from '../lib/eyesShut';
 import {
   elapsedMs,
   formatClock,
@@ -45,7 +45,7 @@ import { HOLD_STATUS, Icon, btnGhost, btnPrimary, btnSecondary, btnStop, tagNeut
  * wash behind the numeral — and the one place the accent is used as light rather
  * than as a line: the reading throws a 60px glow in its own status colour.
  */
-export function FocusHold({
+export function EyesShutHold({
   exercise,
   state,
   hold,
@@ -133,7 +133,7 @@ export function FocusHold({
 
   const restDone = isRestComplete(state, now);
   const offerAdvance = advanceLabel !== null && onAdvance !== undefined;
-  const { action, otherRunning } = focusStep(
+  const { action, otherRunning } = eyesShutStep(
     state,
     exercise.id,
     restDone,
@@ -144,7 +144,7 @@ export function FocusHold({
 
   // T22: while *this* exercise's rest is running, the reading area is the deck.
   // Gated on `mine` because the deck follows the clock, not the view — a rest
-  // running on the half-crimp hang while focus sits on the open-hand one is
+  // running on the half-crimp hang while the surface shows the open-hand one is
   // still the half-crimp's rest, and this screen is not about it (AC9).
   const restingHere = mine && state.phase === 'resting' && !restDone;
   const deck = restingHere ? (reading?.deck ?? []) : [];
@@ -158,7 +158,7 @@ export function FocusHold({
       <header className="flex items-center">
         <button
           onClick={onExit}
-          aria-label="Leave focus mode"
+          aria-label="Leave eyes-shut mode"
           className={`${btnGhost} -ml-1.5 h-[34px] w-[34px] px-0`}
         >
           <Icon name="x" className="text-[20px]" />
@@ -248,7 +248,7 @@ export function FocusHold({
             offer, moving on is the small control and the set is the big one —
             §4F's lighter week means stopping inside a range is a real choice,
             and one it must not have to be hunted for. Where the prescription's
-            top is logged the two swap: `focusStep` hands the primary to the
+            top is logged the two swap: `eyesShutStep` hands the primary to the
             move-on, and the sixth set drops to this row rather than off the
             screen, because the app does not get to end an exercise (D23). */}
         {offerAdvance && (action === 'start' || action === 'start-next' || action === 'wait') && (
@@ -425,7 +425,7 @@ function PrimaryControl({
   onLogHeld,
   onAdvance,
 }: {
-  action: FocusAction;
+  action: EyesShutAction;
   state: TimerState;
   hold: HoldSpec;
   chainLabel: string | null;
