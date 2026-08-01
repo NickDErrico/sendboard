@@ -1,4 +1,4 @@
-import { go, useRoute } from '../lib/routes';
+import { go, tabFor, useRoute, type Route } from '../lib/routes';
 import { Icon } from './ui';
 
 // The primary destinations (T8 AC2). Uses the T6 hash router: `go` to navigate,
@@ -12,13 +12,26 @@ import { Icon } from './ui';
 // weight of the same icon rather than a different icon — the shape stays put and
 // only its weight moves, which is the same "tonal weight, not a second hue" rule
 // the hold band follows.
+// T37 took these from five to four. Exercises and the plan were both content you
+// *read* rather than something you do, and they became Library; History and the
+// check log are both the record of what happened, and they became Log. Nothing
+// was deleted — every screen is still one tap from here, and `tabFor` is what
+// keeps a deep-linked `#/plan/4B` lighting the tab it belongs under.
 const TABS = [
-  { name: 'home', label: 'Today', icon: 'house' },
-  { name: 'exercises', label: 'Exercises', icon: 'list-checks' },
-  { name: 'plan', label: 'Plan', icon: 'book-open' },
-  { name: 'history', label: 'History', icon: 'clock-counter-clockwise' },
+  { name: 'today', label: 'Today', icon: 'house' },
+  { name: 'library', label: 'Library', icon: 'books' },
+  { name: 'log', label: 'Log', icon: 'clock-counter-clockwise' },
   { name: 'settings', label: 'Settings', icon: 'gear-six' },
 ] as const;
+
+// Which route a tab opens. Log lands on History, which is the record itself —
+// the check log hangs off it rather than competing with it.
+const TAB_ROUTE: Record<(typeof TABS)[number]['name'], Route> = {
+  today: { name: 'today' },
+  library: { name: 'library' },
+  log: { name: 'history' },
+  settings: { name: 'settings' },
+};
 
 export function TabBar() {
   const route = useRoute();
@@ -39,11 +52,11 @@ export function TabBar() {
     >
       <div className="mx-auto flex max-w-md">
         {TABS.map((tab) => {
-          const active = route.name === tab.name;
+          const active = tabFor(route) === tab.name;
           return (
             <button
               key={tab.name}
-              onClick={() => go(tab.name === 'plan' ? { name: 'plan', sectionRef: null } : { name: tab.name })}
+              onClick={() => go(TAB_ROUTE[tab.name])}
               aria-current={active ? 'page' : undefined}
               className={`flex flex-1 flex-col items-center gap-[3px] text-[10px] transition-colors ${
                 active ? 'text-accent' : 'text-neutral-500 hover:text-accent-400'

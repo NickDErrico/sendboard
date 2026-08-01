@@ -234,7 +234,7 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   async function handleLeave() {
     const cur = logRef.current;
     if (cur) await leaveSession(cur);
-    go({ name: 'home' });
+    go({ name: 'today' });
   }
 
   // ─── Timer (T10) ───────────────────────────────────────────────────────────

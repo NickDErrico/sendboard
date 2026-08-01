@@ -8,6 +8,7 @@ import {
   type SlotStatus,
 } from './pool';
 import { describeLastCompleted, rotates, routineRotation } from './rotation';
+import type { TierRoute } from './routes';
 
 /**
  * The four tiers as one ordered surface (T36, D47).
@@ -58,8 +59,8 @@ export type LaneId = 'collagen' | 'daily-isometric' | 'pool' | 'heavy';
 export type LaneAction =
   /** Start a session against this routine. */
   | { kind: 'start-routine'; routineId: string; label: string }
-  /** Open the surface where this tier's movements are ticked. */
-  | { kind: 'open-joints'; label: string }
+  /** Open this tier's own screen, where its movements are ticked. */
+  | { kind: 'open-tier'; tier: TierRoute; label: string }
   /** The catalog declares no movement for this tier. Stated, never hidden. */
   | { kind: 'empty'; label: string };
 
@@ -253,9 +254,9 @@ function actionFor(id: LaneId, input: LaneInput): LaneAction {
         : { kind: 'empty', label: 'Nothing declared' };
     }
     case 'daily-isometric':
-      return { kind: 'open-joints', label: "Today's holds" };
+      return { kind: 'open-tier', tier: 'daily-isometric', label: "Today's holds" };
     case 'pool':
-      return { kind: 'open-joints', label: 'Pool queue' };
+      return { kind: 'open-tier', tier: 'pool', label: 'Pool queue' };
     case 'heavy': {
       const routineId = heavyRoutineId(input);
       return routineId === null

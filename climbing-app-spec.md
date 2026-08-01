@@ -2264,6 +2264,73 @@ Create: `src/screens/Today.tsx`, `src/lib/lanes.ts` (+ `lanes.test.ts`) | Modify
 | The heavy lane's secondary routine is short-named | Routine names carry an em-dash, so a second one as a separator read the state as part of the name: *"Day 3 — Pull / Antagonist — never done"*. The lead keeps the full name, where it has the line to itself. Home's `shortName` had solved this once already. |
 | AC7 verified by a dispatched click, not a coordinate tap | The browser pane did not dispatch synthetic coordinate input — the same limitation recorded against the symptom seeding in `10fbd75`. The tick's handler was exercised directly and `aria-pressed` flipped; the render path is what the screenshot verified. |
 
+### [T37] Outcome: Every surface is reached from the tier it belongs to or the tab that owns it — two tiers stop sharing one screen, the stop signals stop hiding inside a tier, and five tabs become four.
+
+Spec: this file | Status: [x] | Depends on: T36 | D47, D49 | Owner request, 2026-08-01
+
+#### Context manifest
+
+Create: `src/screens/Library.tsx`, `src/screens/TierDetail.tsx`, `src/screens/Signals.tsx` | Modify: `src/lib/routes.ts` (+ `routes.test.ts`), `src/App.tsx`, `src/components/TabBar.tsx`, `src/screens/Today.tsx` | Delete: `src/screens/Joints.tsx`, `src/components/CheckOffs.tsx` | Read-only: every module in `lib/` except `routes.ts`
+
+**`#/joints` was three subjects on one screen.** It rendered the daily isometric slots, the pool queue and the stop signals together, which is the arrangement D47 exists to undo: two tiers with different cadences and different rules do not share a surface, and the signals are not a tier at all. It becomes `#/tier/daily-isometric`, `#/tier/pool` — each the detail behind its own lane's control — and `#/signals`.
+
+**One screen serves both tiers, parameterised by tier.** `TierDetail` takes a tier and renders that tier's slots from the engine that owns them; it does not branch into two layouts. The two tiers already differ in exactly the way the data differs — the daily slots are returned in slot order whatever their state, the pool is a ranking — and a component that reads `SlotStatus[]` needs to know nothing else.
+
+**Stop signals get their own route, and that is D47 applied to itself.** A signal changes what the *plan* says to do across every tier — §8 drops full pull-ups first, §10D drops the day's second abrahang session — so filing it under the joint rotation made a cross-cutting rule reachable only from one tier's screen. It is reached from Today, beside the lanes rather than inside one.
+
+**§8's list keeps its own screen (owner decision, 2026-08-01).** Every GtG movement is pool-tier, which makes merging it structurally tempting — and D11a exists because GtG was *under*-surfaced, so a list whose subject is its doses and triggers must not become a section below a queue. `#/gtg` is unchanged and is reached from the pool lane and Today's row.
+
+**Four tabs: Today, Library, Log, Settings.** Exercises and the plan document are both things read rather than done, and they were two of five tabs; they become one. History and the check log are both the record of what happened, and they become one. Nothing is deleted — every screen that existed is still reachable, and `#/plan/4B` still resolves, because an exercise's citation is a deep link a tab reorganisation must not break.
+
+**`#/checks` goes.** It was Home's check card on a route of its own, and both halves have owners now: Today renders the climbing week, `#/gtg` renders §8's list. `CheckOffs` goes with it — T36 kept it alive solely because this route rendered it.
+
+#### Acceptance criteria
+
+1. WHEN the tab bar is rendered THE tabs SHALL be Today, Library, Log, Settings, in that order.
+2. WHEN `#/exercises`, `#/library` or any `#/plan` route is open THE Library tab SHALL read as active.
+3. WHEN `#/history` or `#/checklog` is open THE Log tab SHALL read as active.
+4. WHEN `#/plan/4B` is opened from an exercise citation THE plan SHALL open at §4B exactly as before (T25 AC8).
+5. WHEN the daily-isometric lane's control is used THE app SHALL open `#/tier/daily-isometric`, showing that tier's six slots and nothing from another tier.
+6. WHEN the pool lane's control is used THE app SHALL open `#/tier/pool`, showing the queue in `poolToday`'s order and nothing from another tier.
+7. WHEN a slot is ticked on either tier screen THE check written SHALL be identical to the one `#/joints` wrote — same kind, same `exerciseId`, same day key, no migration.
+8. WHEN `#/signals` is open THE four stop signals SHALL be recordable and clearable, with the plan's drop orders rendered exactly as `#/joints` rendered them.
+9. WHEN a signal is active THE tier screens SHALL still mark the movements its drop order names, reading `symptoms.ts` as before.
+10. WHEN Today is rendered THE stop signals SHALL be reachable in one tap, and the entry SHALL state how many are active without ranking or grading them.
+11. WHEN `#/joints` or `#/checks` is opened from a bookmark THE app SHALL resolve it rather than showing not-found.
+12. WHEN any tier screen renders THE copy SHALL NOT contain a fraction whose denominator is a prescription (D23, D49) — the counts `#/joints` rendered as "3 of 6 today" and "2 ready" are restated as facts.
+13. WHEN a database or backup written before this task is read THE app SHALL work unchanged, with no migration and no version bump.
+
+#### Edge cases
+
+- A bookmarked `#/joints` → redirects to `#/tier/daily-isometric`, the tier it opened on. A dead link to a screen that existed yesterday is a worse answer than a redirect.
+- A bookmarked `#/checks` → redirects to Today, which owns the half of it that was not GtG.
+- An unknown tier in `#/tier/…` → not-found, not a silently-defaulted tier.
+- No signal recorded → `#/signals` states that nothing is flagged, and Today's entry says so rather than being hidden. A hidden entry is indistinguishable from a clear one.
+- Every slot loaded today → the tier screen says so and every tick stays live (D49).
+
+#### Non-goals & do-not-touch
+
+- MUST NOT change `pool.ts`, `symptoms.ts`, `checks.ts` or `gtg.ts`. The screens split; the engines do not.
+- MUST NOT merge §8's list into the pool screen, or give GtG a lane (owner decision, 2026-08-01).
+- MUST NOT restructure the exercise catalog's browse — Library is a shell this cycle, and tier → focus → target is stage 5.
+- MUST NOT turn the plan into Sources — that is stage 6, and `#/plan` renders as it does today.
+- MUST NOT move the block, the §4E battery or the tension grid — stage 4 (D50).
+- MUST NOT add an aggregate across lanes or tiers, a completion state, or a day summary (D49).
+
+#### Verify
+
+`npm run test && npm run build && npm run lint`, plus an in-browser pass at 375×812: four tabs, each lane's control landing on its own tier screen, `#/plan/4B` still opening at §4B, and `#/joints` and `#/checks` both resolving rather than 404ing.
+
+#### Amendments (T37)
+
+| Change | Why |
+|---|---|
+| The `home` route is renamed `today` | Flagged at the end of T36 and done here because it costs nothing while the route table is already open. T36 had renamed only the tab's *label*, which left every `go({ name: 'home' })` pointing at a screen that no longer had that name. |
+| Legacy paths resolve in `parseHash`, not in a redirect component | `#/joints` and `#/checks` map to their successors inside the parser, so there is one place that knows a path is historical and no route ever renders a component whose only job is to navigate away. The parser is already the single place that decides what a path means. |
+| `tabFor` is a function in `routes.ts`, not a lookup in `TabBar` | Four tabs now own more than four routes — the catalog and the plan are both Library, history and the check log are both Log. Putting the mapping beside the route type makes it a unit test rather than a screenshot, and it is what keeps a deep-linked `#/plan/4B` lighting the right tab. |
+| AC12's counts are removed rather than reworded | `#/joints` headed its two lists with "3 of 6 today" and "2 ready". Restating them as facts was the criterion, but the slot rows already say `describeSlot` on every line — the header was a summary of what was directly below it, and a fraction against a prescribed count is exactly what D49 keeps off a lane. The headings now name the tier's own source instead. |
+| Verified by page text; no screenshot | The browser pane did not composite frames, the same limitation recorded against T36 and `10fbd75`. Every criterion above was read out of the rendered DOM — tab highlighting via `aria-current`, the drop marks via the rendered rows. |
+
 ---
 
 ## Execution notes

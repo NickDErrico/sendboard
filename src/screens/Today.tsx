@@ -13,6 +13,7 @@ import {
   saveCheck,
 } from '../lib/storage';
 import { keyToLocalDate, weekClimbingStatus, weekEndKey } from '../lib/checks';
+import { activeSymptoms } from '../lib/symptoms';
 import { lanesToday, type Lane } from '../lib/lanes';
 import { resumable } from '../lib/session';
 import { startSession } from '../lib/openSession';
@@ -110,6 +111,10 @@ export function Today() {
   });
 
   const climbing = weekClimbingStatus(weekChecks);
+  // T37: signals moved off the joint rotation onto their own route, because a
+  // signal changes what the plan says to do across every tier rather than inside
+  // one. Reported here, never ranked — the count is a fact about the record.
+  const signals = activeSymptoms(checks);
   const mondayKey = dateKey(mondayOf(new Date()));
   const routineName = (id: string) => routines?.find((r) => r.id === id)?.name ?? id;
 
@@ -234,6 +239,20 @@ export function Today() {
           rule. GtG leads because it is the only one of the four that is about
           today; §8's list is ticked on its own screen, which this opens. */}
       <section className={`${card} flex flex-col gap-0 px-3 py-1 shadow-edge`}>
+        <button onClick={() => go({ name: 'signals' })} className={`${row} w-full`}>
+          <Icon name="warning-circle" className="shrink-0 text-[17px] text-neutral-500" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-medium">Stop signals</span>
+            <span className="block text-[11px] text-neutral-500">
+              {signals.length === 0
+                ? 'Nothing flagged'
+                : signals.map((s) => s.signal.label).join(' · ')}
+            </span>
+          </span>
+          <Icon name="caret-right" className="shrink-0 text-[13px] text-neutral-600" />
+        </button>
+        <div className="h-px bg-neutral-900" />
+
         <button onClick={() => go({ name: 'gtg' })} className={`${row} w-full`}>
           <Icon name="list-checks" className="shrink-0 text-[17px] text-neutral-500" />
           <span className="min-w-0 flex-1">
@@ -319,8 +338,11 @@ function LaneCard({ lane, onStart }: { lane: Lane; onStart: (routineId: string) 
         </button>
       )}
 
-      {lane.action.kind === 'open-joints' && (
-        <button onClick={() => go({ name: 'joints' })} className={`${btnGhost} w-full justify-center py-[9px]`}>
+      {lane.action.kind === 'open-tier' && (
+        <button
+          onClick={() => go({ name: 'tier', tier: lane.action.kind === 'open-tier' ? lane.action.tier : 'pool' })}
+          className={`${btnGhost} w-full justify-center py-[9px]`}
+        >
           {lane.action.label}
           <Icon name="caret-right" className="text-xs" />
         </button>

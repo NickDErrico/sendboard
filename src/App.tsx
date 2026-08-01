@@ -18,18 +18,21 @@ import { Settings } from './screens/Settings';
 import { InstallGuide } from './screens/InstallGuide';
 import { CheckLog } from './screens/CheckLog';
 import { GtgToday } from './screens/GtgToday';
-import { Joints } from './screens/Joints';
-import { CheckOffs } from './components/CheckOffs';
+import { TierDetail } from './screens/TierDetail';
+import { Signals } from './screens/Signals';
+import { Library } from './screens/Library';
 import { TabBar } from './components/TabBar';
-import { btnGhost, btnPrimary, btnSecondary } from './components/ui';
+import { btnPrimary } from './components/ui';
 
 // The tab bar is hidden on immersive/transient screens (active logging, the
 // focused routine start, the install guide, and not-found), which carry their
 // own back/done affordances.
 const NO_TAB_BAR = new Set(['session', 'routine', 'install', 'notFound']);
 
-// T6 introduced hash routing (src/lib/routes.ts); T8 added the Home this replaced; T36 makes it Today, the tab
-// bar, and first-run install onboarding. This component is the route table.
+// T6 introduced hash routing (src/lib/routes.ts); T8 added the Home that T36
+// replaced with Today, the tab bar, and first-run install onboarding. T37 split
+// `#/joints` into per-tier screens and took the tabs to four. This is the route
+// table.
 export default function App() {
   const route = useRoute();
   const onboarding = useInstallOnboarding();
@@ -63,12 +66,12 @@ export default function App() {
 function renderRoute(route: Route): ReactNode {
   switch (route.name) {
     case 'exercises':
-      return <ExerciseList onExit={() => go({ name: 'home' })} />;
+      return <ExerciseList onExit={() => go({ name: 'today' })} />;
     case 'routines':
       return (
         <RoutineList
           onOpenSession={() => go({ name: 'session' })}
-          onExit={() => go({ name: 'home' })}
+          onExit={() => go({ name: 'today' })}
         />
       );
     case 'routine':
@@ -76,33 +79,35 @@ function renderRoute(route: Route): ReactNode {
     case 'session':
       return <SessionRoute />;
     case 'history':
-      return <History onResume={() => go({ name: 'session' })} onExit={() => go({ name: 'home' })} />;
+      return <History onResume={() => go({ name: 'session' })} onExit={() => go({ name: 'today' })} />;
     case 'block':
-      return <Block onExit={() => go({ name: 'home' })} />;
+      return <Block onExit={() => go({ name: 'today' })} />;
     case 'poster':
       return <Poster onExit={() => go({ name: 'block' })} />;
     case 'retest':
-      return <Retest onExit={() => go({ name: 'home' })} />;
+      return <Retest onExit={() => go({ name: 'today' })} />;
     case 'plan':
       return (
         <Plan
           key={route.sectionRef ?? 'all'}
           initialRef={route.sectionRef}
-          onExit={() => go({ name: 'home' })}
+          onExit={() => go({ name: 'today' })}
         />
       );
-    case 'checks':
-      return <ChecksRoute />;
     case 'checklog':
-      return <CheckLog onExit={() => go({ name: 'checks' })} />;
+      return <CheckLog onExit={() => go({ name: 'history' })} />;
     case 'gtg':
-      return <GtgToday onExit={() => go({ name: 'home' })} />;
-    case 'joints':
-      return <Joints onExit={() => go({ name: 'home' })} />;
+      return <GtgToday onExit={() => go({ name: 'today' })} />;
+    case 'library':
+      return <Library />;
+    case 'tier':
+      return <TierDetail key={route.tier} tier={route.tier} />;
+    case 'signals':
+      return <Signals />;
     case 'settings':
       return (
         <Settings
-          onExit={() => go({ name: 'home' })}
+          onExit={() => go({ name: 'today' })}
           onOpenInstallGuide={() => go({ name: 'install' })}
         />
       );
@@ -110,7 +115,7 @@ function renderRoute(route: Route): ReactNode {
       return <InstallGuide ctaLabel="Back" onCta={() => go({ name: 'settings' })} />;
     case 'notFound':
       return <NotFound path={route.path} />;
-    case 'home':
+    case 'today':
     default:
       return <Today />;
   }
@@ -162,13 +167,13 @@ function SessionRoute() {
     })();
   }, []);
   useEffect(() => {
-    if (logId === null) go({ name: 'home' });
+    if (logId === null) go({ name: 'today' });
   }, [logId]);
 
   if (logId === undefined || logId === null) {
     return <CenteredNote>Loading…</CenteredNote>;
   }
-  return <ActiveSession logId={logId} onFinish={() => go({ name: 'home' })} />;
+  return <ActiveSession logId={logId} onFinish={() => go({ name: 'today' })} />;
 }
 
 function RoutineStartRoute({ routineId }: { routineId: string }) {
@@ -185,23 +190,6 @@ function RoutineStartRoute({ routineId }: { routineId: string }) {
   return <RoutineDetail routine={routine} />;
 }
 
-function ChecksRoute() {
-  return (
-    <div className="mx-auto flex max-w-md flex-col gap-3 px-4 pb-24 pt-[54px]">
-      <header className="flex items-center justify-between">
-        <h1 className="text-[15px] font-medium tracking-[-0.01em]">Check-offs</h1>
-        <button onClick={() => go({ name: 'home' })} className={`${btnGhost} text-[13px]`}>
-          Done
-        </button>
-      </header>
-      <CheckOffs />
-      <button onClick={() => go({ name: 'checklog' })} className={`${btnSecondary} w-full py-2.5`}>
-        View check log
-      </button>
-    </div>
-  );
-}
-
 function NotFound({ path }: { path: string }) {
   return (
     <main className="mx-auto flex min-h-full max-w-md flex-col items-center justify-center gap-4 p-6 text-center">
@@ -209,7 +197,7 @@ function NotFound({ path }: { path: string }) {
       <p className="text-[13px] text-neutral-500">
         Nothing lives at <span className="text-neutral-300">{path}</span>.
       </p>
-      <button onClick={() => go({ name: 'home' })} className={`${btnPrimary} px-4 py-2`}>
+      <button onClick={() => go({ name: 'today' })} className={`${btnPrimary} px-4 py-2`}>
         Go home
       </button>
     </main>

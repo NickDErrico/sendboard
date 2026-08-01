@@ -58,7 +58,7 @@ export function RoutineDetail({ routine }: { routine: Routine }) {
           <p className="mt-0.5 text-xs text-neutral-500">{routine.exerciseIds.length} exercises</p>
         </div>
         <button
-          onClick={() => go({ name: 'home' })}
+          onClick={() => go({ name: 'today' })}
           className="shrink-0 rounded-md px-1 py-1 text-[13px] font-medium text-accent hover:bg-accent/10"
         >
           Home

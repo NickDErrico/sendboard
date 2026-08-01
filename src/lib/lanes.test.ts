@@ -176,7 +176,7 @@ describe('each lane reports its own engine', () => {
     const iso = lanesToday(input({ checks }))[1];
     expect(iso.lines[0]).toBe('Every slot loaded today.');
     // Still a live control — a loaded day never withdraws one (D49).
-    expect(iso.action.kind).toBe('open-joints');
+    expect(iso.action.kind).toBe('open-tier');
   });
 
   it('the pool lane leads with the target poolToday ranks first', () => {
@@ -212,8 +212,8 @@ describe('empty and degenerate states', () => {
     expect(lanes[1].lines[0]).toMatch(/no movement declared/i);
     expect(lanes[2].lines[0]).toMatch(/no movement declared/i);
     // Still a live control on both, so the surface that would fix it is reachable.
-    expect(lanes[1].action.kind).toBe('open-joints');
-    expect(lanes[2].action.kind).toBe('open-joints');
+    expect(lanes[1].action.kind).toBe('open-tier');
+    expect(lanes[2].action.kind).toBe('open-tier');
   });
 
   it('states an empty routine list on the lanes that need one', () => {
