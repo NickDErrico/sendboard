@@ -9,8 +9,9 @@ import { TIER_ROUTES, hashFor, parseHash, tabFor, type Route } from './routes';
 describe('parse / build round trip', () => {
   const ROUTES: Route[] = [
     { name: 'today' },
-    { name: 'library' },
-    { name: 'exercises' },
+    { name: 'library', lane: null },
+    { name: 'library', lane: 'pool' },
+    { name: 'library', lane: 'none' },
     { name: 'routines' },
     { name: 'routine', routineId: 'day-1-fingerboard' },
     { name: 'session' },
@@ -60,6 +61,14 @@ describe('routes that existed yesterday (T37 AC11)', () => {
     expect(parseHash('#/checks')).toEqual({ name: 'today' });
   });
 
+  it('resolves the old flat catalog list to the library (T39)', () => {
+    expect(parseHash('#/exercises')).toEqual({ name: 'library', lane: null });
+  });
+
+  it('refuses an unknown library lane', () => {
+    expect(parseHash('#/library/fingers')).toEqual({ name: 'notFound', path: '/library/fingers' });
+  });
+
   it('routes the heavy tier to a screen of its own (T38)', () => {
     expect(parseHash('#/tier/heavy')).toEqual({ name: 'tier', tier: 'heavy' });
   });
@@ -79,8 +88,8 @@ describe('routes that existed yesterday (T37 AC11)', () => {
 
 describe('which tab a route lights (T37 AC2, AC3)', () => {
   it('files the catalog and the plan under Library', () => {
-    expect(tabFor({ name: 'library' })).toBe('library');
-    expect(tabFor({ name: 'exercises' })).toBe('library');
+    expect(tabFor({ name: 'library', lane: null })).toBe('library');
+    expect(tabFor({ name: 'library', lane: 'heavy' })).toBe('library');
     expect(tabFor({ name: 'plan', sectionRef: null })).toBe('library');
     expect(tabFor({ name: 'plan', sectionRef: '4B' })).toBe('library');
   });
@@ -103,7 +112,7 @@ describe('which tab a route lights (T37 AC2, AC3)', () => {
     const tabs = new Set(['today', 'library', 'log', 'settings']);
     for (const route of [
       { name: 'today' },
-      { name: 'library' },
+      { name: 'library', lane: null },
       { name: 'history' },
       { name: 'settings' },
     ] as Route[]) {

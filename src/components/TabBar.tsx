@@ -28,7 +28,7 @@ const TABS = [
 // the check log hangs off it rather than competing with it.
 const TAB_ROUTE: Record<(typeof TABS)[number]['name'], Route> = {
   today: { name: 'today' },
-  library: { name: 'library' },
+  library: { name: 'library', lane: null },
   log: { name: 'history' },
   settings: { name: 'settings' },
 };

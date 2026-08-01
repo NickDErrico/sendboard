@@ -5,7 +5,6 @@ import { getAllLogs, getRoutine, getSettings, saveSettings } from './lib/storage
 import { requestPersistence } from './lib/persistence';
 import { go, useRoute, type Route } from './lib/routes';
 import { Today } from './screens/Today';
-import { ExerciseList } from './screens/ExerciseList';
 import { RoutineList } from './screens/RoutineList';
 import { RoutineDetail } from './screens/RoutineDetail';
 import { ActiveSession } from './screens/ActiveSession';
@@ -22,6 +21,7 @@ import { TierDetail } from './screens/TierDetail';
 import { HeavyTier } from './screens/HeavyTier';
 import { Signals } from './screens/Signals';
 import { Library } from './screens/Library';
+import { LaneLibrary } from './screens/LaneLibrary';
 import { TabBar } from './components/TabBar';
 import { btnPrimary } from './components/ui';
 
@@ -66,8 +66,6 @@ export default function App() {
 
 function renderRoute(route: Route): ReactNode {
   switch (route.name) {
-    case 'exercises':
-      return <ExerciseList onExit={() => go({ name: 'today' })} />;
     case 'routines':
       return (
         <RoutineList
@@ -100,7 +98,11 @@ function renderRoute(route: Route): ReactNode {
     case 'gtg':
       return <GtgToday onExit={() => go({ name: 'today' })} />;
     case 'library':
-      return <Library />;
+      return route.lane === null ? (
+        <Library />
+      ) : (
+        <LaneLibrary key={route.lane} lane={route.lane} />
+      );
     case 'tier':
       // The one branch T38 allows: the heavy tier is routines, a block and a
       // battery, not slots, so it gets its own component rather than a third

@@ -1,18 +1,28 @@
 import { Fragment, useEffect, useState } from 'react';
-import type { Equipment, Exercise, Focus } from '../types';
-import { getAllExercises } from '../lib/storage';
+import type { Equipment, Exercise, Focus, Routine } from '../types';
+import { getAllExercises, getAllRoutines } from '../lib/storage';
 import { EQUIPMENT_OPTIONS } from '../lib/equipment';
+import { JOINT_TARGET_LABELS } from '../lib/pool';
+import { LANE_NOTES, groupByLane, laneLabel, type Membership } from '../lib/membership';
+import { go, type LibraryLane } from '../lib/routes';
 import { EquipmentBadge, GtgBadge } from '../components/EquipmentBadge';
-import { Icon, kicker } from '../components/ui';
+import { Icon, kicker, tagNeutral } from '../components/ui';
 import { RowRule, readList } from '../components/ReadList';
 import { ExerciseDetail } from './ExerciseDetail';
 
-// Display order + labels for the focus groups (D48; was the category groups).
-//
-// Ordered by where a movement sits in a session rather than by how many entries
-// it has: the warm-up first because it comes first, then the two tiers that carry
-// the heaviest load, then the supporting work, then the sport. A count-ordered
-// list would put sixteen prehab movements above the four the block is built on.
+/**
+ * One lane's movements, grouped by what they develop (T39, D54).
+ *
+ * **Grouped by focus inside the lane, never by target.** `focus` is declared on
+ * all forty-nine entries and `target` on thirty-one, so a target-first grouping
+ * would file a third of the catalog under no heading at all. The target rides on
+ * the row instead, which is what it is — a fact about the movement rather than a
+ * heading that has to exist for every one of them.
+ *
+ * The two filters survive from the flat list this replaced, because "what can I
+ * do with a band" is a real question that neither grouping answers on its own.
+ */
+
 const FOCUS_ORDER: { key: Focus; label: string }[] = [
   { key: 'warm-up', label: 'Warm-up' },
   { key: 'max-strength', label: 'Max strength' },
@@ -27,46 +37,62 @@ const FOCUS_ORDER: { key: Focus; label: string }[] = [
   { key: 'core', label: 'Core' },
 ];
 
-export function ExerciseList({ onExit }: { onExit?: () => void }) {
+function toMembership(lane: LibraryLane): Membership {
+  return lane === 'none' ? null : (lane as Membership);
+}
+
+export function LaneLibrary({ lane }: { lane: LibraryLane }) {
   const [exercises, setExercises] = useState<Exercise[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  // Filter state lives here, so returning from the detail view preserves it (edge case).
+  const [routines, setRoutines] = useState<Routine[]>([]);
   const [equipmentFilter, setEquipmentFilter] = useState<Equipment | 'all'>('all');
   const [gtgOnly, setGtgOnly] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
-    getAllExercises()
-      .then(setExercises)
-      .catch((e: unknown) => setError(String(e)));
+    void (async () => {
+      const [exs, rs] = await Promise.all([getAllExercises(), getAllRoutines()]);
+      setExercises(exs);
+      setRoutines(rs);
+    })();
   }, []);
 
   const selected = exercises?.find((e) => e.id === selectedId);
   if (selected) {
+    // T39 AC8: the detail is T3's, unchanged.
     return <ExerciseDetail exercise={selected} onBack={() => setSelectedId(null)} />;
   }
 
-  const visible = (exercises ?? []).filter(
+  const inLane =
+    exercises === null
+      ? []
+      : (groupByLane(exercises, routines).find((g) => g.lane === toMembership(lane))?.exercises ??
+        []);
+
+  const visible = inLane.filter(
     (e) =>
       (equipmentFilter === 'all' || e.equipment.includes(equipmentFilter)) &&
       (!gtgOnly || e.gtgEligible),
   );
+  const hidden = inLane.length - visible.length;
+  const note = LANE_NOTES[lane];
 
   return (
     <div className="mx-auto max-w-md px-4 pb-24 pt-[54px]">
-      <header className="mb-4 flex items-center justify-between">
-        <h1 className="text-[15px] font-medium tracking-[-0.01em]">Exercises</h1>
-        {onExit && (
-          <button
-            onClick={onExit}
-            className="rounded-md px-1 py-1 text-[13px] font-medium text-accent hover:bg-accent/10"
-          >
-            Done
-          </button>
-        )}
+      <header className="mb-2 flex items-baseline gap-2">
+        <h1 className="text-[15px] font-medium tracking-[-0.01em]">
+          {laneLabel(toMembership(lane))}
+        </h1>
+        <span className="text-[11px] tabular-nums text-neutral-600">{inLane.length}</span>
+        <button
+          onClick={() => go({ name: 'library', lane: null })}
+          className="ml-auto rounded-md px-1 py-1 text-[13px] font-medium text-accent hover:bg-accent/10"
+        >
+          Library
+        </button>
       </header>
 
-      {/* Filters (AC1a, AC2) */}
+      {note && <p className="mb-4 text-[11px] leading-snug text-neutral-500">{note}</p>}
+
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <select
           value={equipmentFilter}
@@ -81,7 +107,6 @@ export function ExerciseList({ onExit }: { onExit?: () => void }) {
             </option>
           ))}
         </select>
-
         <button
           onClick={() => setGtgOnly((v) => !v)}
           aria-pressed={gtgOnly}
@@ -95,37 +120,38 @@ export function ExerciseList({ onExit }: { onExit?: () => void }) {
         </button>
       </div>
 
-      {error && <p className="text-[13px] text-warn">Couldn’t load exercises: {error}</p>}
-
-      {exercises === null && !error && <p className="text-[13px] text-neutral-400">Loading…</p>}
+      {exercises === null && <p className="text-[13px] text-neutral-400">Loading…</p>}
 
       {exercises !== null && visible.length === 0 && (
         <div className="rounded-md bg-surface shadow-edge p-6 text-center">
-          <p className="text-[13px] text-neutral-300">No exercises match this filter.</p>
-          <button
-            onClick={() => {
-              setEquipmentFilter('all');
-              setGtgOnly(false);
-            }}
-            className="mt-3 text-sm font-medium text-accent"
-          >
-            Clear filters
-          </button>
+          <p className="text-[13px] text-neutral-300">
+            {inLane.length === 0
+              ? 'No movement in this lane yet.'
+              : 'No movement here matches this filter.'}
+          </p>
+          {inLane.length > 0 && (
+            <button
+              onClick={() => {
+                setEquipmentFilter('all');
+                setGtgOnly(false);
+              }}
+              className="mt-3 text-sm font-medium text-accent"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
       )}
 
-      {/* Nocturne's collapse rule, at the scale it matters most: twenty cards
-          became six cards of rows. Nothing here is a thing you *do* — the whole
-          screen is a catalog you read and then tap into — and twenty separate
-          surfaces made twenty subjects out of one list. As rows the category is
-          the subject and the entries are its contents, which is what they are. */}
       <div className="space-y-5">
         {FOCUS_ORDER.map(({ key, label }) => {
           const inGroup = visible.filter((e) => e.focus === key);
           if (inGroup.length === 0) return null;
           return (
             <section key={key}>
-              <h2 className={`${kicker} mb-2`}>{label}</h2>
+              <h2 className={`${kicker} mb-2`}>
+                {label} · {inGroup.length}
+              </h2>
               <div className={readList}>
                 {inGroup.map((ex, i) => (
                   <Fragment key={ex.id}>
@@ -137,6 +163,12 @@ export function ExerciseList({ onExit }: { onExit?: () => void }) {
                       <span className="min-w-0 flex-1">
                         <span className="flex flex-wrap items-center gap-2">
                           <span className="text-[13px] font-medium">{ex.name}</span>
+                          {/* The third level, where the entry declares one. It is
+                              a fact about the movement, not a heading — which is
+                              why it is here and not above. */}
+                          {ex.target && (
+                            <span className={tagNeutral}>{JOINT_TARGET_LABELS[ex.target]}</span>
+                          )}
                           {ex.gtgEligible && <GtgBadge />}
                         </span>
                         <span className="mt-0.5 block text-[11px] leading-snug text-neutral-500">
@@ -156,35 +188,14 @@ export function ExerciseList({ onExit }: { onExit?: () => void }) {
             </section>
           );
         })}
-
-        {/* D48: the focuses nothing in the catalog trains, stated rather than
-            omitted. This is the axis's most useful product — an accurate report
-            that this catalog trains max strength and conditions tissue and does
-            nothing else — and it is computed against the whole catalog rather
-            than the filtered view, because it is a fact about what is declared,
-            not about what the equipment chip is currently hiding.
-
-            It reports and stops there (D23): no target, no suggestion to add
-            one, and no implication that a gap is a failing. Absent entirely once
-            every focus has a member. */}
-        {exercises !== null &&
-          (() => {
-            const untrained = FOCUS_ORDER.filter(
-              ({ key }) => !exercises.some((e) => e.focus === key),
-            );
-            if (untrained.length === 0) return null;
-            return (
-              <section>
-                <h2 className={`${kicker} mb-2`}>Not in this catalog</h2>
-                <div className={readList}>
-                  <p className="px-1 py-3 text-[11px] leading-snug text-neutral-500">
-                    {untrained.map(({ label }) => label).join(' · ')}
-                  </p>
-                </div>
-              </section>
-            );
-          })()}
       </div>
+
+      {/* AC6: a filter never makes a group vanish silently. */}
+      {hidden > 0 && (
+        <p className="mt-5 px-0.5 text-[11px] text-neutral-600">
+          {hidden} more in this lane, hidden by the filter.
+        </p>
+      )}
     </div>
   );
 }

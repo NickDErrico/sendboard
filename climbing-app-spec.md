@@ -94,6 +94,7 @@ Recorded once here so no downstream task re-derives or contradicts them.
 | D50 | **The 8-week block is the heavy lane's state, not the app's** | "Week 3 of 8" rides in the app header beside the wordmark, which frames the entire app as an eight-week program. It is not one and is not meant to be — owner's account, 2026-08-01: this is ongoing climbing and tendon training. Three of the four tiers are permanent and unperiodised; only `heavy` has phases, a deload and a retest at each end. So `BLOCK_PHASES`, the §4E battery and the edge×week tension grid move inside that lane and the global week chip is removed. Nothing in `block.ts` changes — D25's derive-don't-store is untouched — only what the week is allowed to frame. The three permanent tiers stop being visually enclosed by a countdown that has nothing to do with them. |
 | D51 | **`target` is the rotation slot; `alsoLoads` is the load path. Two fields, because they answer two questions** | `target` is singular and `pool.ts` depends on it: staleness counts one movement as loading one tissue, and an array would silently change every interval in the rotation. But "which slot does this fill" and "what does this put load through" are different questions, and rehab asks the second — a muscle-up loads shoulder, elbow and wrist, and a front lever puts real load through the biceps tendon at the elbow. With one field, "what should I stop doing while this elbow settles" is answerable only for the movements §8 happened to name. So `target` stays primary and the rotation keeps reading only it, and `alsoLoads: JointTarget[]` is added beside it; symptom and emphasis surfaces read both. **Corollary: rehab and targeted prevention are one feature.** "Work this elbow back" and "bulletproof my shoulders for six weeks" are the same operation — temporarily raise one target's pool interval and mark everything whose `target ∪ alsoLoads` contains it. No new tier. It reports and marks; it never hides a movement, blocks a start, or scores adherence to the emphasis (D23, D31). |
 | D52 | **A progression's rung is derived from the log. Advancing is a tap, never an inference** | A front lever is a ladder — tuck, advanced tuck, straddle, full — not an exercise, and nothing in the catalog expresses a rung. The obvious implementation breaks two rules at once: advancing when a target is hit is the app deciding the owner succeeded (D23, D16), and storing the current rung is state derivable from the log (D15, D25). So rungs are declared in the catalog in order, each with its own prescription; the current rung is derived from the most recent one logged, exactly as block position is derived from the first completed session; the app renders the ladder and the owner's place on it and offers the next rung as a **position**, never a promotion. Nothing regresses on its own either — a rung logged after a harder one is recorded as what it is, and §4F makes stepping back as often correct as stepping up. Not required by any stage of D47; recorded now because it was decided now, and because the shape must be settled before an implementation reaches for a stored `currentRung`. |
+| D54 | **Lane membership is derived. `tiers[]` is a dose declaration, and the two answer different questions** | Forced by T39, and it corrects D48. That row said a movement is addressable as `tier → focus → target`, which turned out not to be buildable: **no catalog entry declares `tier: 'heavy'`** and eighteen of forty-nine declare no tier at all — including both max hangs, both PIMA pulls, all three overcoming bar pulls and all five §4E tests, which *are* the heavy tier. The reason is in `types.ts` and it is right: a tier is a property of a **dose**, and `tiers[]` exists only for movements carrying more than one protocol; an entry with a single protocol states it in `prescription` and declares no tier. So the app already held two notions of tier without saying so — the heavy lane never reads `tiers[]` at all and works entirely off `rotation.ts`, while the two rotation lanes read it directly. `laneOf(exercise, routines)` names the second notion and makes it testable, in a fixed order where **a declaration beats an inference**: a declared dose decides the lane, then membership of the daily routine, then membership of a rotating routine, then none. That order is what puts the three prehab movements in Day 3 — the wall press, the external rotations, the wrist extensor work — in the **pool** rather than in heavy, which is the same fact the heavy lane already reports when it says Day 3 is doing three jobs at once. Four entries stay in no lane and that is correct rather than a gap: the §4E tests are a measurement (D29) and the climbing days are check-offs (D9), and neither is loaded on a cadence. `focus` remains the axis declared on all forty-nine, which is why it and not the tier is what the catalog is grouped by inside a lane. |
 | D53 | **D42's rule applies to a set of sources, not to one document** | D42 bundled `docs/training-plan.md` and set the rule that survives verbatim here: sources are **displayed, searched and quoted; never parsed for meaning.** It renders one document because at the time there was one. There are already two, and `TierPrescription.source` is free text pointing at papers and coaches — *"Crimpd–Gilmore et al. 2024 cadence, Baar spacing"* — which is the newer and better shape and never reached the surface. So every prescription resolves to whichever source it cites rather than to a `§` in a document that may not be where the number came from. The citation discipline gets *stronger*: a dose sourced from a paper stops having to pretend it came from the plan. |
 
 **Documented alternative, not chosen:** Expo + EAS Build → real native app with `expo-notifications` scheduling reminders in-app. Gate to revisit: owner is willing to pay $99/yr for the Apple Developer Program **and** external reminders have proven insufficient in real use (e.g. he wants the notification itself to name the day's routine). Revisit no earlier than the end of the 8-week block. Do not build toward this in v1.
@@ -2388,6 +2389,64 @@ Create: `src/screens/HeavyTier.tsx` | Modify: `src/lib/routes.ts` (+ test), `src
 | `Lane.detail` rather than changing the heavy lane's action | AC6 wanted both a one-tap start and a way into the tier screen. Making the *title* the link puts the affordance in the same place on every lane that has one, and leaves `LaneAction` saying the true thing about each tier: collagen and heavy are run, the two rotations are ticked. Collagen carries no `detail`, so its title stays an `h2` — asserted in `lanes.test.ts`, because a heading that looks tappable is worse than one that never claimed to be. |
 | Today stopped reading `Settings` | Its only two consumers were `blockPosition` and `buildEdgeWeekGrid`, and both moved. Left in place it would have been a load on every Today render feeding nothing. |
 | Verified by page text and a DOM click; screenshot artefacted again | The pane captured at `devicePixelRatio` 2 without downscaling, so the image reads as cropped. Layout was checked directly instead — `scrollWidth === innerWidth`, no horizontal overflow — and AC6 by clicking the heavy lane's title and reading the resulting hash. |
+
+### [T39] Outcome: The catalog is browsed the way the training is organised — by the lane a movement is loaded in, then by what it develops — and the movements that belong to no lane say so instead of hiding among the ones that do.
+
+Spec: this file | Status: [x] | Depends on: T36, T37 | D48, D54 | Owner decision, 2026-08-01
+
+#### Context manifest
+
+Create: `src/lib/membership.ts` (+ `membership.test.ts`), `src/screens/LaneLibrary.tsx` | Modify: `src/screens/Library.tsx`, `src/screens/ExerciseList.tsx`, `src/lib/routes.ts` (+ test), `src/App.tsx` | Read-only: `src/lib/lanes.ts`, `src/lib/rotation.ts`, `src/lib/daily.ts`
+
+**D54 is the whole reason this task has a module in it.** `tier → focus → target` is not browsable off the catalog, because the top level is declared on thirty-one entries and empty for one of the four tiers. `laneOf` derives it instead, in the fixed order D54 states, and it is a pure function of `(exercise, routines)` so the ordering is a unit test rather than an argument.
+
+**Grouped by focus *inside* a lane, not by target.** `focus` is declared on all forty-nine and `target` on thirty-one, so a target-first grouping inside a lane would file a third of the movements under nothing. Target rides on the row, where it is a fact about the movement rather than a heading that must exist.
+
+**One browse, not two.** `#/exercises` becomes `#/library`, the way `#/joints` became a tier route — the flat focus-grouped list and a lane-grouped one are two answers to "what is in the catalog", and two of those is how they start disagreeing. The equipment filter and the GtG filter survive into the new browse, because "what can I do with a band" is a real question that neither grouping answers on its own.
+
+**The four empty focuses keep their place.** They are the axis's most useful product (D48) and they are a fact about the catalog rather than about a lane, so they sit at Library's top level rather than being repeated inside each one.
+
+#### Acceptance criteria
+
+1. WHEN `laneOf` is called THE lane SHALL be decided by, in order: a declared dose for a tier, membership of the daily routine, membership of a rotating routine, otherwise none.
+2. WHEN a movement declares a pool dose and also appears in a rotating routine THE lane SHALL be the pool — a declaration beats an inference (D54).
+3. WHEN a §4E test or a climbing day is resolved THE lane SHALL be none, and the Library SHALL render them under a heading that says so rather than omitting them.
+4. WHEN `#/library` is open THE screen SHALL list the four lanes with a count each, the no-lane group, and the focuses the catalog declares no movement for.
+5. WHEN a lane is opened THE movements SHALL be grouped by focus, each row stating the movement's target where it declares one.
+6. WHEN the equipment or GtG filter is applied THE grouping SHALL narrow without a group vanishing silently — an emptied group is omitted and the filter states what it is hiding.
+7. WHEN `#/exercises` is opened from a bookmark THE app SHALL resolve it to `#/library` rather than showing not-found.
+8. WHEN an exercise row is opened THE detail SHALL be the same `ExerciseDetail` T3 shipped, unchanged.
+9. WHEN every lane's counts are summed THE total SHALL be forty-nine, asserted in a test so a movement cannot fall out of the catalog by being unreachable from any lane.
+10. WHEN any Library copy is rendered THE text SHALL NOT rank lanes, score coverage, or contain a fraction whose denominator is a prescription (D23, D49).
+11. WHEN a database or backup written before this task is read THE app SHALL work unchanged, with no migration and no version bump.
+
+#### Edge cases
+
+- A movement in both the daily routine and a rotating one (the finger warm-up) → collagen, by the order in AC1.
+- A movement declaring two doses → the first tier in declaration order, and a test names which entry that is if one ever exists.
+- An empty catalog → every lane renders its heading with a zero count rather than the screen collapsing to nothing.
+- A filter that empties every group → the screen says so and offers to clear, as `ExerciseList` already does.
+
+#### Non-goals & do-not-touch
+
+- MUST NOT modify `lanes.ts`, `rotation.ts`, `daily.ts` or `pool.ts`.
+- MUST NOT add `tier: 'heavy'` doses to the catalog — D54 chose derivation over a content pass that would restate prescriptions those entries already carry.
+- MUST NOT change `ExerciseDetail`.
+- MUST NOT turn the plan into Sources — stage 6.
+
+#### Verify
+
+`npm run test && npm run build && npm run lint`, plus an in-browser pass at 375×812: lane counts summing to forty-nine, `#/exercises` resolving to the library, and a lane opening to focus groups with targets on the rows.
+
+#### Amendments (T39)
+
+| Change | Why |
+|---|---|
+| D54 was written before a line of this task | The spec could not be built as D48 stated it, and the finding — two notions of tier, only one of them declared — was worth recording as a decision rather than as an implementation note. The module exists because of the decision, not the other way round. |
+| The lane split is **collagen 2, daily-isometric 7, pool 23, heavy 10, none 7** | The estimate offered when the approach was chosen said heavy 13 and none 4. It was wrong in the same way twice: the three prehab movements Day 3 carries declare pool doses, so a declaration puts them in the pool, and the §4E battery is five entries rather than one. The corrected split is asserted by name in `membership.test.ts` so a catalog or routine edit fails the build instead of quietly reshaping the Library. |
+| `ExerciseList.tsx` is deleted and `#/exercises` resolves to `#/library` | Two answers to "what is in the catalog" is how they start disagreeing, which is the argument T37 made for `#/checks`. The equipment and GtG filters moved into the lane browse rather than dying with the screen — "what can I do with a band" is a real question no grouping answers on its own. |
+| `LIBRARY_LANES` is declared in `routes.ts`, not imported | `routes.ts` is imported *by* `lanes.ts`, so importing `membership.ts` back would close a cycle. The duplication is the same shape as `TIER_ROUTES` and is pinned by a test asserting both lists agree, so it cannot drift. |
+| Console shows two stale HMR errors for the deleted file | Logged when `ExerciseList.tsx` was removed under a running dev server, and retained in the pane's buffer across reloads and a server restart. Nothing in `src/` references it, and `tsc` and the production build both pass. |
 
 ---
 

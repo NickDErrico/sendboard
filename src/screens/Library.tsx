@@ -1,77 +1,134 @@
-import { go } from '../lib/routes';
+import { Fragment, useEffect, useState } from 'react';
+import type { Exercise, Focus, Routine } from '../types';
+import { getAllExercises, getAllRoutines } from '../lib/storage';
+import { LANE_NOTES, groupByLane, laneLabel } from '../lib/membership';
+import { go, type LibraryLane } from '../lib/routes';
 import { Icon, card, kicker } from '../components/ui';
 import { RowRule, readList } from '../components/ReadList';
-import { Fragment } from 'react';
 
 /**
- * The reference tab (T37).
+ * The catalog's index, grouped the way the training is organised (T39, D54).
  *
- * Exercises and the plan document were two of five tabs, and they are the same
- * kind of thing: content you *read* rather than something you do. Collapsing
- * them is what takes the tab bar to four without deleting a screen — both are
- * still one tap from here, and `#/exercises` and `#/plan` still resolve on their
- * own, because an exercise's `planRefs` citation deep-links to `#/plan/4B` and a
- * tab reorganisation must not break a link the catalog writes (T25 AC8, D42).
+ * The top level is the **lane a movement is loaded in**, derived rather than
+ * declared — see `membership.ts` for why `tiers[]` could not serve as the top of
+ * a hierarchy, and D54 for the correction to D48 that finding forced.
  *
- * **A shell this cycle, deliberately.** The catalog's browse is still grouped by
- * `focus` exactly as stage 1 left it. Restructuring it into tier → focus →
- * target is stage 5's job, and turning the plan into a set of sources is stage
- * 6's (D53) — doing either here would be a second task wearing this one's
- * clothes.
+ * Two groups earn a note rather than a count alone. **Heavy** is the one lane
+ * derived entirely from routine membership, because no catalog entry declares a
+ * heavy dose. **Not in a lane** is a real answer rather than a leftover: the §4E
+ * battery is a measurement (D29) and the climbing days are check-offs (D9), and
+ * filing either under a lane would assert a cadence that does not exist.
+ *
+ * The four focuses with no movement sit here, at the catalog's own level, rather
+ * than being repeated inside each lane — they are a fact about what the catalog
+ * declares, not about where anything is loaded (D48).
+ *
+ * D23: the lanes are listed in cadence order and never ranked, nothing is scored
+ * against the counts, and no fraction is drawn against any of them.
  */
+
+const ALL_FOCUSES: { key: Focus; label: string }[] = [
+  { key: 'endurance', label: 'Endurance' },
+  { key: 'power-endurance', label: 'Power endurance' },
+  { key: 'power', label: 'Power' },
+  { key: 'core', label: 'Core' },
+];
+
 export function Library() {
-  const rows = [
-    {
-      icon: 'list-checks',
-      title: 'Exercises',
-      sub: 'Every movement, grouped by what it develops',
-      onClick: () => go({ name: 'exercises' }),
-    },
-    {
-      icon: 'book-open',
-      title: 'Training plan',
-      sub: 'The document the app is a tool for — searchable, quoted, never parsed',
-      onClick: () => go({ name: 'plan', sectionRef: null }),
-    },
-  ];
+  const [exercises, setExercises] = useState<Exercise[] | null>(null);
+  const [routines, setRoutines] = useState<Routine[]>([]);
+
+  useEffect(() => {
+    void (async () => {
+      const [exs, rs] = await Promise.all([getAllExercises(), getAllRoutines()]);
+      setExercises(exs);
+      setRoutines(rs);
+    })();
+  }, []);
+
+  const groups = exercises === null ? [] : groupByLane(exercises, routines);
+  const untrained =
+    exercises === null ? [] : ALL_FOCUSES.filter(({ key }) => !exercises.some((e) => e.focus === key));
 
   return (
     <div className="mx-auto flex max-w-md flex-col gap-3.5 px-4 pb-24 pt-[54px]">
       <header className="flex items-baseline gap-2">
         <h1 className="text-[15px] font-medium tracking-[-0.01em]">Library</h1>
+        {exercises !== null && (
+          <span className="text-[11px] tabular-nums text-neutral-600">
+            {exercises.length} movements
+          </span>
+        )}
       </header>
 
-      {/* Nocturne's collapse rule: nothing here is a thing you *do*, so two cards
-          would make two subjects out of one list. */}
-      <div className={readList}>
-        {rows.map((row, i) => (
-          <Fragment key={row.title}>
-            {i > 0 && <RowRule />}
-            <button
-              onClick={row.onClick}
-              className="flex w-full items-center gap-3 rounded-md px-1 py-3 text-left transition-colors hover:bg-white/5"
-            >
-              <Icon name={row.icon} className="shrink-0 text-[17px] text-neutral-500" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[13px] font-medium">{row.title}</span>
-                <span className="mt-0.5 block text-[11px] leading-snug text-neutral-500">
-                  {row.sub}
-                </span>
-              </span>
-              <Icon name="caret-right" className="shrink-0 text-[13px] text-neutral-600" />
-            </button>
-          </Fragment>
-        ))}
-      </div>
+      {exercises === null ? (
+        <p className="text-[13px] text-neutral-400">Loading…</p>
+      ) : (
+        <>
+          <section>
+            <h2 className={`${kicker} mb-2`}>By how it is loaded</h2>
+            <div className={readList}>
+              {groups.map((group, i) => {
+                const key: LibraryLane = (group.lane ?? 'none') as LibraryLane;
+                const note = LANE_NOTES[key];
+                return (
+                  <Fragment key={key}>
+                    {i > 0 && <RowRule />}
+                    <button
+                      onClick={() => go({ name: 'library', lane: key })}
+                      className="flex w-full items-center gap-3 rounded-md px-1 py-3 text-left transition-colors hover:bg-white/5"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-baseline gap-2">
+                          <span className="text-[13px] font-medium">{laneLabel(group.lane)}</span>
+                          <span className="text-[11px] tabular-nums text-neutral-600">
+                            {group.exercises.length}
+                          </span>
+                        </span>
+                        {note && (
+                          <span className="mt-0.5 block text-[11px] leading-snug text-neutral-500">
+                            {note}
+                          </span>
+                        )}
+                      </span>
+                      <Icon name="caret-right" className="shrink-0 text-[13px] text-neutral-600" />
+                    </button>
+                  </Fragment>
+                );
+              })}
+            </div>
+          </section>
 
-      <section className={`${card} flex flex-col gap-1.5 shadow-edge`}>
-        <h2 className={kicker}>What is not here</h2>
-        <p className="text-[11px] leading-snug text-neutral-500">
-          The catalog trains max strength and conditions tissue. Endurance, power endurance, power
-          and core have no movement declared — the Exercises list names them at the bottom rather
-          than leaving the gap invisible.
-        </p>
-      </section>
+          <section>
+            <h2 className={`${kicker} mb-2`}>Reference</h2>
+            <div className={readList}>
+              <button
+                onClick={() => go({ name: 'plan', sectionRef: null })}
+                className="flex w-full items-center gap-3 rounded-md px-1 py-3 text-left transition-colors hover:bg-white/5"
+              >
+                <Icon name="book-open" className="shrink-0 text-[17px] text-neutral-500" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-medium">Training plan</span>
+                  <span className="mt-0.5 block text-[11px] leading-snug text-neutral-500">
+                    The document the app is a tool for — searchable, quoted, never parsed
+                  </span>
+                </span>
+                <Icon name="caret-right" className="shrink-0 text-[13px] text-neutral-600" />
+              </button>
+            </div>
+          </section>
+
+          {untrained.length > 0 && (
+            <section className={`${card} flex flex-col gap-1.5 shadow-edge`}>
+              <h2 className={kicker}>Not in this catalog</h2>
+              <p className="text-[11px] leading-snug text-neutral-500">
+                {untrained.map(({ label }) => label).join(' · ')} — no movement declared. Stated
+                rather than omitted: a gap you can see is the useful half of a taxonomy.
+              </p>
+            </section>
+          )}
+        </>
+      )}
     </div>
   );
 }

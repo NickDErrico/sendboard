@@ -22,10 +22,20 @@ export type TierRoute = (typeof TIER_ROUTES)[number];
  */
 export type SlotTier = Exclude<TierRoute, 'heavy'>;
 
+/**
+ * The Library's top-level groups (T39).
+ *
+ * Declared here rather than imported from `membership.ts`, which imports this
+ * module for `TierRoute` — the same reason `TIER_ROUTES` is declared here. A
+ * test asserts the two lists agree, so the duplication cannot drift.
+ */
+export const LIBRARY_LANES = ['collagen', 'daily-isometric', 'pool', 'heavy', 'none'] as const;
+export type LibraryLane = (typeof LIBRARY_LANES)[number];
+
 export type Route =
   | { name: 'today' }
-  | { name: 'library' }
-  | { name: 'exercises' }
+  /** `null` is the Library's index; a value is one lane's movements. */
+  | { name: 'library'; lane: LibraryLane | null }
   | { name: 'routines' }
   | { name: 'routine'; routineId: string }
   | { name: 'session' }
@@ -59,7 +69,6 @@ export function tabFor(route: Route): TabName | null {
     case 'today':
       return 'today';
     case 'library':
-    case 'exercises':
     case 'plan':
       return 'library';
     case 'history':
@@ -79,9 +88,14 @@ export function parseHash(hash: string): Route {
   if (segments.length === 0) return { name: 'today' };
   switch (segments[0]) {
     case 'library':
-      return { name: 'library' };
+      if (segments[1] === undefined) return { name: 'library', lane: null };
+      return LIBRARY_LANES.includes(segments[1] as LibraryLane)
+        ? { name: 'library', lane: segments[1] as LibraryLane }
+        : { name: 'notFound', path: `/${segments.join('/')}` };
+    // T39: the flat catalog list became the Library's lane browse. A bookmark
+    // resolves rather than 404ing, as `#/joints` and `#/checks` do.
     case 'exercises':
-      return { name: 'exercises' };
+      return { name: 'library', lane: null };
     case 'routines':
       return { name: 'routines' };
     case 'routine':
@@ -140,6 +154,8 @@ export function hashFor(route: Route): string {
       return `#/routine/${route.routineId}`;
     case 'tier':
       return `#/tier/${route.tier}`;
+    case 'library':
+      return route.lane === null ? '#/library' : `#/library/${route.lane}`;
     case 'plan':
       return route.sectionRef === null ? '#/plan' : `#/plan/${route.sectionRef}`;
     case 'notFound':
