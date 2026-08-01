@@ -14,7 +14,7 @@ import type { Exercise, SetEntry } from '../types';
 const base: Exercise = {
   id: 'x',
   name: 'X',
-  category: 'fingers',
+  focus: 'max-strength',
   isoType: 'none',
   equipment: [],
   summary: '',

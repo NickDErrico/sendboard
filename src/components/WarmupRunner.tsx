@@ -39,7 +39,7 @@ import { Icon, btnGhost, btnPrimary, btnSecondary, btnStop, kicker } from './ui'
  *   stage counts down, because §4A gives a total and withholds the parts (D40).
  * - **cycle** — the abrahangs' `10s on / 50s off`, repeating with no tap per
  *   round (D39). The one place in the app where a hold starts itself, and it is
- *   gated on the catalog's `category === 'warmup'` rather than on this file.
+ *   gated on the catalog's `focus === 'warm-up'` rather than on this file.
  *
  * The cycle drives the *session's* timer, so its cues are the ones T13 and T20
  * already paid for. Exactly one view holds `useTimerCues`, which is why this

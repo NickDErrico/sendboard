@@ -7,7 +7,7 @@ import { variationStatus, variationsFor } from './variation';
 const ex = (id: string, rotationGroup?: string): Exercise => ({
   id,
   name: id,
-  category: 'fingers',
+  focus: 'max-strength',
   rotationGroup,
   isoType: 'none',
   equipment: ['bodyweight'],

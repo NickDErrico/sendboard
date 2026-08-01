@@ -15,7 +15,7 @@ const byId = (id: string) => EXERCISES.find((e) => e.id === id);
 const base: Exercise = {
   id: 'x',
   name: 'X',
-  category: 'pulling',
+  focus: 'general-strength',
   isoType: 'none',
   equipment: [],
   summary: '',

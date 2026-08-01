@@ -18,20 +18,20 @@ const ROUTINES: Routine[] = [
 ];
 
 const CATALOG: Exercise[] = [
-  ex('max-hang', 'fingers', [7, 10]),
-  ex('warm', 'warmup', [10, 10]),
-  ex('row', 'pulling', undefined),
+  ex('max-hang', 'max-strength', [7, 10]),
+  ex('warm', 'warm-up', [10, 10]),
+  ex('row', 'general-strength', undefined),
   // §4E's own entries, so a battery log carries holds like the real one does.
-  ex('test-max-hang-half-crimp', 'fingers', [7, 7]),
+  ex('test-max-hang-half-crimp', 'max-strength', [7, 7]),
 ];
 
 function ex(
   id: string,
-  category: Exercise['category'],
+  focus: Exercise['focus'],
   holdSeconds: [number, number] | 'open' | undefined,
 ): Exercise {
   return {
-    id, name: id, category, isoType: 'none', equipment: [],
+    id, name: id, focus, isoType: 'none', equipment: [],
     summary: '', howTo: [], prescription: '', holdSeconds,
     cues: [], safetyNotes: [], gtgEligible: false,
   };

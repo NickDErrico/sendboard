@@ -12,13 +12,39 @@ export type Equipment =
 
 export type IsoType = 'overcoming' | 'yielding' | 'dynamic' | 'none';
 
-export type Category =
-  | 'fingers'
-  | 'pulling'
-  | 'antagonist'
-  | 'lower-body'
+/**
+ * What a movement develops (D48).
+ *
+ * Replaces `Category`, which mixed body region with training role and said so in
+ * its own doc comment. This axis is not a peer of `target` and `Tier` — it is the
+ * middle of a nesting: **tier** answers why and how often a movement is loaded,
+ * **focus** answers what it develops, **target** answers which tissue. A movement
+ * is addressable as `pool → prehab-stability → shoulder`.
+ *
+ * `Category` was not split into a region and a role, because `target` already
+ * owns region on 31 of the 49 entries, and a second region field is how two
+ * taxonomies begin disagreeing about one movement.
+ *
+ * **Four values below have no member in the catalog, and that is the point.**
+ * `endurance`, `power-endurance`, `power` and `core` are declared so the app can
+ * state accurately that this catalog trains max strength and conditions tissue
+ * and does nothing else. That inverts the rule `JointTarget` follows, where a
+ * target with no movement fails the build because `pool.ts` would offer a slot it
+ * cannot fill — see `focus.test.ts`, where both rules are asserted separately so
+ * neither is ever copied onto the other.
+ */
+export type Focus =
+  | 'max-strength'
+  | 'tendon-conditioning'
+  | 'prehab-stability'
+  | 'proprioception'
+  | 'general-strength'
+  | 'warm-up'
   | 'climbing'
-  | 'warmup';
+  | 'endurance'
+  | 'power-endurance'
+  | 'power'
+  | 'core';
 
 /**
  * The joint or tendon group a movement loads (docs/joint-rotation-research.md).
@@ -61,10 +87,17 @@ export type JointTarget =
  *
  * - `collagen` — abrahangs and the finger warm-up. Up to 2x/day, >=6h apart.
  * - `daily-isometric` — one non-finger tendon slot per day, ~70% MVC, 30-45s.
- * - `block-max` — max protocols: the two weekly finger routines, Day 3, §4E.
+ * - `heavy` — loaded heavy, run fresh, 1-2x/week, held fixed within a block so
+ *   retests compare: the two weekly finger routines, Day 3, §4E.
  * - `pool` — dynamic and proprioceptive prehab, 2-3x/week per target.
+ *
+ * `heavy` was `block-max` until D48. The old name described the tier's members
+ * rather than its mechanism, and excluded work that belongs in it and is not a
+ * maximum — a front-lever or muscle-up progression is loaded heavy, run fresh,
+ * once or twice a week, and progressed. Renaming cost nothing: a tier is a
+ * code-seeded catalog value, so there was no stored data and no migration.
  */
-export type Tier = 'collagen' | 'daily-isometric' | 'block-max' | 'pool';
+export type Tier = 'collagen' | 'daily-isometric' | 'heavy' | 'pool';
 
 /**
  * One tier's dose for a movement that carries more than one (D41's shape,
@@ -103,7 +136,7 @@ export interface TierPrescription {
 export interface Exercise {
   id: string; // stable kebab-case slug, never reused
   name: string;
-  category: Category;
+  focus: Focus;
   /**
    * The joint/tendon group this movement loads, where it belongs to one.
    *
@@ -111,8 +144,32 @@ export interface Exercise {
    * days, the finger warm-up and the §4E tests load plenty but belong to no
    * rotation slot, and giving them a target would put a test battery into the
    * pool's "what is stalest" arithmetic.
+   *
+   * This field is the **rotation slot**, not the load path — see `alsoLoads`.
    */
   target?: JointTarget;
+  /**
+   * The other tissues this movement puts load through (D51).
+   *
+   * `target` answers "which rotation slot does this fill"; this answers "what
+   * does this put load through", and they are different questions. A muscle-up
+   * loads shoulder, elbow and wrist; a max hang declares no `target` at all — by
+   * design, so the §4E battery stays out of the pool's arithmetic — and still
+   * loads the finger flexors harder than anything else in the catalog.
+   *
+   * **`pool.ts` never reads this field, and must not.** Staleness counts one
+   * movement as loading one tissue; an array on `target` would silently change
+   * every interval in the rotation, which is why this is a second field rather
+   * than `target` widened. Symptom and emphasis surfaces read both.
+   *
+   * What it buys: `SymptomKind` plus the plan's drop orders are purely reactive —
+   * record elbow pain, see the movements §8 happens to name. With this field,
+   * "what loads my elbow" is answerable across the whole catalog.
+   *
+   * Absent where a movement's load is confined to its `target`. Never contains
+   * the entry's own `target`, which would be the same tissue counted twice.
+   */
+  alsoLoads?: JointTarget[];
   /**
    * Per-tier doses, for movements that appear in more than one program.
    *
@@ -257,6 +314,20 @@ export interface Exercise {
  * watch items first. It groups the surface; it never blocks anything (D23).
  */
 export interface GtgDose {
+  /**
+   * Which of §8's two sections this row belongs to (D48).
+   *
+   * Declared rather than inferred. `gtgKindOf` read `category === 'pulling'`
+   * until the taxonomy moved, and that was always a proxy: the general/pull split
+   * is §8's own, made on the tissue the movement loads, and it does not survive a
+   * regrouping by what a movement *develops* — the two pulling rows are
+   * `general-strength`, and so are three of the five general ones.
+   *
+   * This is D17's argument arriving by a new route. A split that decides which
+   * section a movement is checked off in should be a typed field the plan's table
+   * fills, not a value recovered from whichever classification happens to exist.
+   */
+  kind: 'gtg-general' | 'gtg-pull';
   dose: string; // "8–12 (about half your max)"
   trigger: string; // "Whenever you walk past a clear floor"
   riskClass: 'free' | 'watch';

@@ -9,9 +9,24 @@ import type { Check, CheckKind, Exercise } from '../types';
 // daily yes/no per movement — the dose is *prescribed* here, never logged — so
 // nothing below returns a set, a rep, or a number of times.
 
-/** A movement's kind. §8's list is split by the tissue it loads, which is D13's split. */
+/**
+ * A movement's kind. §8's list is split by the tissue it loads, which is D13's
+ * split — and since D48 the split is **declared on the row** rather than
+ * recovered from a classification.
+ *
+ * This read `category === 'pulling'` until the taxonomy moved, and that was
+ * always a proxy for §8's own column. It does not survive a regrouping by what a
+ * movement *develops*: both pulling rows are `general-strength`, and so are three
+ * of the five general ones, so the old expression would have put five of the
+ * seven movements in the wrong section.
+ *
+ * `gtg` is present on exactly the entries `gtgEligible` marks, asserted rather
+ * than trusted (see the catalog coverage tests). An entry carrying no §8 row is
+ * not a GtG movement at all — every caller reaches it through `gtgMovements`,
+ * which filters on that field first.
+ */
 export function gtgKindOf(exercise: Exercise): CheckKind {
-  return exercise.category === 'pulling' ? 'gtg-pull' : 'gtg-general';
+  return exercise.gtg?.kind ?? 'gtg-general';
 }
 
 /** Every catalog entry carrying a §8 row, in catalog order. */

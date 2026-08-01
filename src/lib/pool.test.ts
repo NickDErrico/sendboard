@@ -69,7 +69,7 @@ describe('catalog coverage', () => {
 const ex = (id: string, target: Exercise['target'], tier: 'daily-isometric' | 'pool'): Exercise => ({
   id,
   name: id,
-  category: 'antagonist',
+  focus: 'prehab-stability',
   target,
   tiers: [{ tier, text: 't', source: 's' }],
   isoType: 'none',

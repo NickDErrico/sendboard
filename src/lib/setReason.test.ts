@@ -13,7 +13,7 @@ function exercise(overrides: Partial<Exercise> = {}): Exercise {
   return {
     id: 'x',
     name: 'X',
-    category: 'fingers',
+    focus: 'max-strength',
     isoType: 'yielding',
     equipment: ['hangboard'],
     summary: '',

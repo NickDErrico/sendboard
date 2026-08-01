@@ -22,21 +22,21 @@ const ROUTINES: Routine[] = [
 // A minimal catalog covering the three shapes that matter: a hold, a hold that
 // is a warm-up, and a rep-based exercise with no `holdSeconds` at all.
 const CATALOG: Exercise[] = [
-  ex('max-hang', 'fingers', [7, 10]),
-  ex('pima', 'fingers', [3, 5]),
-  ex('warm', 'warmup', [10, 10]),
-  ex('row', 'pulling', undefined),
+  ex('max-hang', 'max-strength', [7, 10]),
+  ex('pima', 'max-strength', [3, 5]),
+  ex('warm', 'warm-up', [10, 10]),
+  ex('row', 'general-strength', undefined),
 ];
 
 function ex(
   id: string,
-  category: Exercise['category'],
+  focus: Exercise['focus'],
   holdSeconds: [number, number] | 'open' | undefined,
 ): Exercise {
   return {
     id,
     name: id,
-    category,
+    focus,
     isoType: 'none',
     equipment: [],
     summary: '',
@@ -86,7 +86,7 @@ describe('countsAsHold gates on the timing declaration, minus warm-ups (AC8)', (
   });
 
   it('counts an open hold — §4E’s lock-off is the longest tension in the app', () => {
-    expect(countsAsHold(ex('lockoff', 'pulling', 'open'))).toBe(true);
+    expect(countsAsHold(ex('lockoff', 'general-strength', 'open'))).toBe(true);
   });
 
   it('does not count a warm-up hold: §4A is a condition of the work, not the work', () => {

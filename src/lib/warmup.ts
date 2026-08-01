@@ -17,7 +17,7 @@ import {
  * Three rules, and the first two are why it is a module rather than a component:
  *
  * 1. **D39: a warm-up round may start itself; a working set never may.** The gate
- *    is `category === 'warmup'` — a property of the *catalog*, not a flag on a
+ *    is `focus === 'warm-up'` — a property of the *catalog*, not a flag on a
  *    surface — so no max hang or PIMA pull can reach the auto-repeating path
  *    whatever is built on top of this later. T19 AC5 is narrowed, not reversed.
  * 2. **D40: it paces what the plan paces and reports what it does not.** §4A
@@ -55,15 +55,38 @@ export interface CyclePlan {
 export type WarmupPlan = StagedPlan | CyclePlan;
 
 /**
- * The runner offered for an exercise, or null for every exercise that is not a
- * warm-up.
+ * Which entries may run a self-advancing cadence (D39, moved by D48).
  *
- * The category gate is the whole safety argument for D39, so it is the first
- * thing this function does and the reason it takes an `Exercise` rather than the
- * pieces of one.
+ * The gate was `category === 'warmup'`, and the taxonomy split exposed that it
+ * had been doing two jobs at once. Abrahangs carried that category, but by what
+ * they *develop* they are `tendon-conditioning` — the README puts them in the
+ * collagen tier and §10D prescribes them as a standing twice-daily habit rather
+ * than as preparation for anything. They are also the one entry §10A gives a
+ * 10s/20s cadence and six grips to, so the runner still has to reach them.
+ *
+ * So the gate moves to the axis D39's argument was always actually about: the
+ * **loading mechanism**. Collagen work and the warm-up are preparatory loading at
+ * or below ~40% of max, and a round of either beginning by itself is a round
+ * nobody is endangered by. Nothing in `heavy` can reach this path, which is the
+ * entire guarantee D39 asks for — and it is now guaranteed by the tier rather
+ * than by a category that mixed region with role.
+ */
+function selfPacing(exercise: Exercise): boolean {
+  return (
+    exercise.focus === 'warm-up' || (exercise.tiers?.some((t) => t.tier === 'collagen') ?? false)
+  );
+}
+
+/**
+ * The runner offered for an exercise, or null for every exercise that may not
+ * pace itself.
+ *
+ * The gate is the whole safety argument for D39, so it is the first thing this
+ * function does and the reason it takes an `Exercise` rather than the pieces of
+ * one.
  */
 export function warmupPlanOf(exercise: Exercise | undefined): WarmupPlan | null {
-  if (!exercise || exercise.category !== 'warmup') return null;
+  if (!exercise || !selfPacing(exercise)) return null;
 
   const hold = holdSpecOf(exercise);
   const restMs = restMsOf(exercise);
@@ -121,7 +144,7 @@ export const CYCLE_GRACE_MS = 3000;
  *
  * The arithmetic is `shouldAutoAdvance`'s, shared with T31's rep chain so one
  * grace window governs both. The *permission* is still this module's: nothing
- * reaches here that `warmupPlanOf` did not gate on `category === 'warmup'`.
+ * reaches here that `warmupPlanOf` did not gate on `focus === 'warm-up'`.
  */
 export function shouldStartNextRound(
   state: TimerState,

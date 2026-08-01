@@ -14,7 +14,8 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'finger-warmup-progression',
     name: 'Finger Warm-up Progression',
-    category: 'warmup',
+    focus: 'warm-up',
+    alsoLoads: ['fingers'],
     isoType: 'none',
     equipment: ['hangboard'],
     summary: 'Progressive hang warm-up: jugs down to small edges before any max finger work.',
@@ -37,7 +38,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'abrahangs-no-hang',
     name: 'Abrahangs (No-Hang)',
-    category: 'warmup',
+    focus: 'tendon-conditioning',
     target: 'fingers',
     tiers: [
       {
@@ -93,9 +94,10 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'scapular-pullups-dead-hangs',
     name: 'Scapular Pull-ups / Dead Hangs',
-    category: 'pulling',
+    focus: 'general-strength',
     // The movement is the shoulder blade, not the arm — §10C's own first cue.
     target: 'shoulder',
+    alsoLoads: ['fingers', 'elbow'],
     tiers: [
       {
         tier: 'pool',
@@ -123,17 +125,18 @@ export const EXERCISES: Exercise[] = [
       'Second out, after full pull-ups, if elbow or shoulder symptoms persist (plan §8).',
     ],
     gtgEligible: true,
-    gtg: { dose: '5–8', trigger: 'Walking under the bar', riskClass: 'watch' }, // T33
+    gtg: { kind: 'gtg-pull', dose: '5–8', trigger: 'Walking under the bar', riskClass: 'watch' }, // T33
     planRefs: ['8', '10C'], // T25/D42
   },
   {
     id: 'bodyweight-pullups',
     name: 'Bodyweight Pull-ups',
-    category: 'pulling',
+    focus: 'general-strength',
     // Targeted at the elbow because that is the tissue §8 tracks it by: its own
     // safety note names medial elbow tendinopathy as the risk and puts it first
     // in the drop order. The target is the thing to watch, not the prime mover.
     target: 'elbow',
+    alsoLoads: ['fingers', 'shoulder'],
     tiers: [
       {
         tier: 'pool',
@@ -160,6 +163,7 @@ export const EXERCISES: Exercise[] = [
     ],
     gtgEligible: true,
     gtg: {
+      kind: 'gtg-pull',
       dose: '3–5 (well under half your max)',
       trigger: 'Walking under the bar, max 3–4x/day',
       riskClass: 'watch',
@@ -169,7 +173,8 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'pima-finger-pull-half-crimp',
     name: 'PIMA Finger Pull — Half-Crimp',
-    category: 'fingers',
+    focus: 'max-strength',
+    alsoLoads: ['fingers'],
     // §4B: "rotate in open-hand every other session". Half-crimp is declared
     // first, so it wins the never-run tie-break and is the pair's default.
     rotationGroup: 'pima-grip',
@@ -236,7 +241,8 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'pima-finger-pull-open-hand',
     name: 'PIMA Finger Pull — Open-Hand',
-    category: 'fingers',
+    focus: 'max-strength',
+    alsoLoads: ['fingers'],
     rotationGroup: 'pima-grip', // §4B's other half
     isoType: 'overcoming',
     equipment: ['hangboard'],
@@ -282,7 +288,8 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'max-hang-half-crimp',
     name: 'Max Hang — Half-Crimp',
-    category: 'fingers',
+    focus: 'max-strength',
+    alsoLoads: ['fingers'],
     // §4C: "Grip: half-crimp, alternate open-hand". A separate group from the
     // PIMA pair on purpose — they are two protocols, and alternating them in
     // lockstep would mean a session never sees both grips at all.
@@ -318,7 +325,8 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'max-hang-open-hand',
     name: 'Max Hang — Open-Hand',
-    category: 'fingers',
+    focus: 'max-strength',
+    alsoLoads: ['fingers'],
     rotationGroup: 'max-hang-grip', // §4C's other half
     isoType: 'yielding',
     equipment: ['hangboard', 'dip-belt'],
@@ -346,7 +354,8 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'oi-bar-pull-extended',
     name: 'Overcoming Bar Pull — Near Full Extension',
-    category: 'pulling',
+    focus: 'max-strength',
+    alsoLoads: ['elbow', 'shoulder'],
     isoType: 'overcoming',
     equipment: ['pullup-bar'],
     summary: 'Overcoming isometric bar pull near full extension — bottom-range pulling power.',
@@ -371,7 +380,8 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'oi-bar-pull-90',
     name: 'Overcoming Bar Pull — 90° Lock-off',
-    category: 'pulling',
+    focus: 'max-strength',
+    alsoLoads: ['elbow', 'shoulder'],
     isoType: 'overcoming',
     equipment: ['pullup-bar'],
     summary: "Overcoming isometric bar pull at the 90° lock-off — usually a climber's weakest angle.",
@@ -393,7 +403,8 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'oi-bar-pull-top',
     name: 'Overcoming Bar Pull — Near Top Lock-off',
-    category: 'pulling',
+    focus: 'max-strength',
+    alsoLoads: ['elbow', 'shoulder'],
     isoType: 'overcoming',
     equipment: ['pullup-bar'],
     summary: 'Overcoming isometric bar pull near the top lock-off — finishing-strength angle.',
@@ -415,7 +426,8 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'weighted-lockoff-hold',
     name: 'Weighted Lock-off Hold',
-    category: 'pulling',
+    focus: 'max-strength',
+    alsoLoads: ['fingers', 'elbow', 'shoulder'],
     isoType: 'yielding',
     equipment: ['pullup-bar', 'dip-belt'],
     summary: 'Yielding lock-off hold at your weakest angle, load added as it gets easy.',
@@ -440,7 +452,8 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'kb-single-arm-row',
     name: 'Single-Arm Kettlebell Row',
-    category: 'pulling',
+    focus: 'general-strength',
+    alsoLoads: ['elbow', 'shoulder'],
     isoType: 'dynamic',
     equipment: ['kettlebell'],
     summary: 'Single-arm kettlebell row — pulling strength and scapular control.',
@@ -460,8 +473,9 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'kb-goblet-squat',
     name: 'Kettlebell Goblet Squat',
-    category: 'lower-body',
+    focus: 'general-strength',
     target: 'hip',
+    alsoLoads: ['knee', 'ankle'],
     tiers: [
       { tier: 'pool', text: 'GtG: 10–15 reps, morning and evening', source: 'Plan §8 / §5C' },
     ],
@@ -482,13 +496,14 @@ export const EXERCISES: Exercise[] = [
     ],
     safetyNotes: [],
     gtgEligible: true,
-    gtg: { dose: '10–15', trigger: 'Morning, evening', riskClass: 'free' }, // T33
+    gtg: { kind: 'gtg-general', dose: '10–15', trigger: 'Morning, evening', riskClass: 'free' }, // T33
     planRefs: ['5C', '8'], // T25/D42
   },
   {
     id: 'kb-turkish-getup',
     name: 'Turkish Get-up (Light)',
-    category: 'antagonist',
+    focus: 'general-strength',
+    alsoLoads: ['shoulder', 'wrist'],
     isoType: 'dynamic',
     equipment: ['kettlebell'],
     summary: 'Light Turkish get-up — full-body tension and shoulder stability, technique focus.',
@@ -507,8 +522,9 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'pushups-or-dips',
     name: 'Push-ups or Dips',
-    category: 'antagonist',
+    focus: 'general-strength',
     target: 'shoulder',
+    alsoLoads: ['elbow', 'wrist'],
     tiers: [
       {
         tier: 'pool',
@@ -534,6 +550,7 @@ export const EXERCISES: Exercise[] = [
     safetyNotes: [],
     gtgEligible: true,
     gtg: {
+      kind: 'gtg-general',
       dose: '8–12 (about half your max)',
       trigger: 'Whenever you walk past a clear floor',
       riskClass: 'free',
@@ -543,7 +560,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'oi-wall-press',
     name: 'Overcoming Isometric Wall Press',
-    category: 'antagonist',
+    focus: 'prehab-stability',
     target: 'shoulder',
     tiers: [{ tier: 'pool', text: 'GtG: 5s x 1–2 in any doorway', source: 'Plan §8 / §5D' }],
     isoType: 'overcoming',
@@ -567,13 +584,13 @@ export const EXERCISES: Exercise[] = [
     ],
     safetyNotes: [],
     gtgEligible: true,
-    gtg: { dose: '5s x 1–2', trigger: 'Any doorway', riskClass: 'free' }, // T33
+    gtg: { kind: 'gtg-general', dose: '5s x 1–2', trigger: 'Any doorway', riskClass: 'free' }, // T33
     planRefs: ['5D', '8'], // T25/D42
   },
   {
     id: 'external-rotations',
     name: 'External Rotations',
-    category: 'antagonist',
+    focus: 'prehab-stability',
     target: 'shoulder',
     tiers: [
       { tier: 'pool', text: 'GtG: 10–12 per side, morning and evening', source: 'Plan §8 / §5D' },
@@ -592,13 +609,13 @@ export const EXERCISES: Exercise[] = [
     cues: ['Light load, strict form — this is prehab, not a strength lift.'],
     safetyNotes: [],
     gtgEligible: true,
-    gtg: { dose: '10–12/side', trigger: 'Morning and evening', riskClass: 'free' }, // T33
+    gtg: { kind: 'gtg-general', dose: '10–12/side', trigger: 'Morning and evening', riskClass: 'free' }, // T33
     planRefs: ['5D', '8'], // T25/D42
   },
   {
     id: 'wrist-extensor-work',
     name: 'Wrist Extensor Work',
-    category: 'antagonist',
+    focus: 'prehab-stability',
     target: 'extensors',
     tiers: [
       {
@@ -621,13 +638,14 @@ export const EXERCISES: Exercise[] = [
     cues: ['Directly offsets the finger-flexor load from Day 1 — protects the elbow.'],
     safetyNotes: [],
     gtgEligible: true,
-    gtg: { dose: '10–15 reps', trigger: 'Every time you make coffee', riskClass: 'free' }, // T33
+    gtg: { kind: 'gtg-general', dose: '10–15 reps', trigger: 'Every time you make coffee', riskClass: 'free' }, // T33
     planRefs: ['5D', '8'], // T25/D42
   },
   {
     id: 'climbing-volume-technique',
     name: 'Climbing — Volume / Technique (Day 2)',
-    category: 'climbing',
+    focus: 'climbing',
+    alsoLoads: ['fingers', 'elbow', 'shoulder'],
     isoType: 'none',
     equipment: ['climbing-wall'],
     summary: 'Day 2 volume/technique climbing below your limit — fix the technical leaks a plateau hides.',
@@ -646,7 +664,8 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'climbing-limit-boulder',
     name: 'Climbing — Limit Bouldering (Day 4)',
-    category: 'climbing',
+    focus: 'climbing',
+    alsoLoads: ['fingers', 'elbow', 'shoulder'],
     isoType: 'none',
     equipment: ['climbing-wall'],
     summary: 'Day 4 limit bouldering at or above your max — where new strength becomes sends.',
@@ -680,7 +699,8 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'test-max-hang-half-crimp',
     name: '§4E Test — Max Hang Load, Half-Crimp',
-    category: 'fingers',
+    focus: 'max-strength',
+    alsoLoads: ['fingers'],
     isoType: 'yielding',
     equipment: ['hangboard', 'dip-belt'],
     summary: 'Baseline/retest: the most added weight you can hold 7s on your standard edge, half-crimp.',
@@ -715,7 +735,8 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'test-max-hang-open-hand',
     name: '§4E Test — Max Hang Load, Open-Hand',
-    category: 'fingers',
+    focus: 'max-strength',
+    alsoLoads: ['fingers'],
     isoType: 'yielding',
     equipment: ['hangboard', 'dip-belt'],
     summary: 'Baseline/retest: the most added weight you can hold 7s on your standard edge, open-hand.',
@@ -744,7 +765,8 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'test-max-pullup-load',
     name: '§4E Test — Max Pull-up Load',
-    category: 'pulling',
+    focus: 'max-strength',
+    alsoLoads: ['fingers', 'elbow', 'shoulder'],
     isoType: 'dynamic',
     equipment: ['pullup-bar', 'dip-belt', 'kettlebell'],
     summary: 'Baseline/retest: the heaviest single strict pull-up, kettlebell via dip belt.',
@@ -768,7 +790,8 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'test-lockoff-90-left',
     name: '§4E Test — Lock-off Hold 90°, Left',
-    category: 'pulling',
+    focus: 'max-strength',
+    alsoLoads: ['fingers', 'elbow', 'shoulder'],
     isoType: 'yielding',
     equipment: ['pullup-bar'],
     summary: 'Baseline/retest: longest static 90° lock-off at bodyweight, left side, one attempt.',
@@ -794,7 +817,8 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'test-lockoff-90-right',
     name: '§4E Test — Lock-off Hold 90°, Right',
-    category: 'pulling',
+    focus: 'max-strength',
+    alsoLoads: ['fingers', 'elbow', 'shoulder'],
     isoType: 'yielding',
     equipment: ['pullup-bar'],
     summary: 'Baseline/retest: longest static 90° lock-off at bodyweight, right side, one attempt.',
@@ -835,7 +859,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'iso-extensor-hold',
     name: 'Finger Extensor Isometric Hold',
-    category: 'antagonist',
+    focus: 'tendon-conditioning',
     target: 'extensors',
     tiers: [
       {
@@ -867,7 +891,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'iso-elbow-neutral-hold',
     name: 'Neutral-Grip Mid-Range Hold',
-    category: 'pulling',
+    focus: 'tendon-conditioning',
     target: 'elbow',
     tiers: [
       {
@@ -901,7 +925,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'iso-shoulder-er-hold',
     name: 'External Rotation Isometric Hold',
-    category: 'antagonist',
+    focus: 'tendon-conditioning',
     target: 'shoulder',
     tiers: [
       {
@@ -933,7 +957,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'iso-copenhagen-hold',
     name: 'Copenhagen Adductor Hold',
-    category: 'lower-body',
+    focus: 'tendon-conditioning',
     target: 'hip',
     tiers: [
       {
@@ -967,7 +991,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'iso-knee-flexion-hold',
     name: 'Mid-Range Knee Flexion Hold',
-    category: 'lower-body',
+    focus: 'tendon-conditioning',
     target: 'knee',
     tiers: [
       {
@@ -999,7 +1023,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'iso-calf-raise-hold',
     name: 'Isometric Calf Raise Hold',
-    category: 'lower-body',
+    focus: 'tendon-conditioning',
     target: 'ankle',
     tiers: [
       {
@@ -1037,7 +1061,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'pronator-eccentric',
     name: 'Pronator Lower (Eccentric)',
-    category: 'antagonist',
+    focus: 'prehab-stability',
     target: 'elbow',
     tiers: [
       {
@@ -1067,8 +1091,9 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'wide-pinch-wrist-extension',
     name: 'Wide Pinch with Wrist Extension',
-    category: 'antagonist',
+    focus: 'prehab-stability',
     target: 'wrist',
+    alsoLoads: ['fingers', 'extensors'],
     tiers: [
       {
         tier: 'pool',
@@ -1101,8 +1126,9 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'nordic-hamstring-curl',
     name: 'Nordic Hamstring Curl',
-    category: 'lower-body',
+    focus: 'prehab-stability',
     target: 'knee',
+    alsoLoads: ['hip'],
     tiers: [
       {
         tier: 'pool',
@@ -1136,7 +1162,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'single-leg-balance',
     name: 'Single-Leg Balance',
-    category: 'lower-body',
+    focus: 'proprioception',
     target: 'ankle',
     tiers: [
       {
@@ -1177,7 +1203,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'iso-scapular-retraction-hold',
     name: 'Scapular Retraction Hold',
-    category: 'antagonist',
+    focus: 'tendon-conditioning',
     target: 'shoulder',
     tiers: [
       {
@@ -1209,7 +1235,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'internal-rotations',
     name: 'Internal Rotations',
-    category: 'antagonist',
+    focus: 'prehab-stability',
     target: 'shoulder',
     tiers: [
       { tier: 'pool', text: '2 x 15 per side, light', prescribedSets: [2, 2], source: 'Rotator-cuff prehab consensus — the neglected half of the ER pair' },
@@ -1231,7 +1257,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'prone-y-raise',
     name: 'Prone Y Raise',
-    category: 'antagonist',
+    focus: 'prehab-stability',
     target: 'shoulder',
     tiers: [
       { tier: 'pool', text: '2 x 10–12, slow', prescribedSets: [2, 2], source: 'Lower-trapezius prehab consensus for climbers' },
@@ -1256,7 +1282,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'serratus-wall-slide',
     name: 'Serratus Wall Slide',
-    category: 'antagonist',
+    focus: 'prehab-stability',
     target: 'shoulder',
     tiers: [
       { tier: 'pool', text: '2 x 10–12', prescribedSets: [2, 2], source: 'Scapular stability prehab consensus for climbers' },
@@ -1281,7 +1307,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'supinator-eccentric',
     name: 'Supinator Lower (Eccentric)',
-    category: 'antagonist',
+    focus: 'prehab-stability',
     target: 'elbow',
     tiers: [
       { tier: 'pool', text: '2 x 15–20 per hand, 5s eccentric', prescribedSets: [2, 2], source: "Hörst's pronator protocol, run in the opposite direction" },
@@ -1303,7 +1329,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'band-finger-extension',
     name: 'Band Finger Extension',
-    category: 'antagonist',
+    focus: 'prehab-stability',
     target: 'extensors',
     tiers: [
       { tier: 'pool', text: '15–25 reps, light resistance', source: 'Hörst — explicitly warm-up, beginner and rehab grade, not strength' },
@@ -1328,7 +1354,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'radial-ulnar-deviation',
     name: 'Radial / Ulnar Deviation',
-    category: 'antagonist',
+    focus: 'prehab-stability',
     target: 'wrist',
     tiers: [
       { tier: 'pool', text: '2 x 15 per direction', prescribedSets: [2, 2], source: 'Wrist stabilizer training — standard practice, not separately cited' },
@@ -1350,7 +1376,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'wrist-extension-extended',
     name: 'Wrist Extension — Extended Position',
-    category: 'antagonist',
+    focus: 'prehab-stability',
     target: 'wrist',
     tiers: [
       { tier: 'pool', text: '2 x 15, holding the extended position', prescribedSets: [2, 2], source: 'Hörst — training extensors in neutral AND extended positions' },
@@ -1375,7 +1401,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'hip-90-90',
     name: 'Hip 90-90 Rotation',
-    category: 'lower-body',
+    focus: 'prehab-stability',
     target: 'hip',
     tiers: [
       { tier: 'pool', text: '2 x 10 per side', prescribedSets: [2, 2], source: 'Heel-hook prevention — open the whole hip rather than the tibia alone' },
@@ -1400,8 +1426,9 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'stability-ball-hamstring-curl',
     name: 'Stability-Ball Hamstring Curl',
-    category: 'lower-body',
+    focus: 'prehab-stability',
     target: 'knee',
+    alsoLoads: ['hip'],
     tiers: [
       { tier: 'pool', text: '2 x 10', prescribedSets: [2, 2], source: 'Climbing Doctor — mimics the heel hook, adds hip and core stabilisation' },
     ],
@@ -1425,7 +1452,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'calf-raise',
     name: 'Calf Raise — Straight and Bent Knee',
-    category: 'lower-body',
+    focus: 'prehab-stability',
     target: 'ankle',
     tiers: [
       { tier: 'pool', text: '2 x 15, straight and bent knee', prescribedSets: [2, 2], source: 'Proprioceptive review — balance plus strengthening beats either alone' },
@@ -1450,8 +1477,9 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'unstable-surface-balance',
     name: 'Unstable-Surface Balance',
-    category: 'lower-body',
+    focus: 'proprioception',
     target: 'ankle',
+    alsoLoads: ['knee'],
     tiers: [
       { tier: 'pool', text: '3 x 30s per side on a cushion or wobble board', holdSeconds: [30, 30], prescribedSets: [3, 3], source: 'Proprioceptive training meta-analysis (RR 0.65, NNT 17)' },
     ],
@@ -1474,8 +1502,9 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'drop-landing',
     name: 'Drop Landing',
-    category: 'lower-body',
+    focus: 'proprioception',
     target: 'ankle',
+    alsoLoads: ['knee', 'hip'],
     tiers: [
       { tier: 'pool', text: '2 x 5, low box', prescribedSets: [2, 2], source: 'Landing mechanics for bouldering falls — standard practice, not separately cited' },
     ],

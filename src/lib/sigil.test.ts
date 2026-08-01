@@ -16,20 +16,20 @@ import { blockPosition } from './block';
 import type { Routine, Settings } from '../types';
 
 const CATALOG: Exercise[] = [
-  ex('max-hang', 'fingers', [7, 10]),
-  ex('pima', 'fingers', [3, 5]),
-  ex('lockoff', 'pulling', 'open'),
-  ex('warm', 'warmup', [10, 10]),
-  ex('row', 'pulling', undefined),
+  ex('max-hang', 'max-strength', [7, 10]),
+  ex('pima', 'max-strength', [3, 5]),
+  ex('lockoff', 'general-strength', 'open'),
+  ex('warm', 'warm-up', [10, 10]),
+  ex('row', 'general-strength', undefined),
 ];
 
 function ex(
   id: string,
-  category: Exercise['category'],
+  focus: Exercise['focus'],
   holdSeconds: [number, number] | 'open' | undefined,
 ): Exercise {
   return {
-    id, name: id, category, isoType: 'none', equipment: [],
+    id, name: id, focus, isoType: 'none', equipment: [],
     summary: '', howTo: [], prescription: '', holdSeconds,
     cues: [], safetyNotes: [], gtgEligible: false,
   };

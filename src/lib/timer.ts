@@ -343,7 +343,7 @@ export function restCountdownSecondsLeft(state: TimerState, now: number): number
  * cannot drift apart — one grace window, one visibility rule, one place to
  * change them. **What does not live here is permission.** Each caller keeps its
  * own gate: `warmupPlanOf` will not build a cycle for anything outside
- * `category === 'warmup'`, and a rep chain exists only on a variant that
+ * `focus === 'warm-up'`, and a rep chain exists only on a variant that
  * declares one. D39 is a statement about which exercises may advance
  * themselves, and sharing the arithmetic does not widen it.
  *

@@ -317,7 +317,7 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   // count exists so `holdSec` measures the effort rather than the tap offset, and
   // a warm-up round records no `holdSec` — so the count would buy nothing and
   // spend three seconds of a prescribed sixty-second cadence. Reachable only from
-  // the runner, which the catalog's `category === 'warmup'` gates.
+  // the runner, which the catalog's `focus === 'warm-up'` gates.
   function beginWarmupRound(exerciseId: string) {
     primeAudio();
     primeSpeech();

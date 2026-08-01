@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
-import type { Category, Equipment, Exercise } from '../types';
+import type { Equipment, Exercise, Focus } from '../types';
 import { getAllExercises } from '../lib/storage';
 import { EQUIPMENT_OPTIONS } from '../lib/equipment';
 import { EquipmentBadge, GtgBadge } from '../components/EquipmentBadge';
@@ -7,14 +7,24 @@ import { Icon, kicker } from '../components/ui';
 import { RowRule, readList } from '../components/ReadList';
 import { ExerciseDetail } from './ExerciseDetail';
 
-// Display order + labels for the category groups (AC1).
-const CATEGORY_ORDER: { key: Category; label: string }[] = [
-  { key: 'warmup', label: 'Warm-up' },
-  { key: 'fingers', label: 'Fingers' },
-  { key: 'pulling', label: 'Pulling' },
-  { key: 'antagonist', label: 'Antagonist & Prehab' },
-  { key: 'lower-body', label: 'Lower Body' },
+// Display order + labels for the focus groups (D48; was the category groups).
+//
+// Ordered by where a movement sits in a session rather than by how many entries
+// it has: the warm-up first because it comes first, then the two tiers that carry
+// the heaviest load, then the supporting work, then the sport. A count-ordered
+// list would put sixteen prehab movements above the four the block is built on.
+const FOCUS_ORDER: { key: Focus; label: string }[] = [
+  { key: 'warm-up', label: 'Warm-up' },
+  { key: 'max-strength', label: 'Max strength' },
+  { key: 'tendon-conditioning', label: 'Tendon conditioning' },
+  { key: 'general-strength', label: 'General strength' },
+  { key: 'prehab-stability', label: 'Prehab & stability' },
+  { key: 'proprioception', label: 'Proprioception' },
   { key: 'climbing', label: 'Climbing' },
+  { key: 'endurance', label: 'Endurance' },
+  { key: 'power-endurance', label: 'Power endurance' },
+  { key: 'power', label: 'Power' },
+  { key: 'core', label: 'Core' },
 ];
 
 export function ExerciseList({ onExit }: { onExit?: () => void }) {
@@ -110,8 +120,8 @@ export function ExerciseList({ onExit }: { onExit?: () => void }) {
           surfaces made twenty subjects out of one list. As rows the category is
           the subject and the entries are its contents, which is what they are. */}
       <div className="space-y-5">
-        {CATEGORY_ORDER.map(({ key, label }) => {
-          const inGroup = visible.filter((e) => e.category === key);
+        {FOCUS_ORDER.map(({ key, label }) => {
+          const inGroup = visible.filter((e) => e.focus === key);
           if (inGroup.length === 0) return null;
           return (
             <section key={key}>
@@ -146,6 +156,34 @@ export function ExerciseList({ onExit }: { onExit?: () => void }) {
             </section>
           );
         })}
+
+        {/* D48: the focuses nothing in the catalog trains, stated rather than
+            omitted. This is the axis's most useful product — an accurate report
+            that this catalog trains max strength and conditions tissue and does
+            nothing else — and it is computed against the whole catalog rather
+            than the filtered view, because it is a fact about what is declared,
+            not about what the equipment chip is currently hiding.
+
+            It reports and stops there (D23): no target, no suggestion to add
+            one, and no implication that a gap is a failing. Absent entirely once
+            every focus has a member. */}
+        {exercises !== null &&
+          (() => {
+            const untrained = FOCUS_ORDER.filter(
+              ({ key }) => !exercises.some((e) => e.focus === key),
+            );
+            if (untrained.length === 0) return null;
+            return (
+              <section>
+                <h2 className={`${kicker} mb-2`}>Not in this catalog</h2>
+                <div className={readList}>
+                  <p className="px-1 py-3 text-[11px] leading-snug text-neutral-500">
+                    {untrained.map(({ label }) => label).join(' · ')}
+                  </p>
+                </div>
+              </section>
+            );
+          })()}
       </div>
     </div>
   );

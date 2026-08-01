@@ -210,6 +210,19 @@
       "port": 5206
     },
     {
+      "name": "dev-taxonomy",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5207",
+        "--strictPort"
+      ],
+      "port": 5207
+    },
+    {
       "name": "preview-t25",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

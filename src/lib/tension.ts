@@ -92,7 +92,7 @@ export interface TensionInput {
  * of them, and §4A is preparation for the work, not the work.
  */
 export function countsAsHold(exercise: Exercise | undefined): boolean {
-  return exercise?.holdSeconds !== undefined && exercise.category !== 'warmup';
+  return exercise?.holdSeconds !== undefined && exercise.focus !== 'warm-up';
 }
 
 function emptyTotals(): TensionTotals {
