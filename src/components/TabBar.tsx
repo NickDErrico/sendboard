@@ -13,7 +13,7 @@ import { Icon } from './ui';
 // only its weight moves, which is the same "tonal weight, not a second hue" rule
 // the hold band follows.
 const TABS = [
-  { name: 'home', label: 'Home', icon: 'house' },
+  { name: 'home', label: 'Today', icon: 'house' },
   { name: 'exercises', label: 'Exercises', icon: 'list-checks' },
   { name: 'plan', label: 'Plan', icon: 'book-open' },
   { name: 'history', label: 'History', icon: 'clock-counter-clockwise' },

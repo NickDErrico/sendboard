@@ -4,7 +4,7 @@ import type { Routine } from './types';
 import { getAllLogs, getRoutine, getSettings, saveSettings } from './lib/storage';
 import { requestPersistence } from './lib/persistence';
 import { go, useRoute, type Route } from './lib/routes';
-import { Home } from './screens/Home';
+import { Today } from './screens/Today';
 import { ExerciseList } from './screens/ExerciseList';
 import { RoutineList } from './screens/RoutineList';
 import { RoutineDetail } from './screens/RoutineDetail';
@@ -28,7 +28,7 @@ import { btnGhost, btnPrimary, btnSecondary } from './components/ui';
 // own back/done affordances.
 const NO_TAB_BAR = new Set(['session', 'routine', 'install', 'notFound']);
 
-// T6 introduced hash routing (src/lib/routes.ts); T8 adds the real Home, the tab
+// T6 introduced hash routing (src/lib/routes.ts); T8 added the Home this replaced; T36 makes it Today, the tab
 // bar, and first-run install onboarding. This component is the route table.
 export default function App() {
   const route = useRoute();
@@ -112,7 +112,7 @@ function renderRoute(route: Route): ReactNode {
       return <NotFound path={route.path} />;
     case 'home':
     default:
-      return <Home />;
+      return <Today />;
   }
 }
 

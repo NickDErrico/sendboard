@@ -2196,7 +2196,7 @@ Create: `src/lib/daily.ts` (+ `daily.test.ts`) | Modify: `docs/training-plan.md`
 
 ### [T36] Outcome: The four tiers the README is organised around are the screen the owner opens — one lane each, in frequency order, every lane stating its own cadence and its own state, and nothing on the surface reading all four together.
 
-Spec: this file | Status: [ ] | Depends on: T5b, T33, T34 | D47, D49, D50 | Owner request, 2026-08-01
+Spec: this file | Status: [x] | Depends on: T5b, T33, T34 | D47, D49, D50 | Owner request, 2026-08-01
 
 #### Context manifest
 
@@ -2253,6 +2253,16 @@ Create: `src/screens/Today.tsx`, `src/lib/lanes.ts` (+ `lanes.test.ts`) | Modify
 #### Verify
 
 `npm run test && npm run build && npm run lint`, plus an in-browser pass at 375×812 against both an empty store and a seeded one: confirm lane order is fixed across both, that a collagen run completed inside six hours changes only the stated words and not one visual property of the lane, and that no string on the surface contains a fraction against a prescribed count.
+
+#### Amendments (T36)
+
+| Change | Why |
+|---|---|
+| `CheckOffs.tsx` is **kept**, not deleted with Home | The manifest listed only `Home.tsx` for deletion, and deleting the component it renders looked like tidying dead code — but `#/checks` renders `CheckOffs` too, and that route stays this cycle by this task's own non-goal. Today therefore grows its own climbing strip and both surfaces read `weekClimbingStatus`, which is the arrangement the non-goal already anticipated: two renderings of one engine cannot disagree. Stage 3 collapses the route and the component together. |
+| Today keeps a GtG row into `#/gtg` | Home reached §8's list through `CheckOffs`, and Today does not render that card. Without a row the list would have become unreachable from the main screen — a regression this task has no reason to cause, and GtG's movements are pool-tier work whose lane placement is stage 3's question. |
+| Two empty-catalog branches in `lanes.ts` were removed as unreachable | `DAILY_ISOMETRIC_SLOTS` and `POOL_TARGETS` are constants, so those engines return their slots whatever the catalog holds, with a null `exercise` on any they cannot fill. The lanes therefore *name the uncovered tendon* rather than reporting the tier as empty, which is strictly more useful — a test asserted the wrong wording first and the code was right. |
+| The heavy lane's secondary routine is short-named | Routine names carry an em-dash, so a second one as a separator read the state as part of the name: *"Day 3 — Pull / Antagonist — never done"*. The lead keeps the full name, where it has the line to itself. Home's `shortName` had solved this once already. |
+| AC7 verified by a dispatched click, not a coordinate tap | The browser pane did not dispatch synthetic coordinate input — the same limitation recorded against the symptom seeding in `10fbd75`. The tick's handler was exercised directly and `aria-pressed` flipped; the render path is what the screenshot verified. |
 
 ---
 
