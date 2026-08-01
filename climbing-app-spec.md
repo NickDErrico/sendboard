@@ -2331,6 +2331,64 @@ Create: `src/screens/Library.tsx`, `src/screens/TierDetail.tsx`, `src/screens/Si
 | AC12's counts are removed rather than reworded | `#/joints` headed its two lists with "3 of 6 today" and "2 ready". Restating them as facts was the criterion, but the slot rows already say `describeSlot` on every line — the header was a summary of what was directly below it, and a fraction against a prescribed count is exactly what D49 keeps off a lane. The headings now name the tier's own source instead. |
 | Verified by page text; no screenshot | The browser pane did not composite frames, the same limitation recorded against T36 and `10fbd75`. Every criterion above was read out of the rendered DOM — tab highlighting via `aria-current`, the drop marks via the rendered rows. |
 
+### [T38] Outcome: The eight-week block stops framing the whole app and becomes the state of the one tier it describes — with its phase, its retest and its volume on that tier's own screen.
+
+Spec: this file | Status: [x] | Depends on: T36, T37 | D50 | Owner request, 2026-08-01
+
+#### Context manifest
+
+Create: `src/screens/HeavyTier.tsx` | Modify: `src/lib/routes.ts` (+ test), `src/lib/lanes.ts` (+ test), `src/App.tsx`, `src/screens/Today.tsx`, `src/screens/TierDetail.tsx`, `src/screens/Block.tsx`, `src/screens/Retest.tsx` | Read-only: `src/lib/block.ts`, `src/lib/rotation.ts`, `src/lib/retest.ts`, `src/lib/tension.ts`
+
+**"~Week 3 of 8" rides in the app header beside the wordmark, and it is wrong there.** It frames the entire app as an eight-week program. Three of the four tiers are permanent and unperiodised — the collagen work, the daily isometric slots and the pool have no phase, no deload and no retest — and only `heavy` has any of that. The chip enclosed all four in a countdown that describes one.
+
+**A separate screen, not `TierDetail` widened.** `TierDetail` reads `SlotStatus[]` and says in its own comment that it is one component parameterised rather than two layouts behind a branch. The heavy tier is not slots — it is two rotating routines, a block position and a test battery — so widening it would put exactly the branch it refuses inside it. The route branches instead, which is one `if` in the route table rather than a component pretending two shapes are one.
+
+**What moves, and what merely gets a home.** The week chip and the block card move off Today. `#/block` (the edge × week grid) and `#/retest` (the §4E battery) are unchanged screens that stop being reached from the app's read list and start being reached from the tier they measure. Nothing about `block.ts` changes: D25's derive-don't-store is untouched, and this task changes only what the week is allowed to frame.
+
+**The heavy lane keeps its one-tap start.** Collagen and heavy are tiers you *run*; the two rotations are tiers you *tick*. That difference is already in `LaneAction`, and it should stay visible — replacing Start with "open the tier" would cost a tap on the surface whose whole premise is that the likeliest next act is one tap away. The tier screen is reached from the lane's title instead, so every lane that has a detail screen says so in the same place.
+
+#### Acceptance criteria
+
+1. WHEN Today is rendered THE app header SHALL NOT contain the block week, and no block position SHALL appear anywhere on Today.
+2. WHEN Today is rendered THE read list SHALL NOT contain the §4E battery row or the edge × week row.
+3. WHEN `#/tier/heavy` is open THE screen SHALL state which routine is up next, when each rotating routine was last completed, the block position with its §4F phase, the §4E battery's occasions, and the under-tension total.
+4. WHEN a rotating routine is started from `#/tier/heavy` THE session SHALL open exactly as starting it from Today's lane does.
+5. WHEN no block has started THE heavy screen SHALL say so rather than reading week 1 (D25).
+6. WHEN the heavy lane's title is tapped THE app SHALL open `#/tier/heavy`; WHEN its Start is tapped THE up-next routine SHALL start, unchanged from T36.
+7. WHEN a lane has no detail screen THE title SHALL NOT be a control — collagen has no tier screen, and a dead affordance is worse than none.
+8. WHEN `#/block` or `#/retest` is exited THE app SHALL return to `#/tier/heavy`, the tier that owns them.
+9. WHEN `#/tier/heavy` is rendered THE copy SHALL NOT contain a fraction whose denominator is a prescription, nor the words due, owed, missed, behind or late (D23, D49).
+10. WHEN past week 8 THE screen SHALL read "week 8+" and SHALL NOT mark the block finished, late or overdue.
+11. WHEN a database or backup written before this task is read THE app SHALL work unchanged, with no migration and no version bump.
+
+#### Edge cases
+
+- An empty store → the heavy screen states no block and no battery, and both routines still start.
+- A block past week 8 → the week strip fills and stops; nothing is added to say so.
+- The battery recorded once → the screen states the baseline date and does not compute a comparison from one occasion.
+- No holds logged → the tension row states that rather than rendering a zero.
+
+#### Non-goals & do-not-touch
+
+- MUST NOT modify `block.ts`, `rotation.ts`, `retest.ts` or `tension.ts`.
+- MUST NOT widen `TierDetail` to a third shape.
+- MUST NOT delete `#/block` or `#/retest`, or fold their contents into the tier screen — they are their own surfaces and this task only changes where they are reached from.
+- MUST NOT restructure the catalog browse (stage 5) or the plan (stage 6).
+- MUST NOT add an aggregate across tiers, a completion state, or a day summary (D49).
+
+#### Verify
+
+`npm run test && npm run build && npm run lint`, plus an in-browser pass at 375×812: no week chip on Today, `#/tier/heavy` carrying the block and both routines, and Start from the lane and from the tier screen opening the same session.
+
+#### Amendments (T38)
+
+| Change | Why |
+|---|---|
+| `SlotTier` added beside `TierRoute` | `TIER_ROUTES` had to gain `heavy` so `#/tier/heavy` parses, but `TierDetail` must not accept it — the type now says which tiers are a list of slots, so passing the heavy tier to the slot component is a compile error rather than a runtime shape mismatch. The refusal is in the type rather than in a comment asking nobody to do it. |
+| `Lane.detail` rather than changing the heavy lane's action | AC6 wanted both a one-tap start and a way into the tier screen. Making the *title* the link puts the affordance in the same place on every lane that has one, and leaves `LaneAction` saying the true thing about each tier: collagen and heavy are run, the two rotations are ticked. Collagen carries no `detail`, so its title stays an `h2` — asserted in `lanes.test.ts`, because a heading that looks tappable is worse than one that never claimed to be. |
+| Today stopped reading `Settings` | Its only two consumers were `blockPosition` and `buildEdgeWeekGrid`, and both moved. Left in place it would have been a load on every Today render feeding nothing. |
+| Verified by page text and a DOM click; screenshot artefacted again | The pane captured at `devicePixelRatio` 2 without downscaling, so the image reads as cropped. Layout was checked directly instead — `scrollWidth === innerWidth`, no horizontal overflow — and AC6 by clicking the heavy lane's title and reading the resulting hash. |
+
 ---
 
 ## Execution notes

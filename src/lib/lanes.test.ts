@@ -70,6 +70,28 @@ describe('the lanes themselves (D47)', () => {
   });
 });
 
+describe('which lanes have a screen behind them (T38)', () => {
+  it('gives every tier but collagen a detail route', () => {
+    // Collagen's routine is the whole of that tier, so the title stays inert
+    // rather than pointing at a screen that would only repeat the lane.
+    const detail = Object.fromEntries(lanesToday(input()).map((l) => [l.id, l.detail]));
+    expect(detail).toEqual({
+      collagen: undefined,
+      'daily-isometric': 'daily-isometric',
+      pool: 'pool',
+      heavy: 'heavy',
+    });
+  });
+
+  it('keeps the heavy lane a one-tap start, not a link', () => {
+    // Collagen and heavy are tiers you run; the rotations are tiers you tick.
+    // Replacing Start with "open the tier" would cost a tap on the surface whose
+    // premise is that the likeliest next act is one tap away.
+    const heavy = lanesToday(input())[3];
+    expect(heavy.action.kind).toBe('start-routine');
+  });
+});
+
 describe('elevation is cadence, never completion (D49)', () => {
   it('marks the two daily tiers and only those', () => {
     const daily = lanesToday(input())
@@ -103,6 +125,7 @@ describe('nothing reads more than one lane (D49)', () => {
       'action',
       'cadence',
       'daily',
+      'detail',
       'id',
       'lines',
       'name',

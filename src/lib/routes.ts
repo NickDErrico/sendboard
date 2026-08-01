@@ -9,9 +9,18 @@ import { useSyncExternalStore } from 'react';
 // deep-link was cut by the T0 spike (no iOS path opens the installed PWA), so no
 // route here is advertised as an externally-openable URL.
 
-/** The tiers that have a screen of their own (T37). */
-export const TIER_ROUTES = ['daily-isometric', 'pool'] as const;
+/** The tiers that have a screen of their own (T37, T38). */
+export const TIER_ROUTES = ['daily-isometric', 'pool', 'heavy'] as const;
 export type TierRoute = (typeof TIER_ROUTES)[number];
+
+/**
+ * The tiers whose screen is a list of slots.
+ *
+ * `heavy` is not one: it is two rotating routines, a block position and a test
+ * battery, so it gets its own screen rather than a third branch inside the one
+ * that renders `SlotStatus[]` (T38).
+ */
+export type SlotTier = Exclude<TierRoute, 'heavy'>;
 
 export type Route =
   | { name: 'today' }

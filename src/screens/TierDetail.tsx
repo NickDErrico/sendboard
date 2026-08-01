@@ -9,7 +9,7 @@ import {
   type SlotStatus,
 } from '../lib/pool';
 import { activeSymptoms, describeDropPosition, dropPositions } from '../lib/symptoms';
-import { go, type TierRoute } from '../lib/routes';
+import { go, type SlotTier } from '../lib/routes';
 import { Icon, card, kicker, tagNeutral } from '../components/ui';
 
 /**
@@ -45,7 +45,7 @@ interface TierCopy {
   source: string;
 }
 
-const COPY: Record<TierRoute, TierCopy> = {
+const COPY: Record<SlotTier, TierCopy> = {
   'daily-isometric': {
     title: 'Daily isometrics',
     note: 'Around 70% effort, held 30–45s. Firm, never maximal — that is what makes a daily dose safe. Fingers are not here: the abrahangs and your two weekly finger sessions already cover them.',
@@ -58,7 +58,7 @@ const COPY: Record<TierRoute, TierCopy> = {
   },
 };
 
-export function TierDetail({ tier }: { tier: TierRoute }) {
+export function TierDetail({ tier }: { tier: SlotTier }) {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
   const [checks, setChecks] = useState<Check[] | null>(null);

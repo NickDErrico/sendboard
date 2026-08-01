@@ -8,7 +8,7 @@ import {
   type SlotStatus,
 } from './pool';
 import { describeLastCompleted, rotates, routineRotation } from './rotation';
-import type { TierRoute } from './routes';
+import type { SlotTier, TierRoute } from './routes';
 
 /**
  * The four tiers as one ordered surface (T36, D47).
@@ -60,7 +60,7 @@ export type LaneAction =
   /** Start a session against this routine. */
   | { kind: 'start-routine'; routineId: string; label: string }
   /** Open this tier's own screen, where its movements are ticked. */
-  | { kind: 'open-tier'; tier: TierRoute; label: string }
+  | { kind: 'open-tier'; tier: SlotTier; label: string }
   /** The catalog declares no movement for this tier. Stated, never hidden. */
   | { kind: 'empty'; label: string };
 
@@ -86,6 +86,15 @@ export interface Lane {
   /** This tier's state, from this tier's engine. Never empty. */
   lines: string[];
   action: LaneAction;
+  /**
+   * The tier's own screen, where it has one (T38).
+   *
+   * Absent on collagen, which has nothing behind it — the routine it starts is
+   * the whole of that tier. The view renders the lane's title as a control only
+   * where this is set, because a title that looks tappable and is not is worse
+   * than one that never claimed to be.
+   */
+  detail?: TierRoute;
 }
 
 /**
@@ -95,7 +104,14 @@ export interface Lane {
  * week per target, the heavy work once or twice. Cadences are the README's tier
  * table, which transcribed them from the plan and the research file.
  */
-const LANES: { id: LaneId; name: string; cadence: string; source: string; daily: boolean }[] = [
+const LANES: {
+  id: LaneId;
+  name: string;
+  cadence: string;
+  source: string;
+  daily: boolean;
+  detail?: TierRoute;
+}[] = [
   {
     id: 'collagen',
     name: 'Collagen',
@@ -109,6 +125,7 @@ const LANES: { id: LaneId; name: string; cadence: string; source: string; daily:
     cadence: 'daily, ~8–10 min',
     source: 'research §6',
     daily: true,
+    detail: 'daily-isometric',
   },
   {
     id: 'pool',
@@ -116,6 +133,7 @@ const LANES: { id: LaneId; name: string; cadence: string; source: string; daily:
     cadence: '2–3×/week per target',
     source: 'research §6',
     daily: false,
+    detail: 'pool',
   },
   {
     id: 'heavy',
@@ -123,6 +141,7 @@ const LANES: { id: LaneId; name: string; cadence: string; source: string; daily:
     cadence: '1–2×/week per pattern',
     source: 'plan §3',
     daily: false,
+    detail: 'heavy',
   },
 ];
 

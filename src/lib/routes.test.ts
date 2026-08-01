@@ -21,6 +21,7 @@ describe('parse / build round trip', () => {
     { name: 'gtg' },
     { name: 'tier', tier: 'daily-isometric' },
     { name: 'tier', tier: 'pool' },
+    { name: 'tier', tier: 'heavy' },
     { name: 'signals' },
     { name: 'checklog' },
     { name: 'plan', sectionRef: null },
@@ -57,6 +58,10 @@ describe('routes that existed yesterday (T37 AC11)', () => {
 
   it('sends #/checks to Today, which owns the half of it that was not GtG', () => {
     expect(parseHash('#/checks')).toEqual({ name: 'today' });
+  });
+
+  it('routes the heavy tier to a screen of its own (T38)', () => {
+    expect(parseHash('#/tier/heavy')).toEqual({ name: 'tier', tier: 'heavy' });
   });
 
   it('never silently defaults an unknown tier', () => {

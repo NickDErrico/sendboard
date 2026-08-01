@@ -8,19 +8,15 @@ import {
   getAllLogs,
   getAllRoutines,
   getChecksForWeek,
-  getSettings,
   mondayOf,
   saveCheck,
 } from '../lib/storage';
 import { keyToLocalDate, weekClimbingStatus, weekEndKey } from '../lib/checks';
 import { activeSymptoms } from '../lib/symptoms';
 import { lanesToday, type Lane } from '../lib/lanes';
+import type { TierRoute } from '../lib/routes';
 import { resumable } from '../lib/session';
 import { startSession } from '../lib/openSession';
-import { batteryOccasions, type Occasion } from '../lib/retest';
-import { BLOCK_WEEKS, blockPosition, formatPhaseWeeks, phaseFor, type BlockPosition } from '../lib/block';
-import { buildEdgeWeekGrid, describeTension, type EdgeWeekGrid } from '../lib/tension';
-import { LIGHTER_WEEK_CAVEAT } from '../data/blockPhases';
 import { go } from '../lib/routes';
 import { BodyweightRow } from '../components/BodyweightRow';
 import { Icon, btnGhost, btnPrimary, card, kicker, kickerAccent, row, tagOutline } from '../components/ui';
@@ -61,21 +57,17 @@ export function Today() {
   const [checks, setChecks] = useState<Check[]>([]);
   const [weekChecks, setWeekChecks] = useState<Check[]>([]);
   const [inProgress, setInProgress] = useState<WorkoutLog | null>(null);
-  const [occasions, setOccasions] = useState<Occasion[]>([]);
-  const [block, setBlock] = useState<BlockPosition | null>(null);
-  const [tension, setTension] = useState<EdgeWeekGrid | null>(null);
 
   // Every read recomputes from `new Date()`, so the app left open across
   // midnight (or across a Monday) rolls over on refocus rather than showing
   // yesterday's lanes — T5b's rule, which every daily surface has followed since.
   const refresh = useCallback(async () => {
-    const [rs, exs, allLogs, allChecks, week, settings] = await Promise.all([
+    const [rs, exs, allLogs, allChecks, week] = await Promise.all([
       getAllRoutines(),
       getAllExercises(),
       getAllLogs(),
       getAllChecks(),
       getChecksForWeek(new Date()),
-      getSettings(),
     ]);
     setRoutines(rs);
     setExercises(exs);
@@ -86,9 +78,6 @@ export function Today() {
     // opened, read and backed out of leaves a log behind, and that is not a
     // thing to resume.
     setInProgress(resumable(allLogs));
-    setOccasions(batteryOccasions(allLogs));
-    setBlock(blockPosition({ logs: allLogs, routines: rs, settings, today: new Date() }));
-    setTension(buildEdgeWeekGrid({ logs: allLogs, routines: rs, exercises: exs, settings, today: new Date() }));
   }, []);
 
   useEffect(() => {
@@ -117,13 +106,6 @@ export function Today() {
   const signals = activeSymptoms(checks);
   const mondayKey = dateKey(mondayOf(new Date()));
   const routineName = (id: string) => routines?.find((r) => r.id === id)?.name ?? id;
-
-  const batteryLine =
-    occasions.length === 0
-      ? 'Not recorded yet'
-      : occasions.length === 1
-        ? `Baseline ${new Date(occasions[0].at).toLocaleDateString()}`
-        : `${occasions.length} recorded · latest ${new Date(occasions[occasions.length - 1].at).toLocaleDateString()}`;
 
   async function start(routineId: string) {
     // If a session is already open, defer to the routine screen, which surfaces
@@ -156,11 +138,6 @@ export function Today() {
           S
         </div>
         <h1 className="text-[15px] font-medium tracking-[-0.01em]">Today</h1>
-        {/* Stays until stage 4 moves the block onto the heavy tier's own screen
-            (D50). It is the app header's last piece of heavy-tier state. */}
-        {block !== null && (
-          <span className={`${tagOutline} ml-auto`}>{block.weekLabel.replace(/week/, 'Week')}</span>
-        )}
       </header>
 
       {inProgress && (
@@ -192,48 +169,6 @@ export function Today() {
         lanes.map((lane) => <LaneCard key={lane.id} lane={lane} onStart={start} />)
       )}
 
-      {/* Heavy-tier state, still under the app rather than under its tier until
-          stage 4 (D50). Not a button and not a schedule: nothing is due, and past
-          week 8 it reads "week 8+" rather than late. */}
-      <section className={`${card} flex flex-col gap-2.5 shadow-edge`}>
-        <div className="flex items-baseline gap-2">
-          <h2 className={kicker}>Block</h2>
-          {block !== null && (
-            <span className="ml-auto text-[11px] text-neutral-600">
-              {block.derived ? 'counted from' : 'from'}{' '}
-              {new Date(`${block.startKey}T00:00`).toLocaleDateString()}
-            </span>
-          )}
-        </div>
-        {block === null ? (
-          <p className="text-[13px] text-neutral-400">
-            Not started — the block begins at your first logged session.
-          </p>
-        ) : (
-          <>
-            <p className="text-base font-medium">{block.label}</p>
-            <div className="grid grid-cols-8 gap-[3px]" aria-hidden>
-              {Array.from({ length: BLOCK_WEEKS }, (_, i) => (
-                <span
-                  key={i}
-                  className={`h-1 rounded-sm ${i < Math.min(block.week, BLOCK_WEEKS) ? 'bg-accent' : 'bg-neutral-800'}`}
-                />
-              ))}
-            </div>
-            {(() => {
-              const phase = phaseFor(block.week);
-              if (!phase) return null;
-              return (
-                <p className="text-xs leading-relaxed text-neutral-400">
-                  <span className={kicker}>{formatPhaseWeeks(phase)}</span>{' '}
-                  <span className="text-neutral-200">{phase.focus}</span> — {phase.note} (plan §4F)
-                </p>
-              );
-            })()}
-            <p className="text-[11px] leading-snug text-neutral-600">{LIGHTER_WEEK_CAVEAT}</p>
-          </>
-        )}
-      </section>
 
       {/* Things you read rather than do — one card of rows, Nocturne's collapse
           rule. GtG leads because it is the only one of the four that is about
@@ -263,31 +198,7 @@ export function Today() {
         </button>
         <div className="h-px bg-neutral-900" />
 
-        {tension !== null && (
-          <>
-            <button onClick={() => go({ name: 'block' })} className={`${row} w-full`}>
-              <Icon name="chart-bar" className="shrink-0 text-[17px] text-neutral-500" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[13px] font-medium">Edge × week · under tension</span>
-                <span className="block text-[11px] tabular-nums text-neutral-500">
-                  {describeTension(tension.total)}
-                </span>
-              </span>
-              <Icon name="caret-right" className="shrink-0 text-[13px] text-neutral-600" />
-            </button>
-            <div className="h-px bg-neutral-900" />
-          </>
-        )}
 
-        <button onClick={() => go({ name: 'retest' })} className={`${row} w-full`}>
-          <Icon name="target" className="shrink-0 text-[17px] text-neutral-500" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-[13px] font-medium">§4E baseline / retest</span>
-            <span className="block text-[11px] text-neutral-500">{batteryLine}</span>
-          </span>
-          <Icon name="caret-right" className="shrink-0 text-[13px] text-neutral-600" />
-        </button>
-        <div className="h-px bg-neutral-900" />
 
         <BodyweightRow />
       </section>
@@ -311,7 +222,21 @@ function LaneCard({ lane, onStart }: { lane: Lane; onStart: (routineId: string) 
   return (
     <section className={`flex flex-col gap-2 rounded-lg p-3.5 ${raised}`}>
       <div className="flex items-start justify-between gap-3">
-        <h2 className="text-[15px] font-medium tracking-[-0.01em]">{lane.name}</h2>
+        {/* A control only where there is a screen behind it (T38 AC7). Collagen
+            has none — the routine it starts is the whole of that tier — and a
+            title that looks tappable and is not is worse than one that never
+            claimed to be. */}
+        {lane.detail === undefined ? (
+          <h2 className="text-[15px] font-medium tracking-[-0.01em]">{lane.name}</h2>
+        ) : (
+          <button
+            onClick={() => go({ name: 'tier', tier: lane.detail as TierRoute })}
+            className="flex items-center gap-1 text-left text-[15px] font-medium tracking-[-0.01em] hover:text-accent-200"
+          >
+            {lane.name}
+            <Icon name="caret-right" className="text-[11px] text-neutral-600" />
+          </button>
+        )}
         <span
           className={`${tagOutline} shrink-0 tabular-nums`}
           title={lane.source}

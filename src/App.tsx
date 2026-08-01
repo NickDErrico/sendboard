@@ -19,6 +19,7 @@ import { InstallGuide } from './screens/InstallGuide';
 import { CheckLog } from './screens/CheckLog';
 import { GtgToday } from './screens/GtgToday';
 import { TierDetail } from './screens/TierDetail';
+import { HeavyTier } from './screens/HeavyTier';
 import { Signals } from './screens/Signals';
 import { Library } from './screens/Library';
 import { TabBar } from './components/TabBar';
@@ -81,11 +82,11 @@ function renderRoute(route: Route): ReactNode {
     case 'history':
       return <History onResume={() => go({ name: 'session' })} onExit={() => go({ name: 'today' })} />;
     case 'block':
-      return <Block onExit={() => go({ name: 'today' })} />;
+      return <Block onExit={() => go({ name: 'tier', tier: 'heavy' })} />;
     case 'poster':
       return <Poster onExit={() => go({ name: 'block' })} />;
     case 'retest':
-      return <Retest onExit={() => go({ name: 'today' })} />;
+      return <Retest onExit={() => go({ name: 'tier', tier: 'heavy' })} />;
     case 'plan':
       return (
         <Plan
@@ -101,7 +102,14 @@ function renderRoute(route: Route): ReactNode {
     case 'library':
       return <Library />;
     case 'tier':
-      return <TierDetail key={route.tier} tier={route.tier} />;
+      // The one branch T38 allows: the heavy tier is routines, a block and a
+      // battery, not slots, so it gets its own component rather than a third
+      // shape inside the one that renders `SlotStatus[]`.
+      return route.tier === 'heavy' ? (
+        <HeavyTier />
+      ) : (
+        <TierDetail key={route.tier} tier={route.tier} />
+      );
     case 'signals':
       return <Signals />;
     case 'settings':
