@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from 'react';
 import type { Exercise, Focus, Routine } from '../types';
 import { getAllExercises, getAllRoutines } from '../lib/storage';
 import { LANE_NOTES, groupByLane, laneLabel } from '../lib/membership';
+import { SOURCES } from '../lib/sources';
 import { go, type LibraryLane } from '../lib/routes';
 import { Icon, card, kicker } from '../components/ui';
 import { RowRule, readList } from '../components/ReadList';
@@ -101,20 +102,32 @@ export function Library() {
 
           <section>
             <h2 className={`${kicker} mb-2`}>Reference</h2>
+            {/* Both documents the app's numbers come from (T40, D53). Displayed,
+                searched and quoted; never parsed for meaning (D42). */}
             <div className={readList}>
-              <button
-                onClick={() => go({ name: 'plan', sectionRef: null })}
-                className="flex w-full items-center gap-3 rounded-md px-1 py-3 text-left transition-colors hover:bg-white/5"
-              >
-                <Icon name="book-open" className="shrink-0 text-[17px] text-neutral-500" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-medium">Training plan</span>
-                  <span className="mt-0.5 block text-[11px] leading-snug text-neutral-500">
-                    The document the app is a tool for — searchable, quoted, never parsed
-                  </span>
-                </span>
-                <Icon name="caret-right" className="shrink-0 text-[13px] text-neutral-600" />
-              </button>
+              {SOURCES.map((source, i) => (
+                <Fragment key={source.id}>
+                  {i > 0 && <RowRule />}
+                  <button
+                    onClick={() => go({ name: 'source', sourceId: source.id, sectionRef: null })}
+                    className="flex w-full items-center gap-3 rounded-md px-1 py-3 text-left transition-colors hover:bg-white/5"
+                  >
+                    <Icon name="book-open" className="shrink-0 text-[17px] text-neutral-500" />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline gap-2">
+                        <span className="text-[13px] font-medium">{source.title}</span>
+                        <span className="text-[11px] tabular-nums text-neutral-600">
+                          {source.sections.length} sections
+                        </span>
+                      </span>
+                      <span className="mt-0.5 block text-[11px] leading-snug text-neutral-500">
+                        {source.summary}
+                      </span>
+                    </span>
+                    <Icon name="caret-right" className="shrink-0 text-[13px] text-neutral-600" />
+                  </button>
+                </Fragment>
+              ))}
             </div>
           </section>
 

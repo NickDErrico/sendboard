@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import {
-  PLAN_SECTIONS,
   inlineSpans,
   queryTerms,
-  searchPlan,
-  sectionsForRef,
-  type PlanSection as Section,
-} from '../lib/plan';
-import { PlanSection } from '../components/PlanSection';
+  searchSource,
+  sourceById,
+  type SourceSection as Section,
+} from '../lib/sources';
+import { SourceSection } from '../components/SourceSection';
+import { go } from '../lib/routes';
 import { Icon, input } from '../components/ui';
 import { RowRule, readList } from '../components/ReadList';
 
@@ -19,20 +19,29 @@ import { RowRule, readList } from '../components/ReadList';
  * entries for when there is not. Everything on this screen is reading — nothing
  * here writes, times, or logs anything (D37, D42).
  *
- * Rendered both as a route (`#/plan`, `#/plan/4B`) and *over* a running session,
- * which is why the query and the open section are props-free view state that dies
- * with the component: no query, scroll position or bookmark is persisted (D18).
+ * Rendered both as a route (`#/source/plan`, `#/source/plan/4B`) and *over* a
+ * running session, which is why the query and the open section are props-free
+ * view state that dies with the component: no query, scroll position or bookmark
+ * is persisted (D18).
+ *
+ * T40 made it serve any bundled document rather than only the plan. The screen
+ * names which one it is showing, because both files number a §6 and two
+ * documents rendered identically would make those look like one address.
  */
-export function Plan({
+export function Source({
+  sourceId = 'plan',
   initialRef = null,
   onExit,
   exitLabel = 'Done',
 }: {
+  /** Which bundled document. Defaults to the plan — every citation targets it. */
+  sourceId?: string;
   /** Open straight into a section — how an exercise's citation resolves (AC8). */
   initialRef?: string | null;
   onExit?: () => void;
   exitLabel?: string;
 }) {
+  const source = sourceById(sourceId);
   const [query, setQuery] = useState('');
   const [openRef, setOpenRef] = useState<string | null>(initialRef);
   const [openTitle, setOpenTitle] = useState<string | null>(null);
@@ -43,7 +52,13 @@ export function Plan({
   }, [initialRef]);
 
   const terms = queryTerms(query);
-  const hits = searchPlan(query);
+  const sections = source?.sections ?? [];
+  const title = source?.title ?? 'Source';
+  // AC10: an id the registry does not hold is refused, never quietly served as
+  // the plan — a citation that resolved to the wrong document would be worse
+  // than one that did not resolve at all (D42's reason for typed refs).
+  const missing = source === undefined;
+  const hits = searchSource(query, sections);
 
   // A `§` can address several sections where the plan left subsections unlettered
   // (§8's prose headings), so opening one by reference shows all of them in the
@@ -51,7 +66,26 @@ export function Plan({
   const open: Section[] =
     openRef === null
       ? []
-      : sectionsForRef(openRef).filter((s) => openTitle === null || s.title === openTitle);
+      : sections
+          .filter((s) => s.ref.toLowerCase() === openRef.replace(/^§/, '').toLowerCase())
+          .filter((s) => openTitle === null || s.title === openTitle);
+
+  if (missing) {
+    return (
+      <div className="mx-auto max-w-md px-4 pb-24 pt-[54px]">
+        <h1 className="text-[15px] font-medium tracking-[-0.01em]">Source not found</h1>
+        <p className="mt-2 text-[13px] text-neutral-400">
+          The app holds no document called “{sourceId}”.
+        </p>
+        <button
+          onClick={() => go({ name: 'library', lane: null })}
+          className="mt-4 text-[13px] font-medium text-accent"
+        >
+          Back to the library
+        </button>
+      </div>
+    );
+  }
 
   if (open.length > 0) {
     return (
@@ -81,7 +115,7 @@ export function Plan({
         </div>
         <div className="space-y-8">
           {open.map((section) => (
-            <PlanSection key={`${section.ref}-${section.title}`} section={section} terms={terms} />
+            <SourceSection key={`${section.ref}-${section.title}`} section={section} terms={terms} />
           ))}
         </div>
       </div>
@@ -91,7 +125,7 @@ export function Plan({
   return (
     <div className="mx-auto max-w-md px-4 pb-24 pt-[54px]">
       <header className="mb-3 flex items-center justify-between gap-3">
-        <h1 className="text-[15px] font-medium tracking-[-0.01em]">Training plan</h1>
+        <h1 className="text-[15px] font-medium tracking-[-0.01em]">{title}</h1>
         {onExit && (
           <button
             onClick={onExit}
@@ -106,8 +140,8 @@ export function Plan({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         type="search"
-        placeholder="Search the plan — “elbow”, “edge size”…"
-        aria-label="Search the training plan"
+        placeholder={`Search ${title.toLowerCase()} — “elbow”, “edge size”…`}
+        aria-label={`Search ${title}`}
         className={input}
       />
 
@@ -117,13 +151,13 @@ export function Plan({
               plan's order. This is the mid-session path — a search box is no use
               to chalked hands (AC5). */}
           <p className="mt-3 text-xs text-neutral-500">
-            Your plan, in the app and offline. Tap a section, or search it.
+            {source?.summary} In the app and offline — tap a section, or search it.
           </p>
           {/* One card of rows, not one card per section: this is a table of
               contents, and twenty separate surfaces made the document look like
               twenty documents. */}
           <ul className={`${readList} mt-2`}>
-            {PLAN_SECTIONS.map((section, i) => (
+            {sections.map((section, i) => (
               <li key={`${section.ref}-${section.title}`}>
                 {i > 0 && <RowRule />}
                 <button
@@ -147,13 +181,14 @@ export function Plan({
         // Plainly, with no suggestion and no correction: the section list is one
         // clear of the box (AC11).
         <p className="mt-4 text-[13px] text-neutral-400">
-          No section of the plan contains that. Clear the search to browse all{' '}
-          {PLAN_SECTIONS.length} sections.
+          No section of {title.toLowerCase()} contains that. Clear the search to browse all{' '}
+          {sections.length} sections.
         </p>
       ) : (
         <>
           <p className="mt-3 text-xs text-neutral-500">
-            {hits.length} section{hits.length === 1 ? '' : 's'}, in the plan’s order
+            {hits.length} section{hits.length === 1 ? '' : 's'} of {title.toLowerCase()}, in
+            document order
           </p>
           <ul className="mt-2 space-y-2">
             {hits.map((hit) => (

@@ -1,5 +1,5 @@
 import { go } from '../lib/routes';
-import { sectionsForRef } from '../lib/plan';
+import { sectionsForRef } from '../lib/sources';
 import { Icon, btnSecondary } from './ui';
 
 /**
@@ -15,7 +15,7 @@ import { Icon, btnSecondary } from './ui';
  * timer (D18 keeps it in React state), so mid-session the plan is rendered *over*
  * the session instead — the same thing the exercise detail view already does.
  */
-export function PlanRefLinks({
+export function SourceRefLinks({
   refs,
   onOpen,
   className = '',
@@ -35,7 +35,7 @@ export function PlanRefLinks({
         return (
           <button
             key={ref}
-            onClick={() => (onOpen ? onOpen(ref) : go({ name: 'plan', sectionRef: ref }))}
+            onClick={() => (onOpen ? onOpen(ref) : go({ name: 'source', sourceId: 'plan', sectionRef: ref }))}
             title={section.title}
             className={`${btnSecondary} gap-1 px-2 py-1 text-xs !text-accent`}
           >

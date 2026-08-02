@@ -15,7 +15,7 @@ import { LIGHTER_WEEK_CAVEAT } from '../data/blockPhases';
 import { SessionSigil } from '../components/SessionSigil';
 import { EdgeWeekGrid } from '../components/EdgeWeekGrid';
 import { RetestComparison } from '../components/RetestComparison';
-import { PlanRefLinks } from '../components/PlanRefLinks';
+import { SourceRefLinks } from '../components/SourceRefLinks';
 
 // The whole block on one surface (T28).
 //
@@ -181,7 +181,7 @@ export function Poster({ onExit }: { onExit: () => void }) {
               position rather than a design preference (D23). */}
           <section className="rounded-md border border-neutral-800 bg-bg/60 p-3">
             <p className="text-xs leading-snug text-neutral-500">{LIGHTER_WEEK_CAVEAT}</p>
-            <PlanRefLinks refs={['4E', '4F']} className="mt-2" />
+            <SourceRefLinks refs={['4E', '4F']} className="mt-2" />
           </section>
         </>
       )}

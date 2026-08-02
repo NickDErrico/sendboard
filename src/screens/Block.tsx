@@ -3,7 +3,7 @@ import { getAllExercises, getAllLogs, getAllRoutines, getSettings } from '../lib
 import { buildEdgeWeekGrid, describeTension, describeUntimed, type EdgeWeekGrid as Grid } from '../lib/tension';
 import { go } from '../lib/routes';
 import { EdgeWeekGrid } from '../components/EdgeWeekGrid';
-import { PlanRefLinks } from '../components/PlanRefLinks';
+import { SourceRefLinks } from '../components/SourceRefLinks';
 import { Icon } from '../components/ui';
 
 // Where the block's work went (T26). A reading surface: it loads, aggregates and
@@ -116,7 +116,7 @@ export function Block({ onExit }: { onExit: () => void }) {
                 sessions are not included.
               </li>
             </ul>
-            <PlanRefLinks refs={['4B', '4C', '5A', '5B']} className="mt-2" />
+            <SourceRefLinks refs={['4B', '4C', '5A', '5B']} className="mt-2" />
           </section>
 
           {grid.excludedBatteries > 0 && (

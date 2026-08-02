@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   PLAN_SECTIONS,
+  SOURCES,
   inlineSpans,
   normalize,
-  parsePlan,
+  parseSections,
   queryTerms,
-  searchPlan,
+  searchSource,
   sectionsForRef,
-  type PlanBlock,
-} from './plan';
+  sourceById,
+  type SourceBlock,
+} from './sources';
 import { EXERCISES } from '../data/exercises';
 
 const SAMPLE = `# Title — The Document
@@ -49,11 +51,11 @@ Short submaximal sets through the day.
 > Drop it at any elbow soreness.
 `;
 
-const sections = parsePlan(SAMPLE);
+const sections = parseSections(SAMPLE);
 const byRef = (ref: string, title?: string) =>
   sections.find((s) => s.ref === ref && (title === undefined || s.title === title))!;
 
-describe('parsePlan derives the plan’s own § numbering (AC2, AC4)', () => {
+describe('parseSections derives the plan’s own § numbering (AC2, AC4)', () => {
   it('skips the document title and subtitle rather than listing them as a section', () => {
     expect(sections.some((s) => s.title.includes('The Document'))).toBe(false);
     expect(sections.some((s) => s.searchText.includes('A subtitle nobody cites'))).toBe(false);
@@ -79,7 +81,7 @@ describe('parsePlan derives the plan’s own § numbering (AC2, AC4)', () => {
 });
 
 describe('parseBlocks keeps the structure the plan wrote (AC4)', () => {
-  const kinds = (blocks: PlanBlock[]) => blocks.map((b) => b.kind);
+  const kinds = (blocks: SourceBlock[]) => blocks.map((b) => b.kind);
 
   it('reads unordered lists as lists, with markers stripped', () => {
     const list = byRef('1').blocks.find((b) => b.kind === 'list');
@@ -120,37 +122,37 @@ describe('parseBlocks keeps the structure the plan wrote (AC4)', () => {
 
 describe('search finds sections, unranked, in the plan’s order (AC2, AC10)', () => {
   it('returns document order, not a relevance order', () => {
-    const hits = searchPlan('the', sections);
+    const hits = searchSource('the', sections);
     const order = hits.map((h) => sections.indexOf(h.section));
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
   it('requires every term (AND), not any', () => {
-    expect(searchPlan('pima pulls', sections).map((h) => h.section.ref)).toContain('4B');
-    expect(searchPlan('pima kettlebell', sections).map((h) => h.section.ref)).toEqual(['4B']);
-    expect(searchPlan('pima unicycle', sections)).toEqual([]);
+    expect(searchSource('pima pulls', sections).map((h) => h.section.ref)).toContain('4B');
+    expect(searchSource('pima kettlebell', sections).map((h) => h.section.ref)).toEqual(['4B']);
+    expect(searchSource('pima unicycle', sections)).toEqual([]);
   });
 
   it('matches text inside a table cell (AC10)', () => {
-    expect(searchPlan('kettlebell', sections).map((h) => h.section.ref)).toEqual(['4B']);
+    expect(searchSource('kettlebell', sections).map((h) => h.section.ref)).toEqual(['4B']);
   });
 
   it('matches text inside a list item (AC10)', () => {
-    expect(searchPlan('immovable', sections).map((h) => h.section.ref)).toEqual(['1']);
+    expect(searchSource('immovable', sections).map((h) => h.section.ref)).toEqual(['1']);
   });
 
   it('matches a term that appears only in the heading', () => {
-    expect(searchPlan('warm-up', sections).map((h) => h.section.ref)).toContain('4A');
+    expect(searchSource('warm-up', sections).map((h) => h.section.ref)).toContain('4A');
   });
 
   it('is insensitive to case and to the plan’s typography (AC3)', () => {
-    expect(searchPlan("DON'T", sections).map((h) => h.section.ref)).toEqual(['4A']);
-    expect(searchPlan('don’t', sections).map((h) => h.section.ref)).toEqual(['4A']);
+    expect(searchSource("DON'T", sections).map((h) => h.section.ref)).toEqual(['4A']);
+    expect(searchSource('don’t', sections).map((h) => h.section.ref)).toEqual(['4A']);
     expect(normalize('Don’t — “quoted”')).toBe('don\'t - "quoted"');
   });
 
   it('reports snippets and a count without ordering by them', () => {
-    const hit = searchPlan('pima', sections)[0];
+    const hit = searchSource('pima', sections)[0];
     expect(hit.snippets.length).toBeGreaterThan(0);
     expect(hit.snippets.length).toBeLessThanOrEqual(3);
     expect(hit.matches).toBeGreaterThan(0);
@@ -159,12 +161,12 @@ describe('search finds sections, unranked, in the plan’s order (AC2, AC10)', (
   it('searches nothing for a one-character or punctuation-only query', () => {
     expect(queryTerms('a')).toEqual([]);
     expect(queryTerms('§ — .')).toEqual([]);
-    expect(searchPlan('a', sections)).toEqual([]);
-    expect(searchPlan('   ', sections)).toEqual([]);
+    expect(searchSource('a', sections)).toEqual([]);
+    expect(searchSource('   ', sections)).toEqual([]);
   });
 
   it('returns nothing rather than everything when a term matches no section (AC11)', () => {
-    expect(searchPlan('kayaking', sections)).toEqual([]);
+    expect(searchSource('kayaking', sections)).toEqual([]);
   });
 });
 
@@ -231,9 +233,9 @@ describe('the real plan parses into an addressable document (AC1, AC4)', () => {
   });
 
   it('finds §7’s safety content by the words the owner would type', () => {
-    expect(searchPlan('pulley').map((h) => h.section.label)).toContain('§7');
-    expect(searchPlan('elbow').length).toBeGreaterThan(0);
-    expect(searchPlan('track everything').map((h) => h.section.label)).toContain('§7');
+    expect(searchSource('pulley').map((h) => h.section.label)).toContain('§7');
+    expect(searchSource('elbow').length).toBeGreaterThan(0);
+    expect(searchSource('track everything').map((h) => h.section.label)).toContain('§7');
   });
 
   it('every section has a reference and a title', () => {
@@ -263,5 +265,45 @@ describe('every catalog citation resolves (AC8, D42)', () => {
     const uncited = { ...EXERCISES[0], planRefs: undefined };
     expect(uncited.planRefs ?? []).toEqual([]);
     expect(sectionsForRef('')).toEqual([]);
+  });
+});
+
+describe('the registry (T40, D53)', () => {
+  it('holds both training documents and no design document', () => {
+    expect(SOURCES.map((s) => s.id)).toEqual(['plan', 'joints']);
+  });
+
+  it('parses the research file with the same parser as the plan', () => {
+    // Both number their top-level sections and both carry subsections — lettered
+    // in the plan, prose-headed in the research file, which is the case §8 forced
+    // the parser to handle at T25. No second parser was needed.
+    const joints = sourceById('joints');
+    expect(joints).toBeDefined();
+    expect(joints!.sections.length).toBeGreaterThan(5);
+    expect(joints!.sections.every((s) => s.ref.length > 0)).toBe(true);
+  });
+
+  it('scopes a ref to its source — both documents number a §6', () => {
+    const planSix = sectionsForRef('6', 'plan');
+    const jointsSix = sectionsForRef('6', 'joints');
+    expect(planSix.length).toBeGreaterThan(0);
+    expect(jointsSix.length).toBeGreaterThan(0);
+    expect(planSix[0].title).not.toBe(jointsSix[0].title);
+  });
+
+  it('defaults a ref to the plan, where every catalog citation points', () => {
+    expect(sectionsForRef('4B')).toEqual(sectionsForRef('4B', 'plan'));
+  });
+
+  it('refuses an unknown id rather than falling back', () => {
+    expect(sourceById('tier-architecture')).toBeUndefined();
+    expect(sourceById('')).toBeUndefined();
+  });
+
+  it('gives every source a title and a summary for the library', () => {
+    for (const source of SOURCES) {
+      expect(source.title.length, source.id).toBeGreaterThan(0);
+      expect(source.summary.length, source.id).toBeGreaterThan(0);
+    }
   });
 });

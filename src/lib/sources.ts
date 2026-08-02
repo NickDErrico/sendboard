@@ -1,4 +1,5 @@
 import PLAN_MARKDOWN from '../../docs/training-plan.md?raw';
+import JOINTS_MARKDOWN from '../../docs/joint-rotation-research.md?raw';
 
 /**
  * The training plan, in the app (T25, D42).
@@ -18,13 +19,13 @@ import PLAN_MARKDOWN from '../../docs/training-plan.md?raw';
  * library, no search library, and the whole parse is a function of one string.
  */
 
-export type PlanBlock =
+export type SourceBlock =
   | { kind: 'para'; text: string }
   | { kind: 'list'; ordered: boolean; items: string[] }
   | { kind: 'quote'; text: string }
   | { kind: 'table'; header: string[]; rows: string[][] };
 
-export interface PlanSection {
+export interface SourceSection {
   /** "4", "4B", "8" — the plan's own numbering, derived from the heading. */
   ref: string;
   /** "§4B" — the form the catalog's safety notes already cite. */
@@ -35,7 +36,7 @@ export interface PlanSection {
   parentTitle: string | null;
   /** True where the plan numbered the subsection with a letter (§4B) rather than leaving it unlettered (§8's prose headings). */
   lettered: boolean;
-  blocks: PlanBlock[];
+  blocks: SourceBlock[];
   /** Heading + body, flattened once at parse time — what search reads. */
   searchText: string;
 }
@@ -72,9 +73,9 @@ const LETTERED = /^([A-Z])\.\s+(.*)$/;
  * the document rather than a part of it, and listing them would put an entry in
  * the browser that nothing ever cites.
  */
-export function parsePlan(markdown: string): PlanSection[] {
+export function parseSections(markdown: string): SourceSection[] {
   const lines = markdown.split(/\r?\n/);
-  const sections: PlanSection[] = [];
+  const sections: SourceSection[] = [];
   let current: { ref: string; title: string; parentTitle: string | null; lettered: boolean } | null =
     null;
   let buffer: string[] = [];
@@ -157,8 +158,8 @@ export function parsePlan(markdown: string): PlanSection[] {
 const TABLE_DIVIDER = /^\|[\s:|-]+\|$/;
 
 /** Markdown block structure, to the extent the plan actually uses it. */
-function parseBlocks(lines: string[]): PlanBlock[] {
-  const blocks: PlanBlock[] = [];
+function parseBlocks(lines: string[]): SourceBlock[] {
+  const blocks: SourceBlock[] = [];
   let paragraph: string[] = [];
 
   const flushParagraph = () => {
@@ -229,7 +230,7 @@ function splitRow(row: string): string[] {
 }
 
 /** Every word in a section's blocks, for search. Tables and lists included (AC10). */
-function blocksToText(blocks: PlanBlock[]): string {
+function blocksToText(blocks: SourceBlock[]): string {
   return blocks
     .map((block) => {
       switch (block.kind) {
@@ -245,13 +246,68 @@ function blocksToText(blocks: PlanBlock[]): string {
     .join('\n');
 }
 
-/** The parsed plan, computed once — the text is a build-time constant. */
-export const PLAN_SECTIONS: PlanSection[] = parsePlan(PLAN_MARKDOWN);
+// ─── The registry (T40, D53) ─────────────────────────────────────────────────
 
-/** A section by its `§` reference, or undefined. Case-insensitive: "4b" finds §4B. */
-export function sectionsForRef(ref: string): PlanSection[] {
+/**
+ * The documents the app's numbers come from.
+ *
+ * D42 bundled one and set the rule that survives here verbatim: a source is
+ * **displayed, searched and quoted; never parsed for meaning.** Nothing below or
+ * downstream derives a duration, a set count, an interval or a behaviour from
+ * either document, and the one structural product is a `§` reference — a
+ * heading, not a training variable.
+ *
+ * There were always two. `docs/joint-rotation-research.md` is where the joint
+ * rotation, the daily isometric slots and every pool interval come from, and
+ * until now it was the only part of the app's reasoning the owner could not open.
+ *
+ * `docs/tier-architecture.md` is deliberately absent: it describes the app rather
+ * than the training, and a design document in a browser whose subject is where
+ * the numbers come from would be answering a different question.
+ */
+export type SourceId = 'plan' | 'joints';
+
+export interface Source {
+  id: SourceId;
+  /** What the source is called where it is listed and where it is open. */
+  title: string;
+  /** One line on what it governs — Library needs it, the reader does too. */
+  summary: string;
+  sections: SourceSection[];
+}
+
+export const SOURCES: Source[] = [
+  {
+    id: 'plan',
+    title: 'Training plan',
+    summary: 'The overcoming-isometrics program — sessions, progression, safety.',
+    sections: parseSections(PLAN_MARKDOWN),
+  },
+  {
+    id: 'joints',
+    title: 'Joint & tendon research',
+    summary: 'Where the rotation, the daily slots and every pool interval come from.',
+    sections: parseSections(JOINTS_MARKDOWN),
+  },
+];
+
+export function sourceById(id: string): Source | undefined {
+  return SOURCES.find((s) => s.id === id);
+}
+
+/** The plan, still the default target of a catalog citation (`planRefs`). */
+export const PLAN_SECTIONS: SourceSection[] = SOURCES[0].sections;
+
+/**
+ * A section by its `§` reference, within one source.
+ *
+ * Scoped, because both documents number a §6 and they are different addresses.
+ * The default is the plan: `planRefs` is declared against it (D42), and every
+ * citation the catalog writes resolves there.
+ */
+export function sectionsForRef(ref: string, sourceId: SourceId = 'plan'): SourceSection[] {
   const wanted = ref.trim().replace(/^§/, '').toLowerCase();
-  return PLAN_SECTIONS.filter((s) => s.ref.toLowerCase() === wanted);
+  return (sourceById(sourceId)?.sections ?? []).filter((s) => s.ref.toLowerCase() === wanted);
 }
 
 // ─── Search ──────────────────────────────────────────────────────────────────
@@ -264,8 +320,8 @@ export function queryTerms(query: string): string[] {
     .filter((term) => term.length >= 2);
 }
 
-export interface PlanHit {
-  section: PlanSection;
+export interface SourceHit {
+  section: SourceSection;
   /** Up to `SNIPPET_LIMIT` lines of the section that contain a term. */
   snippets: string[];
   matches: number;
@@ -280,11 +336,11 @@ export const SNIPPET_LIMIT = 3;
  * where a relevance score would be a judgment the app has no business making
  * (D23). `matches` is reported as a count, not used to sort.
  */
-export function searchPlan(query: string, sections: PlanSection[] = PLAN_SECTIONS): PlanHit[] {
+export function searchSource(query: string, sections: SourceSection[] = PLAN_SECTIONS): SourceHit[] {
   const terms = queryTerms(query);
   if (terms.length === 0) return [];
 
-  const hits: PlanHit[] = [];
+  const hits: SourceHit[] = [];
   for (const section of sections) {
     const haystack = normalize(section.searchText);
     if (!terms.every((term) => haystack.includes(term))) continue;

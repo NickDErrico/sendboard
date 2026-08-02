@@ -88,14 +88,14 @@ import {
   kicker,
   tagAccent,
 } from '../components/ui';
-import { PlanRefLinks } from '../components/PlanRefLinks';
+import { SourceRefLinks } from '../components/SourceRefLinks';
 import { PrescriptionVariants } from '../components/PrescriptionVariants';
 import { SetLogger } from '../components/SetLogger';
 import { SessionTimer } from '../components/SessionTimer';
 import { EyesShutHold } from '../components/EyesShutHold';
 import { WarmupRunner } from '../components/WarmupRunner';
 import { ExerciseDetail } from './ExerciseDetail';
-import { Plan } from './Plan';
+import { Source } from './Source';
 
 export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: () => void }) {
   const [log, setLog] = useState<WorkoutLog | null>(null);
@@ -851,7 +851,7 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
   if (planRef !== null) {
     return (
       <>
-        <Plan initialRef={planRef} onExit={() => setPlanRef(null)} exitLabel="Back to session" />
+        <Source initialRef={planRef} onExit={() => setPlanRef(null)} exitLabel="Back to session" />
         {timerBar}
       </>
     );
@@ -1039,7 +1039,7 @@ export function ActiveSession({ logId, onFinish }: { logId: string; onFinish: ()
                   )}
                   {/* T25: the section this entry was transcribed from, one tap
                       away and readable during the rest that follows (D42, D37). */}
-                  <PlanRefLinks
+                  <SourceRefLinks
                     refs={exercise.planRefs}
                     onOpen={(ref) => setPlanRef(ref)}
                     className="mt-2"

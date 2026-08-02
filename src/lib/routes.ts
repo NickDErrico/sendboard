@@ -49,7 +49,8 @@ export type Route =
   /** The plan's stop signals. Not a tier: a signal changes every tier. */
   | { name: 'signals' }
   | { name: 'checklog' }
-  | { name: 'plan'; sectionRef: string | null }
+  /** One bundled document, optionally opened at a section (T40, D53). */
+  | { name: 'source'; sourceId: string; sectionRef: string | null }
   | { name: 'settings' }
   | { name: 'install' }
   | { name: 'notFound'; path: string };
@@ -69,7 +70,7 @@ export function tabFor(route: Route): TabName | null {
     case 'today':
       return 'today';
     case 'library':
-    case 'plan':
+    case 'source':
       return 'library';
     case 'history':
     case 'checklog':
@@ -132,10 +133,16 @@ export function parseHash(hash: string): Route {
       return { name: 'today' };
     case 'checklog':
       return { name: 'checklog' };
+    case 'source':
+      // `#/source/plan` is the whole document; `#/source/plan/4B` opens a
+      // section. The id is validated by the screen, which owns not-found.
+      return segments[1]
+        ? { name: 'source', sourceId: segments[1], sectionRef: segments[2] ?? null }
+        : { name: 'notFound', path: `/${segments.join('/')}` };
+    // T40: the plan was the only document when D42 bundled it, so it had the
+    // route to itself. Every citation the catalog writes still points here.
     case 'plan':
-      // `#/plan` is the whole document; `#/plan/4B` opens a section, which is how
-      // an exercise's typed citation resolves (T25 AC8).
-      return { name: 'plan', sectionRef: segments[1] ?? null };
+      return { name: 'source', sourceId: 'plan', sectionRef: segments[1] ?? null };
     case 'settings':
       return { name: 'settings' };
     case 'install':
@@ -156,8 +163,10 @@ export function hashFor(route: Route): string {
       return `#/tier/${route.tier}`;
     case 'library':
       return route.lane === null ? '#/library' : `#/library/${route.lane}`;
-    case 'plan':
-      return route.sectionRef === null ? '#/plan' : `#/plan/${route.sectionRef}`;
+    case 'source':
+      return route.sectionRef === null
+        ? `#/source/${route.sourceId}`
+        : `#/source/${route.sourceId}/${route.sectionRef}`;
     case 'notFound':
       return '#/';
     default:

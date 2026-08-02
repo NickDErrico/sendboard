@@ -10,7 +10,7 @@ import {
 } from '../lib/storage';
 import { last7DayGtgCounts } from '../lib/checks';
 import { doneMovementIds, gtgKindOf, gtgSections, unnamedKinds, type GtgSection } from '../lib/gtg';
-import { PlanRefLinks } from '../components/PlanRefLinks';
+import { SourceRefLinks } from '../components/SourceRefLinks';
 import { Icon, card, kicker, tagNeutral } from '../components/ui';
 
 // T33: §8's committed list, as the thing it is — a routine with a movement, a
@@ -208,7 +208,7 @@ function Section({
       )}
 
       <p className="text-[11px] leading-snug text-neutral-600">{copy.note}</p>
-      <PlanRefLinks refs={copy.refs} />
+      <SourceRefLinks refs={copy.refs} />
     </section>
   );
 }

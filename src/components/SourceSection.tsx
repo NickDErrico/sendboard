@@ -1,4 +1,4 @@
-import { inlineSpans, type PlanBlock, type PlanSection as Section } from '../lib/plan';
+import { inlineSpans, type SourceBlock, type SourceSection as Section } from '../lib/sources';
 
 // One section of the training plan, rendered from its own markdown (T25, D42).
 //
@@ -31,7 +31,7 @@ function Inline({ text, terms }: { text: string; terms: string[] }) {
   );
 }
 
-function Block({ block, terms }: { block: PlanBlock; terms: string[] }) {
+function Block({ block, terms }: { block: SourceBlock; terms: string[] }) {
   switch (block.kind) {
     case 'para':
       return (
@@ -98,7 +98,7 @@ function Block({ block, terms }: { block: PlanBlock; terms: string[] }) {
   }
 }
 
-export function PlanSection({
+export function SourceSection({
   section,
   terms = [],
   compact = false,

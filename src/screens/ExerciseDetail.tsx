@@ -1,7 +1,7 @@
 import type { Exercise, IsoType } from '../types';
 import { EquipmentBadge, GtgBadge } from '../components/EquipmentBadge';
 import { ExerciseProgress } from '../components/ExerciseProgress';
-import { PlanRefLinks } from '../components/PlanRefLinks';
+import { SourceRefLinks } from '../components/SourceRefLinks';
 import { PrescriptionVariants } from '../components/PrescriptionVariants';
 import { useBlockWeek } from '../lib/useBlockWeek';
 import { Icon } from '../components/ui';
@@ -58,7 +58,7 @@ export function ExerciseDetail({
 
       {/* T25: the entry's own citations, now that the plan is in the app (D42).
           Renders nothing where an entry cites nothing. */}
-      <PlanRefLinks refs={exercise.planRefs} onOpen={onOpenPlan} className="mt-3" />
+      <SourceRefLinks refs={exercise.planRefs} onOpen={onOpenPlan} className="mt-3" />
 
       {/* T12: renders nothing unless the exercise declares metrics (D20) — only
           the three the training plan actually progresses. */}

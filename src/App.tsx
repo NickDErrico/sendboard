@@ -12,7 +12,7 @@ import { History } from './screens/History';
 import { Retest } from './screens/Retest';
 import { Block } from './screens/Block';
 import { Poster } from './screens/Poster';
-import { Plan } from './screens/Plan';
+import { Source } from './screens/Source';
 import { Settings } from './screens/Settings';
 import { InstallGuide } from './screens/InstallGuide';
 import { CheckLog } from './screens/CheckLog';
@@ -85,12 +85,13 @@ function renderRoute(route: Route): ReactNode {
       return <Poster onExit={() => go({ name: 'block' })} />;
     case 'retest':
       return <Retest onExit={() => go({ name: 'tier', tier: 'heavy' })} />;
-    case 'plan':
+    case 'source':
       return (
-        <Plan
-          key={route.sectionRef ?? 'all'}
+        <Source
+          key={`${route.sourceId}:${route.sectionRef ?? 'all'}`}
+          sourceId={route.sourceId}
           initialRef={route.sectionRef}
-          onExit={() => go({ name: 'today' })}
+          onExit={() => go({ name: 'library', lane: null })}
         />
       );
     case 'checklog':

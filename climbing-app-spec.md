@@ -2448,6 +2448,64 @@ Create: `src/lib/membership.ts` (+ `membership.test.ts`), `src/screens/LaneLibra
 | `LIBRARY_LANES` is declared in `routes.ts`, not imported | `routes.ts` is imported *by* `lanes.ts`, so importing `membership.ts` back would close a cycle. The duplication is the same shape as `TIER_ROUTES` and is pinned by a test asserting both lists agree, so it cannot drift. |
 | Console shows two stale HMR errors for the deleted file | Logged when `ExerciseList.tsx` was removed under a running dev server, and retained in the pane's buffer across reloads and a server restart. Nothing in `src/` references it, and `tsc` and the production build both pass. |
 
+### [T40] Outcome: The app holds the documents its numbers come from, plural — the research file becomes as reachable as the plan, and D42's rule applies to a set instead of to whichever one happened to be first.
+
+Spec: this file | Status: [x] | Depends on: T37, T39 | D42, D53 | Owner request, 2026-08-01
+
+#### Context manifest
+
+Rename: `src/lib/plan.ts` → `src/lib/sources.ts` (+ test), `src/screens/Plan.tsx` → `src/screens/Source.tsx`, `src/components/PlanRefLinks.tsx` → `src/components/SourceRefLinks.tsx` | Modify: `src/lib/routes.ts` (+ test), `src/App.tsx`, `src/screens/Library.tsx`, every caller of the renamed symbols | Read-only: `docs/training-plan.md`, `docs/joint-rotation-research.md`
+
+**The parser already generalises, which is why this is small.** Both documents number their top-level sections (`## 4. Day 1: Fingerboard Session`, `## 6. Rotation rules`) and both carry subsections, lettered in the plan and prose-headed in the research file — a case `parsePlan` handles already, because §8's prose headings forced it at T25. So the parse is renamed rather than rewritten, and the registry is additive.
+
+**D42 survives verbatim and applies to a set.** A source is **displayed, searched and quoted; never parsed for meaning.** Nothing derives a duration, a set count or a behaviour from either document; the one structural product is a `§` reference, which is a heading. Adding a second document does not weaken that rule — it removes the reason the rule kept getting restated for one file.
+
+**`docs/tier-architecture.md` is not a source.** It describes the app, not the training, and bundling it would put a design document in a browser whose subject is where the numbers come from. The registry is training content only.
+
+**What this task does not finish.** `TierPrescription.source` is free text by declaration — *"a paper, a coach, a plan section"* — so a dose citing "Crimpd–Gilmore et al. 2024 cadence, Baar spacing" names something the app does not hold and cannot link to. D53's "every prescription resolves to whichever source it cites" is therefore only half delivered here: the documents the app *does* hold become reachable and their citations resolve, and structuring `source` into a typed `{ sourceId, ref }` is a catalog content pass left for its own task. Free-text sources render as they always have.
+
+#### Acceptance criteria
+
+1. WHEN the app is built THE bundle SHALL include both `docs/training-plan.md` and `docs/joint-rotation-research.md`, imported at build time — not fetched, not stored, not editable (D42).
+2. WHEN `#/source/plan` is open THE training plan SHALL render exactly as `#/plan` rendered it, with the same section list, search and section view.
+3. WHEN `#/source/joints` is open THE research file SHALL render through the same component, with its own sections parsed from its own headings.
+4. WHEN `#/plan` or `#/plan/4B` is opened from a bookmark or a citation THE app SHALL resolve it to the plan source rather than showing not-found.
+5. WHEN an exercise's `planRefs` are rendered THE links SHALL open that ref in the plan, unchanged from T25 AC8.
+6. WHEN a ref names no section THE link SHALL be omitted rather than rendered dead, unchanged.
+7. WHEN Library is open THE Reference group SHALL list both documents, each with its own title.
+8. WHEN a source is open THE screen SHALL name which document it is, so two sources with similar section numbering cannot be confused.
+9. WHEN either document is searched THE search SHALL cover only that document, and SHALL state which one it searched.
+10. WHEN an unknown source id is requested THE app SHALL show not-found rather than defaulting to the plan.
+11. WHEN a database or backup written before this task is read THE app SHALL work unchanged, with no migration and no version bump.
+
+#### Edge cases
+
+- Both documents numbering a `§6` → the ref is scoped to its source; a citation carries the source with it, so §6 in the plan and §6 in the research file are different addresses.
+- A section heading the parser cannot number → dropped from the section list exactly as it is today, not rendered under an invented ref.
+- The research file's prose subsections (`### Shoulder — 2–3×/week`) → parsed as unlettered subsections, the case §8 already established.
+
+#### Non-goals & do-not-touch
+
+- MUST NOT parse either document for a training value — no duration, set count, interval or prescription is ever read out of prose (D42, D53).
+- MUST NOT bundle `docs/tier-architecture.md` or any other design document.
+- MUST NOT change `TierPrescription.source` to a typed reference — flagged above, and its own task.
+- MUST NOT change the catalog, the lanes, or any tier screen.
+
+#### Verify
+
+`npm run test && npm run build && npm run lint`, plus an in-browser pass at 375×812: both documents opening from Library, `#/plan/4B` still resolving to §4B of the plan, and a search inside the research file returning its own sections.
+
+#### Amendments (T40)
+
+| Change | Why |
+|---|---|
+| No second parser was needed | `parsePlan` became `parseSections` and read the research file unchanged. Both documents number their top-level sections and both carry subsections — lettered in the plan, prose-headed in the research file — and the prose case was already handled because §8 forced it at T25. The generalisation was a rename plus a registry. |
+| A `§` is scoped to its source | Both documents number a §6, and they are different addresses. `sectionsForRef` takes a source and defaults to the plan, which is where every `planRefs` citation points — so the catalog's links are unchanged while the two documents stay distinguishable. Asserted rather than assumed: a test opens §6 in both and requires the titles to differ. |
+| The screen names its document in four places | Header, search placeholder, result count and empty state. Two documents rendered identically, both with numbered sections, would make §6 look like one address — so the surface says *"3 sections of joint & tendon research"* rather than *"3 sections"*. |
+| An unknown source id is refused, not defaulted | `#/source/tier-architecture` renders "Source not found" rather than quietly serving the plan. A citation resolving to the *wrong* document is worse than one that does not resolve — D42's own argument for typed refs, applied to the id. |
+| `TierPrescription.source` is still free text | D53 says every prescription resolves to whichever source it cites. Half of that shipped: the documents the app holds are reachable and their citations resolve. The other half needs `source` to become a typed `{ sourceId, ref }`, which is a catalog content pass over every dose — flagged in the manifest and left as its own task, because doing it here would have been a second task wearing this one's clothes. |
+| Console shows HMR errors for the renamed files | Logged when `Plan.tsx`, `PlanSection.tsx` and `PlanRefLinks.tsx` were renamed under a running dev server, and retained in the pane's buffer. Nothing in `src/` references the old paths, and `tsc` and the production build both pass. |
+
 ---
 
 ## Execution notes

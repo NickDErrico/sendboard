@@ -25,8 +25,10 @@ describe('parse / build round trip', () => {
     { name: 'tier', tier: 'heavy' },
     { name: 'signals' },
     { name: 'checklog' },
-    { name: 'plan', sectionRef: null },
-    { name: 'plan', sectionRef: '4B' },
+    { name: 'source', sourceId: 'plan', sectionRef: null },
+    { name: 'source', sourceId: 'plan', sectionRef: '4B' },
+    { name: 'source', sourceId: 'joints', sectionRef: null },
+    { name: 'source', sourceId: 'joints', sectionRef: '6' },
     { name: 'settings' },
     { name: 'install' },
   ];
@@ -46,8 +48,9 @@ describe('parse / build round trip', () => {
 describe('an exercise citation still resolves (T25 AC8, D42)', () => {
   it('opens the plan at the cited section', () => {
     // The link the catalog writes. A tab reorganisation must not break it.
-    expect(parseHash('#/plan/4B')).toEqual({ name: 'plan', sectionRef: '4B' });
-    expect(parseHash('#/plan/10A')).toEqual({ name: 'plan', sectionRef: '10A' });
+    expect(parseHash('#/plan/4B')).toEqual({ name: 'source', sourceId: 'plan', sectionRef: '4B' });
+    expect(parseHash('#/plan/10A')).toEqual({ name: 'source', sourceId: 'plan', sectionRef: '10A' });
+    expect(parseHash('#/source/plan/4B')).toEqual({ name: 'source', sourceId: 'plan', sectionRef: '4B' });
   });
 });
 
@@ -90,8 +93,8 @@ describe('which tab a route lights (T37 AC2, AC3)', () => {
   it('files the catalog and the plan under Library', () => {
     expect(tabFor({ name: 'library', lane: null })).toBe('library');
     expect(tabFor({ name: 'library', lane: 'heavy' })).toBe('library');
-    expect(tabFor({ name: 'plan', sectionRef: null })).toBe('library');
-    expect(tabFor({ name: 'plan', sectionRef: '4B' })).toBe('library');
+    expect(tabFor({ name: 'source', sourceId: 'plan', sectionRef: null })).toBe('library');
+    expect(tabFor({ name: 'source', sourceId: 'joints', sectionRef: '6' })).toBe('library');
   });
 
   it('files history and the check log under Log', () => {
