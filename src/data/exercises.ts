@@ -1053,6 +1053,84 @@ export const EXERCISES: Exercise[] = [
     gtgEligible: false,
   },
 
+  // ─── Second movement per daily slot (research file §6) ──────────────────────
+  //
+  // §6's rule is that the slot is fixed and daily while the *movement filling it*
+  // rotates. Five of the six slots carried exactly one entry, which made that
+  // rotation a fixed answer — `movementsForSlot` ranks by least-recently-loaded,
+  // and a list of one is always the same list.
+  //
+  // Three slots were filled by adding a second dose to a movement that already
+  // existed, which is §6's own instruction: the pronator, the 90-90 and the wide
+  // pinch. The two below are the slots where nothing suitable was in the catalog.
+  {
+    id: 'iso-split-squat-hold',
+    name: 'Split-Squat Isometric Hold',
+    focus: 'tendon-conditioning',
+    target: 'knee',
+    alsoLoads: ['hip', 'ankle'],
+    tiers: [
+      {
+        tier: 'daily-isometric',
+        text: '2 x 30–45s per side @ ~70% effort',
+        holdSeconds: [30, 45],
+        prescribedSets: [2, 2],
+        position: 'Front thigh at or below parallel — the quad and patellar tendon at length',
+        source:
+          'Research file §6 tier-2 slot table ("split-squat isometric"); 70% MVC / 30–45s standard; long-length per Oranchuk 2019',
+      },
+    ],
+    isoType: 'yielding',
+    equipment: ['bodyweight', 'kettlebell'],
+    summary: 'Held low split squat — the patellar half of a knee slot that was all hamstring.',
+    howTo: [
+      'Step into a split stance, rear knee under the hip, and lower until the front thigh is at or below parallel.',
+      'Hold there — weight through the front mid-foot, torso upright.',
+      'Hold at roughly 70% of a hard effort for 30–45 seconds, then swap sides.',
+      'Two holds per side. Add a kettlebell held at the chest once bodyweight is easy.',
+    ],
+    prescription: 'Daily: 2 x 30–45s per side @ ~70% effort, front thigh at or below parallel',
+    cues: [
+      'The knee slot’s other movement is knee flexion; this is the extension side, and they are different tissues.',
+      'Depth is the prescription — a shallow hold trains the short position instead.',
+    ],
+    safetyNotes: [],
+    gtgEligible: false,
+  },
+  {
+    id: 'iso-dorsiflexion-hold',
+    name: 'Dorsiflexion Isometric Hold',
+    focus: 'tendon-conditioning',
+    target: 'ankle',
+    tiers: [
+      {
+        tier: 'daily-isometric',
+        text: '2 x 30–45s per side @ ~70% effort',
+        holdSeconds: [30, 45],
+        prescribedSets: [2, 2],
+        position: 'Toes pulled toward the shin from a pointed start — the tibialis anterior at length',
+        source:
+          'Antagonist to the plantarflexion slot — standard practice, not separately cited; 70% MVC / 30–45s standard; long-length per Oranchuk 2019',
+      },
+    ],
+    isoType: 'overcoming',
+    equipment: ['band', 'bodyweight'],
+    summary: 'Held dorsiflexion — the decelerator on a landing, and the one ankle direction nothing else loads.',
+    howTo: [
+      'Sit with the leg extended and a band looped around the forefoot, anchored ahead of you.',
+      'Start with the foot pointed and pull the toes back toward the shin against the band.',
+      'Hold at roughly 70% of a hard effort — firm, not straining.',
+      'Hold 30–45 seconds, twice per side.',
+    ],
+    prescription: 'Daily: 2 x 30–45s per side @ ~70% effort, pulling from a pointed start',
+    cues: [
+      'The calf hold is plantarflexion; this is the direction it does not train.',
+      'The tibialis anterior is what absorbs a landing, which is the ankle’s actual mechanism in bouldering.',
+    ],
+    safetyNotes: [],
+    gtgEligible: false,
+  },
+
   // ─── Pool additions (docs/joint-rotation-research.md §4, tier 4) ────────────
   //
   // One per target the existing catalog left uncovered — elbow, wrist, knee and
@@ -1069,6 +1147,15 @@ export const EXERCISES: Exercise[] = [
         text: '2 x 15–20 per hand, 5s eccentric',
         prescribedSets: [2, 2],
         source: "Hörst, climber's-elbow rehab/prehab protocol",
+      },
+      {
+        tier: 'daily-isometric',
+        text: '2 x 30–45s per hand @ ~70% effort',
+        holdSeconds: [30, 45],
+        prescribedSets: [2, 2],
+        position: 'Held in supination, resisting into pronation — the pronators at length',
+        source:
+          'Research file §6 tier-2 slot table ("pronator isometric"); 70% MVC / 30–45s standard; long-length per Oranchuk 2019',
       },
     ],
     isoType: 'dynamic',
@@ -1092,8 +1179,15 @@ export const EXERCISES: Exercise[] = [
     id: 'wide-pinch-wrist-extension',
     name: 'Wide Pinch with Wrist Extension',
     focus: 'prehab-stability',
-    target: 'wrist',
-    alsoLoads: ['fingers', 'extensors'],
+    // Retargeted from 'wrist' to 'extensors' when the daily dose below was added.
+    // Research file §6 names this movement as the extensor slot's second filler,
+    // and `movementsForSlot` reads `target` — so under 'wrist' the daily dose
+    // would have filed against a target that has no daily slot and never
+    // surfaced. Hörst's own framing is extensor work performed in wrist
+    // extension, so the slot follows the tissue the dose is for; the wrist keeps
+    // its pool coverage through the deviation and extended-position entries.
+    target: 'extensors',
+    alsoLoads: ['fingers', 'wrist'],
     tiers: [
       {
         tier: 'pool',
@@ -1101,6 +1195,15 @@ export const EXERCISES: Exercise[] = [
         holdSeconds: [10, 30],
         prescribedSets: [3, 3],
         source: 'Hörst, wrist stabilizer training',
+      },
+      {
+        tier: 'daily-isometric',
+        text: '2 x 30–45s per hand @ ~70% effort',
+        holdSeconds: [30, 45],
+        prescribedSets: [2, 2],
+        position: 'Wrist extended, fingers straight — the pinch held open, not curled',
+        source:
+          'Research file §6 tier-2 slot table ("wide-pinch-with-extension hold"); 70% MVC / 30–45s standard',
       },
     ],
     isoType: 'yielding',
@@ -1405,6 +1508,15 @@ export const EXERCISES: Exercise[] = [
     target: 'hip',
     tiers: [
       { tier: 'pool', text: '2 x 10 per side', prescribedSets: [2, 2], source: 'Heel-hook prevention — open the whole hip rather than the tibia alone' },
+      {
+        tier: 'daily-isometric',
+        text: '2 x 30–45s per side @ ~70% effort',
+        holdSeconds: [30, 45],
+        prescribedSets: [2, 2],
+        position: 'At the end of the rotation, pressing into the floor — the rotators at length',
+        source:
+          'The isometric dose of the pool movement above (research file §6: one entry carries both); 70% MVC / 30–45s standard; long-length per Oranchuk 2019',
+      },
     ],
     isoType: 'dynamic',
     equipment: ['bodyweight'],
@@ -1525,6 +1637,212 @@ export const EXERCISES: Exercise[] = [
     safetyNotes: [
       'Start knee-height at most. This is the one pool movement with an acute injury mechanism of its own.',
     ],
+    gtgEligible: false,
+  },
+
+  // ─── Trunk (docs/joint-rotation-research.md is silent; see sources below) ────
+  //
+  // The first entries under `focus: 'core'`, which the catalog declared and
+  // deliberately had no member for. Adding them changes what the app says it
+  // does not train, which is why `taxonomy.test.ts` fails the build on the first
+  // one rather than letting it pass unnoticed.
+  //
+  // These are the one part of the pool that is **not** prophylactic. §2's injury
+  // table is fingers, shoulder, elbow, wrist and ankle; the trunk is not a
+  // climbing injury site, and nothing here is being prevented. It is performance
+  // work, and it is in the pool because the pool is the only rotation that
+  // reaches a day — see `JointTarget`.
+  //
+  // Two sources, and they disagree about frequency in a way worth keeping:
+  //
+  // - **Saeterbakken et al. 2018** (PLOS ONE, doi:10.1371/journal.pone.0203766)
+  //   is the only climbing-specific core intervention there is — 19 advanced and
+  //   elite climbers, isometric vs dynamic, 2x/week for ten weeks. The isometric
+  //   arm improved the climbing-specific body-lift test by 29.6% (p=0.037); the
+  //   dynamic arm improved trunk flexion and rotation more. The paper's own
+  //   conclusion is that neither beat the other, and that is transcribed rather
+  //   than resolved. Its four movements are the foot-lift, arm lock-off,
+  //   side-bridge and prone-bridge; the arm lock-off is omitted here because
+  //   `weighted-lockoff-hold` and the three OI bar pulls already are it.
+  // - **McGill's Big 3** — curl-up, side bridge, bird dog — is the lower-back
+  //   half, prescribed as short holds in a descending pyramid, cheap enough to
+  //   run daily.
+  //
+  // The side bridge is in both. It carries one dose, McGill's, because his is the
+  // more specific prescription; the study is cited beside it rather than split
+  // into a second pool dose that the rotation would then have to choose between.
+  {
+    id: 'core-foot-lift',
+    name: 'Foot Lift',
+    focus: 'core',
+    target: 'trunk',
+    alsoLoads: ['hip', 'shoulder', 'fingers'],
+    tiers: [
+      {
+        tier: 'pool',
+        text: '3–4 sets x 4–10 reps, 3–5s hold per rep, 3s between reps, 2 min between sets',
+        holdSeconds: [3, 5],
+        prescribedSets: [3, 4],
+        restSeconds: 120,
+        position: 'Hanging on an overhang, foot held at the high placement rather than swung to it',
+        source:
+          'Saeterbakken et al. 2018 (PLOS ONE), isometric core training arm — 2x/week x 10 weeks',
+      },
+    ],
+    isoType: 'yielding',
+    equipment: ['climbing-wall'],
+    summary: 'Holding a high foot placement on an overhang — the study’s most climbing-specific core movement.',
+    howTo: [
+      'Hang on two holds on an overhanging section, feet on.',
+      'Lift one foot to a high placement and hold it there rather than stepping through.',
+      'Hold 3–5 seconds, lower, and take about 3 seconds before the next rep.',
+      '4–10 reps per set, 3–4 sets, two minutes between sets. Alternate sides.',
+    ],
+    prescription:
+      'Pool: 3–4 sets x 4–10 reps, 3–5s hold, ~3s between reps, 2 min between sets (Saeterbakken isometric protocol)',
+    cues: [
+      'The hold is the exercise — a foot swung up and placed is the movement without the stimulus.',
+      'Steeper wall, harder set. The study progressed by wall angle and by reducing the base of support rather than by adding reps alone.',
+    ],
+    safetyNotes: [],
+    gtgEligible: false,
+  },
+  {
+    id: 'core-prone-bridge',
+    name: 'Prone Bridge',
+    focus: 'core',
+    target: 'trunk',
+    alsoLoads: ['shoulder'],
+    tiers: [
+      {
+        tier: 'pool',
+        text: '3–4 sets x 4–10 reps, 3–5s hold per rep, 3s between reps, 2 min between sets',
+        holdSeconds: [3, 5],
+        prescribedSets: [3, 4],
+        restSeconds: 120,
+        position: 'Ribs down and hips level — a straight line from heel to head, never sagging',
+        source:
+          'Saeterbakken et al. 2018 (PLOS ONE), isometric core training arm — 2x/week x 10 weeks',
+      },
+    ],
+    isoType: 'yielding',
+    equipment: ['bodyweight'],
+    summary: 'Front plank held in short efforts — resisting extension, which is what an overhang asks for.',
+    howTo: [
+      'Set up on forearms and toes, elbows under the shoulders.',
+      'Brace so the body is one line — ribs pulled down, glutes on, hips neither high nor sagging.',
+      'Hold hard for 3–5 seconds, release for about 3, and repeat.',
+      '4–10 reps per set, 3–4 sets, two minutes between sets.',
+    ],
+    prescription:
+      'Pool: 3–4 sets x 4–10 reps, 3–5s hold, ~3s between reps, 2 min between sets (Saeterbakken isometric protocol)',
+    cues: [
+      'Short hard efforts, not one long sag — the study’s protocol is 3–5 seconds at a real intensity.',
+      'Progress by narrowing the base or raising the feet rather than by holding longer.',
+    ],
+    safetyNotes: [],
+    gtgEligible: false,
+  },
+  {
+    id: 'core-side-bridge',
+    name: 'Side Bridge',
+    focus: 'core',
+    target: 'trunk',
+    alsoLoads: ['shoulder', 'hip'],
+    tiers: [
+      {
+        tier: 'pool',
+        text: '10s holds, descending pyramid 6/4/2 per side, ~10s between reps, all reps on one side before switching',
+        holdSeconds: [10, 10],
+        prescribedSets: [3, 3],
+        restSeconds: 20,
+        position: 'Hips stacked and lifted — the body in one line seen from the front, not rolled',
+        source:
+          'McGill Big 3 — 8–10s holds, descending pyramid; also the side-bridge in Saeterbakken et al. 2018',
+      },
+    ],
+    isoType: 'yielding',
+    equipment: ['bodyweight'],
+    summary: 'The obliques and QL under load — resisting sideways collapse, the plane nothing else here trains.',
+    howTo: [
+      'Lie on one side, forearm under the shoulder, knees bent to start or legs straight to progress.',
+      'Lift the hips so the body is one line, stacked rather than rolled forward.',
+      'Hold about 10 seconds, down for about 10, and repeat.',
+      'Six reps, then four, then two — all on one side, then switch.',
+    ],
+    prescription: 'Pool: 10s holds, 6/4/2 descending pyramid per side, ~10s between reps',
+    cues: [
+      'Stacked, not rolled — the shoulders and hips stay square to the front the whole time.',
+      'Knees bent is the regression and it is a real one; straight legs are not a requirement.',
+    ],
+    safetyNotes: [],
+    gtgEligible: false,
+  },
+  {
+    id: 'core-bird-dog',
+    name: 'Bird Dog',
+    focus: 'core',
+    target: 'trunk',
+    alsoLoads: ['shoulder', 'hip'],
+    tiers: [
+      {
+        tier: 'pool',
+        text: '10s holds, descending pyramid 6/4/2 per side, ~10s between reps, all reps on one side before switching',
+        holdSeconds: [10, 10],
+        prescribedSets: [3, 3],
+        restSeconds: 20,
+        position: 'Opposite arm and leg straight out at the height of the back, not above it',
+        source: 'McGill Big 3 — 8–10s holds, descending pyramid, all reps one side then the other',
+      },
+    ],
+    isoType: 'yielding',
+    equipment: ['bodyweight'],
+    summary: 'Extended arm and opposite leg held level — the lower-back and anti-rotation entry.',
+    howTo: [
+      'Start on hands and knees, hands under shoulders, knees under hips, back flat.',
+      'Extend one arm forward and the opposite leg back until both are level with the back.',
+      'Hold about 10 seconds without letting the hips rotate, then return.',
+      'Six reps, then four, then two — all on one side, then switch.',
+    ],
+    prescription: 'Pool: 10s holds, 6/4/2 descending pyramid per side, ~10s between reps',
+    cues: [
+      'Level with the back, not above it — lifting higher arches the spine, which is the thing this is meant to avoid.',
+      'The hips stay square. If they open to the side, shorten the reach.',
+    ],
+    safetyNotes: [],
+    gtgEligible: false,
+  },
+  {
+    id: 'core-mcgill-curl-up',
+    name: 'McGill Curl-up',
+    focus: 'core',
+    target: 'trunk',
+    tiers: [
+      {
+        tier: 'pool',
+        text: '10s holds, descending pyramid 6/4/2, ~10s between reps',
+        holdSeconds: [10, 10],
+        prescribedSets: [3, 3],
+        restSeconds: 20,
+        position: 'Head and shoulders just off the floor, lumbar spine keeping its natural arch',
+        source: 'McGill Big 3 — 8–10s holds, descending pyramid; hands under the low back to hold the arch',
+      },
+    ],
+    isoType: 'yielding',
+    equipment: ['bodyweight'],
+    summary: 'Abdominal endurance without flexing the spine — the reason it is not a sit-up.',
+    howTo: [
+      'Lie on your back, one knee bent with that foot flat, the other leg straight.',
+      'Slide both hands under the low back to keep its natural arch.',
+      'Lift the head and shoulders a centimetre or two off the floor — the neck and head move as one with the ribs.',
+      'Hold about 10 seconds. Six reps, then four, then two. Swap which knee is bent halfway.',
+    ],
+    prescription: 'Pool: 10s holds, 6/4/2 descending pyramid, ~10s between reps',
+    cues: [
+      'The spine does not bend — the hands under the low back are there so you can feel it staying still.',
+      'Barely off the floor. Height is not the variable; holding the brace is.',
+    ],
+    safetyNotes: [],
     gtgEligible: false,
   },
 ];

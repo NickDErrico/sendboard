@@ -103,8 +103,14 @@ describe('every movement is reachable from exactly one lane (AC9)', () => {
     );
     expect(counts).toEqual({
       collagen: 2,
-      'daily-isometric': 7,
-      pool: 23,
+      // 7 → 9: the split-squat and dorsiflexion holds, which are the two slots
+      // that had no second movement already in the catalog. The pronator, the
+      // 90-90 and the wide pinch also gained a daily dose and are *not* counted
+      // here — `laneOf` takes the first declared tier, and all three declare
+      // their pool dose first, so they stay in the pool lane. A movement is in
+      // one lane; carrying two doses does not change that.
+      'daily-isometric': 9,
+      pool: 28, // 23 → 28: the five trunk entries
       heavy: 10,
       none: 7,
     });

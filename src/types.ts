@@ -47,7 +47,17 @@ export type Focus =
   | 'core';
 
 /**
- * The joint or tendon group a movement loads (docs/joint-rotation-research.md).
+ * The tissue region a movement loads (docs/joint-rotation-research.md).
+ *
+ * Named `JointTarget` and read as "joint or tendon group" until `trunk` was
+ * added. Every other member is a joint; `trunk` is a region, and it is here
+ * because this field is the **rotation slot** and the rotation is the only way
+ * anything reaches the owner's day. A trunk that rotated on its own mechanism
+ * would be a fifth tier, and there are four (docs/tier-architecture.md §3).
+ *
+ * The type keeps its name. Renaming it to `Target` would touch every consumer to
+ * record one widening, and `target`/`alsoLoads` — the two fields that actually
+ * carry it — are already named for the question rather than the anatomy.
  *
  * Deliberately *not* `Category`, which mixes body region with training role —
  * 'antagonist' and 'warmup' are roles, 'fingers' and 'lower-body' are regions,
@@ -63,6 +73,11 @@ export type Focus =
  * slot — that tissue is already covered by the abrahangs and the two weekly
  * finger routines, and adding a seventh daily hold to it is the double-dosing
  * the research file's §6 refuses.
+ *
+ * 'trunk' is the second target with no daily-isometric slot, for the opposite
+ * reason: nothing loads it at all today, but its dose is sourced at 2x/week
+ * (Saeterbakken et al. 2018), and promoting a twice-weekly prescription into a
+ * daily slot would be the app inventing a frequency. It is pool-only.
  */
 export type JointTarget =
   | 'fingers'
@@ -72,7 +87,8 @@ export type JointTarget =
   | 'shoulder'
   | 'hip'
   | 'knee'
-  | 'ankle';
+  | 'ankle'
+  | 'trunk';
 
 /**
  * Which of the four programs a prescription belongs to

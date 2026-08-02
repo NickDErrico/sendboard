@@ -33,8 +33,8 @@ describe('catalog (AC1, AC4, AC5)', () => {
   // A bare count is a weak assertion — `pool.test.ts` is what holds the shape,
   // asserting every slot and pool target has a movement. This one only catches an
   // accidental duplicate or deletion.
-  it('exposes all 49 exercises and 4 routines from an empty database', async () => {
-    expect(await storage.getAllExercises()).toHaveLength(49);
+  it('exposes all 56 exercises and 4 routines from an empty database', async () => {
+    expect(await storage.getAllExercises()).toHaveLength(56);
     expect(await storage.getAllRoutines()).toHaveLength(4);
   });
 

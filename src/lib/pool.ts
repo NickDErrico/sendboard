@@ -61,6 +61,7 @@ export const POOL_TARGETS = [
   'hip',
   'knee',
   'ankle',
+  'trunk',
 ] as const satisfies readonly JointTarget[];
 
 export type PoolTarget = (typeof POOL_TARGETS)[number];
@@ -76,6 +77,11 @@ export type PoolTarget = (typeof POOL_TARGETS)[number];
  * the climber's-elbow work; ankle is the longest, because the proprioceptive
  * evidence found program *duration* mattered more than session frequency, with
  * doses as low as 1x/week effective.
+ *
+ * Trunk is 3, from the only climbing-specific core intervention there is:
+ * Saeterbakken et al. 2018 trained 19 advanced and elite climbers twice weekly
+ * for ten weeks. Every other target's number came from a prehab source; this one
+ * came from a performance one, and it lands in the same place.
  */
 export const POOL_INTERVAL_DAYS: Record<PoolTarget, number> = {
   extensors: 3,
@@ -85,6 +91,7 @@ export const POOL_INTERVAL_DAYS: Record<PoolTarget, number> = {
   hip: 3,
   knee: 3,
   ankle: 4,
+  trunk: 3,
 };
 
 /** Every catalog entry carrying a dose for `tier`. */
@@ -153,6 +160,7 @@ export const JOINT_TARGET_LABELS: Record<JointTarget, string> = {
   hip: 'Hip',
   knee: 'Knee',
   ankle: 'Ankle',
+  trunk: 'Trunk',
 };
 
 export interface SlotStatus {

@@ -30,8 +30,15 @@ const ALL_FOCUSES: Focus[] = [
   'core',
 ];
 
-/** The four the catalog declares and has no movement for — D48's whole point. */
-const EXPECTED_UNTRAINED: Focus[] = ['endurance', 'power-endurance', 'power', 'core'];
+/**
+ * The focuses the catalog declares and has no movement for — D48's whole point.
+ *
+ * Was four. `core` left the list when the trunk entries landed: the app used to
+ * say accurately that it trained max strength and conditioned tissue and did
+ * nothing else, and now it trains the trunk too. That sentence changing is
+ * exactly what this constant exists to make someone notice.
+ */
+const EXPECTED_UNTRAINED: Focus[] = ['endurance', 'power-endurance', 'power'];
 
 describe('focus coverage — empty is a supported state', () => {
   it('every exercise declares a known focus', () => {
@@ -185,5 +192,9 @@ const _everyTargetAccountedFor: Record<JointTarget, true> = {
   hip: true,
   knee: true,
   ankle: true,
+  // Decided: rotated by the pool on a 3-day interval, and given no daily slot.
+  // Its dose is sourced at 2x/week, and a daily slot would be a frequency the
+  // app invented rather than one anything prescribes.
+  trunk: true,
 };
 void _everyTargetAccountedFor;
