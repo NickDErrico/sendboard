@@ -11,6 +11,7 @@ import {
 import { activeSymptoms, describeDropPosition, dropPositions } from '../lib/symptoms';
 import { go, type SlotTier } from '../lib/routes';
 import { Icon, card, kicker, tagNeutral } from '../components/ui';
+import { ExerciseDetail } from './ExerciseDetail';
 
 /**
  * One tier's own screen (T37, D47).
@@ -62,6 +63,11 @@ export function TierDetail({ tier }: { tier: SlotTier }) {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
   const [checks, setChecks] = useState<Check[] | null>(null);
+  // Local state rather than a route, which is how every other detail in the app
+  // is opened (T3's rule, still followed by the Library and the routine preview):
+  // Back returns to the list with its scroll and its ranking intact, and there is
+  // no route state to keep in step with the day.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // Recomputed from `new Date()` on every focus, so the app left open across
   // midnight rolls over rather than offering yesterday's slots — the rule every
@@ -98,6 +104,10 @@ export function TierDetail({ tier }: { tier: SlotTier }) {
   // are on this screen.
   const drops = dropPositions(activeSymptoms(checks ?? []));
   const copy = COPY[tier];
+  // Resolved against the freshly-ranked list rather than remembered, so the open
+  // detail follows the slot through a tick — `doneToday` is what keeps the match
+  // once ticking has made the movement the freshest in its group.
+  const selected = slots.find((s) => (s.doneToday ?? s.exercise)?.id === selectedId) ?? null;
 
   // Un-ticking is silent, as on the GtG screen and for the same reason: a check
   // names one movement on one day, so a mis-tap costs one tap to undo and a
@@ -119,6 +129,27 @@ export function TierDetail({ tier }: { tier: SlotTier }) {
       });
     }
     await refresh();
+  }
+
+  // The movement's own screen, opened by selecting the slot. It is T3's detail —
+  // the same how-to, cues and safety the Library shows — carrying the tier's dose
+  // and the tick, so an unfamiliar movement no longer has to be looked up
+  // somewhere else before it can be run.
+  const selectedExercise = selected === null ? null : (selected.doneToday ?? selected.exercise);
+  if (selected !== null && selectedExercise !== null) {
+    return (
+      <ExerciseDetail
+        exercise={selectedExercise}
+        onBack={() => setSelectedId(null)}
+        todo={{
+          label: `${JOINT_TARGET_LABELS[selected.target]} · ${copy.title.toLowerCase()}`,
+          dose: selectedExercise.tiers?.find((t) => t.tier === tier),
+          status: slotStatusLine(selected),
+          done: selected.doneToday !== null,
+          onToggle: () => void toggle(selectedExercise),
+        }}
+      />
+    );
   }
 
   return (
@@ -150,7 +181,13 @@ export function TierDetail({ tier }: { tier: SlotTier }) {
           <ul className="flex flex-col gap-1.5">
             {slots.map((slot) => (
               <li key={slot.target}>
-                <SlotRow slot={slot} tier={tier as Tier} drops={drops} onToggle={toggle} />
+                <SlotRow
+                  slot={slot}
+                  tier={tier as Tier}
+                  drops={drops}
+                  onToggle={toggle}
+                  onOpen={setSelectedId}
+                />
               </li>
             ))}
           </ul>
@@ -160,23 +197,37 @@ export function TierDetail({ tier }: { tier: SlotTier }) {
   );
 }
 
+/** The staleness line, shared by the row and the detail it opens. */
+function slotStatusLine(slot: SlotStatus): string {
+  return `${describeSlot(slot)}${slot.daysSince === null ? '' : ` · every ${slot.intervalDays}d`}`;
+}
+
 /**
  * One slot: which joint, what is up for it, the dose, and when it last happened.
  *
  * Shows `doneToday` in preference to `exercise` so a tick does not swap the row
  * for the next movement in the group under the owner's finger.
+ *
+ * **Two controls, not one.** The circle ticks in place, which is the whole row's
+ * behaviour up to now and the right cost for a movement already known; the rest
+ * of the row opens the movement's screen, because tapping the *name* of
+ * something unfamiliar and having it silently complete is the wrong answer to
+ * "what is this". Siblings rather than nested, which a button inside a button
+ * would be.
  */
 function SlotRow({
   slot,
   tier,
   drops,
   onToggle,
+  onOpen,
 }: {
   slot: SlotStatus;
   tier: Tier;
   /** Exercise id → drop position, from whichever stop signals are up. */
   drops: Map<string, number>;
   onToggle: (exercise: Exercise) => Promise<void>;
+  onOpen: (exerciseId: string) => void;
 }) {
   const exercise = slot.doneToday ?? slot.exercise;
   const done = slot.doneToday !== null;
@@ -202,10 +253,8 @@ function SlotRow({
   const dropPosition = drops.get(exercise.id);
 
   return (
-    <button
-      onClick={() => void onToggle(exercise)}
-      aria-pressed={done}
-      className={`flex w-full items-start gap-2.5 rounded-[10px] border px-2.5 py-[11px] text-left transition-colors ${
+    <div
+      className={`flex w-full items-stretch rounded-[10px] border transition-colors ${
         done
           ? 'border-accent bg-accent/[.12]'
           : slot.due
@@ -213,36 +262,55 @@ function SlotRow({
             : 'border-neutral-900 opacity-60 hover:border-white/[.2]'
       }`}
     >
-      <Icon
-        name={done ? 'check-circle' : 'circle'}
-        weight={done ? 'fill' : 'regular'}
-        className={`mt-px shrink-0 text-[18px] ${done ? 'text-accent-400' : 'text-neutral-600'}`}
-      />
-      <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className={`text-[13px] font-medium ${done ? 'text-accent-200' : 'text-neutral-300'}`}>
-            {JOINT_TARGET_LABELS[slot.target]}
+      <button
+        onClick={() => void onToggle(exercise)}
+        aria-pressed={done}
+        aria-label={`${done ? 'Undo' : 'Mark done'}: ${exercise.name}`}
+        className="shrink-0 rounded-l-[10px] px-2.5 py-[11px] transition-colors hover:bg-white/[.06]"
+      >
+        <Icon
+          name={done ? 'check-circle' : 'circle'}
+          weight={done ? 'fill' : 'regular'}
+          className={`block text-[18px] ${done ? 'text-accent-400' : 'text-neutral-600'}`}
+        />
+      </button>
+
+      <button
+        onClick={() => onOpen(exercise.id)}
+        className="flex min-w-0 flex-1 items-start gap-2 rounded-r-[10px] py-[11px] pr-2.5 text-left transition-colors hover:bg-white/[.04]"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className={`text-[13px] font-medium ${done ? 'text-accent-200' : 'text-neutral-300'}`}>
+              {JOINT_TARGET_LABELS[slot.target]}
+            </span>
+            <span className="text-[11px] text-neutral-500">{exercise.name}</span>
+            {dropPosition !== undefined && (
+              <span className="shrink-0 rounded-[5px] border border-amber-500/40 bg-amber-500/[.12] px-1.5 py-px text-[10px] font-medium text-amber-200">
+                {describeDropPosition(dropPosition)}
+              </span>
+            )}
+            {/* Wraps rather than holding its width. A chip that cannot shrink is
+                fine for "2 x 10" and takes a 616px line for the wrist pinch's
+                two protocols, which used to carry the whole screen off the right
+                edge of a 390px phone. */}
+            {dose && (
+              <span className={`${tagNeutral} max-w-full leading-snug`}>{dose.text}</span>
+            )}
           </span>
-          <span className="text-[11px] text-neutral-500">{exercise.name}</span>
-          {dropPosition !== undefined && (
-            <span className="shrink-0 rounded-[5px] border border-amber-500/40 bg-amber-500/[.12] px-1.5 py-px text-[10px] font-medium text-amber-200">
-              {describeDropPosition(dropPosition)}
+          {/* Muscle length is part of the prescription, not a form cue (Oranchuk
+              2019), so it sits on the row rather than behind a tap. */}
+          {dose?.position && (
+            <span className="mt-0.5 block text-[11px] leading-snug text-neutral-500">
+              {dose.position}
             </span>
           )}
-          {dose && <span className={`${tagNeutral} shrink-0`}>{dose.text}</span>}
-        </span>
-        {/* Muscle length is part of the prescription, not a form cue (Oranchuk
-            2019), so it sits on the row rather than behind a tap. */}
-        {dose?.position && (
-          <span className="mt-0.5 block text-[11px] leading-snug text-neutral-500">
-            {dose.position}
+          <span className="mt-0.5 block text-[11px] leading-snug text-neutral-600">
+            {slotStatusLine(slot)}
           </span>
-        )}
-        <span className="mt-0.5 block text-[11px] leading-snug text-neutral-600">
-          {describeSlot(slot)}
-          {slot.daysSince !== null && ` · every ${slot.intervalDays}d`}
         </span>
-      </span>
-    </button>
+        <Icon name="caret-right" className="mt-px shrink-0 text-[13px] text-neutral-600" />
+      </button>
+    </div>
   );
 }

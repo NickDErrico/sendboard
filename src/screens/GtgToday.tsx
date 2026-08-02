@@ -247,8 +247,10 @@ function MovementRow({
             {exercise.name}
           </span>
           {/* The dose is the reason this screen exists, so it is a tag rather
-              than a third line of grey: §8's numbers, transcribed (D6). */}
-          <span className={`${tagNeutral} shrink-0`}>{gtg.dose}</span>
+              than a third line of grey: §8's numbers, transcribed (D6). It wraps
+              rather than holding its width — §8's longer doses are wider than a
+              390px row, and a chip that cannot shrink takes the screen with it. */}
+          <span className={`${tagNeutral} max-w-full leading-snug`}>{gtg.dose}</span>
         </span>
         <span className="mt-0.5 block text-[11px] leading-snug text-neutral-500">{gtg.trigger}</span>
       </span>

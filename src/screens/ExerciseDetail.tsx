@@ -1,10 +1,35 @@
-import type { Exercise, IsoType } from '../types';
+import type { Exercise, IsoType, TierPrescription } from '../types';
 import { EquipmentBadge, GtgBadge } from '../components/EquipmentBadge';
 import { ExerciseProgress } from '../components/ExerciseProgress';
 import { SourceRefLinks } from '../components/SourceRefLinks';
 import { PrescriptionVariants } from '../components/PrescriptionVariants';
 import { useBlockWeek } from '../lib/useBlockWeek';
-import { Icon } from '../components/ui';
+import { Icon, btnPrimary, btnSecondary, kickerAccent } from '../components/ui';
+
+/**
+ * The tick, where this screen was opened to *do* the movement rather than read
+ * about it.
+ *
+ * A slot on a tier screen used to complete on the tap that selected it, which
+ * meant an unfamiliar movement had to be looked up in the Library before it
+ * could be run — the description was one screen away from the only screen that
+ * asked for it. The tap opens this instead, and the tick moved here, above the
+ * how-to it was missing.
+ *
+ * Optional, and its absence is the Library's and mid-session's case: there the
+ * record is made somewhere else, and a second control for it would be a second
+ * answer to where the truth lives.
+ */
+export interface DetailTodo {
+  /** What offered this movement — its slot and the tier, e.g. "Wrist · rotating pool". */
+  label: string;
+  /** That tier's dose. Shown in full here; the row it came from has no width for it. */
+  dose?: TierPrescription;
+  /** Where it stands, in facts only (D23) — never a score against the interval. */
+  status?: string;
+  done: boolean;
+  onToggle: () => void;
+}
 
 // Only overcoming/yielding are required to be labelled (AC6); dynamic is shown
 // too as useful context, 'none' is omitted.
@@ -18,6 +43,7 @@ export function ExerciseDetail({
   exercise,
   onBack,
   onOpenPlan,
+  todo,
 }: {
   exercise: Exercise;
   onBack: () => void;
@@ -27,6 +53,8 @@ export function ExerciseDetail({
    * link then navigates to the Plan tab.
    */
   onOpenPlan?: (ref: string) => void;
+  /** The tick, where this screen is where the movement is done. See `DetailTodo`. */
+  todo?: DetailTodo;
 }) {
   const isoLabel = ISO_LABELS[exercise.isoType];
   // T24: which of §4B's two protocols this week is, where the exercise declares
@@ -55,6 +83,42 @@ export function ExerciseDetail({
           <EquipmentBadge key={eq} equipment={eq} />
         ))}
       </div>
+
+      {/* The dose and the tick, where a tier screen sent the owner here to run
+          the movement. It leads because it is what the tap was for; everything
+          below it is the reading that used to be a Library trip away. */}
+      {todo && (
+        <section className="mt-4 rounded-lg border border-accent/40 bg-accent/[.08] p-3">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <h2 className={kickerAccent}>{todo.label}</h2>
+            {todo.status && (
+              <span className="ml-auto text-[11px] text-neutral-400">{todo.status}</span>
+            )}
+          </div>
+          {todo.dose && (
+            <p className="mt-1.5 break-words text-sm leading-relaxed text-ink">{todo.dose.text}</p>
+          )}
+          {/* Muscle length is part of the prescription, not a form cue (Oranchuk
+              2019), so it stays with the dose rather than dropping into How to. */}
+          {todo.dose?.position && (
+            <p className="mt-1 break-words text-[13px] leading-snug text-neutral-400">
+              {todo.dose.position}
+            </p>
+          )}
+          <button
+            onClick={todo.onToggle}
+            aria-pressed={todo.done}
+            className={`${todo.done ? btnSecondary : btnPrimary} mt-3 w-full py-2.5`}
+          >
+            <Icon
+              name={todo.done ? 'check-circle' : 'circle'}
+              weight={todo.done ? 'fill' : 'regular'}
+              className="text-[15px]"
+            />
+            {todo.done ? 'Done today · tap to undo' : 'Mark done'}
+          </button>
+        </section>
+      )}
 
       {/* T25: the entry's own citations, now that the plan is in the app (D42).
           Renders nothing where an entry cites nothing. */}
