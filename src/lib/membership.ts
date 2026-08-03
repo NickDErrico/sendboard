@@ -8,7 +8,7 @@ import type { LaneId } from './lanes';
  *
  * D48 said a movement is addressable as `tier → focus → target`. Building the
  * browse proved that wrong: **no catalog entry declares `tier: 'heavy'`**, and
- * eighteen of forty-nine declare no tier at all — including both max hangs, both
+ * eighteen of fifty-six declare no tier at all — including both max hangs, both
  * PIMA pulls, all three overcoming bar pulls and all five §4E tests, which *are*
  * the heavy tier.
  *

@@ -20,9 +20,13 @@ import { RowRule, readList } from '../components/ReadList';
  * battery is a measurement (D29) and the climbing days are check-offs (D9), and
  * filing either under a lane would assert a cadence that does not exist.
  *
- * The four focuses with no movement sit here, at the catalog's own level, rather
- * than being repeated inside each lane — they are a fact about what the catalog
+ * The focuses with no movement sit here, at the catalog's own level, rather than
+ * being repeated inside each lane — they are a fact about what the catalog
  * declares, not about where anything is loaded (D48).
+ *
+ * `ALL_FOCUSES` is the candidate list and the card is filtered from the catalog,
+ * so a focus that gains its first movement leaves this card without an edit —
+ * which is how `core` left it when the trunk entries landed.
  *
  * D23: the lanes are listed in cadence order and never ranked, nothing is scored
  * against the counts, and no fraction is drawn against any of them.

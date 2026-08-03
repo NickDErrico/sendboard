@@ -55,27 +55,39 @@ last:
 ```
 tier      why and how often it is loaded    collagen · daily-isometric · pool · heavy
   focus   what it develops                  max-strength · tendon-conditioning ·
-          prehab-stability · proprioception · general-strength · warm-up · climbing
+          prehab-stability · proprioception · general-strength · warm-up ·
+          climbing · core
     target  which tissue                    fingers · extensors · wrist · elbow ·
-            shoulder · hip · knee · ankle
+            shoulder · hip · knee · ankle · trunk
 ```
 
 A movement is addressable as **pool → prehab-stability → shoulder**, or
 **heavy → max-strength → fingers**. `Category` is deleted rather than split:
-`target` already owns "where" on 31 of the 49 entries, and a second region field is
+`target` already owns "where" on 38 of the 56 entries, and a second region field is
 how two taxonomies start disagreeing about one movement.
 
 ### 2.1 `focus` declares values it has no members for
 
-Seven focus values have members. Four do not: `endurance`, `power-endurance`,
-`power`, `core`. They are declared anyway, and they render.
+Eight focus values have members. Three do not: `endurance`, `power-endurance`,
+`power`. They are declared anyway, and they render.
 
 This inverts the rule that governs `target`. A joint target with no movement
 **fails the build** — `pool.ts` will offer a slot it cannot fill, so the coverage
 test exists to catch exactly that. A focus with no movement is not a defect: it
 is the most useful thing this axis produces, which is an accurate statement that
-the catalog trains max strength and conditions tissue and does nothing else. A
-coverage test copied across from the tendon one would delete the finding.
+the catalog trains strength, conditions tissue and loads the trunk, and touches
+no energy system at all. A coverage test copied across from the tendon one would
+delete the finding.
+
+**The three are empty for two different reasons, and the card that renders them
+says neither.** `endurance` and `power-endurance` are trained — on the wall, on
+plan §3's Day 2 and Day 4 — and the app deliberately prescribes nothing for
+climbing (D9), so they are absent from the *catalog* rather than from the
+training. `power` is declined outright: plan §2 refuses a campus board because it
+"adds power but also adds real injury risk", and holds that overcoming isometrics
+buy most of the explosive-catch adaptation with far less shock loading on
+pulleys — so the PIMA pulls carry that intent under `max-strength`. "No movement
+declared" flattens a delegation and a refusal into one sentence.
 
 The two rules therefore differ on purpose, and each is asserted in its own test.
 

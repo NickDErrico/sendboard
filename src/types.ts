@@ -22,16 +22,20 @@ export type IsoType = 'overcoming' | 'yielding' | 'dynamic' | 'none';
  * is addressable as `pool → prehab-stability → shoulder`.
  *
  * `Category` was not split into a region and a role, because `target` already
- * owns region on 31 of the 49 entries, and a second region field is how two
+ * owns region on 38 of the 56 entries, and a second region field is how two
  * taxonomies begin disagreeing about one movement.
  *
- * **Four values below have no member in the catalog, and that is the point.**
- * `endurance`, `power-endurance`, `power` and `core` are declared so the app can
- * state accurately that this catalog trains max strength and conditions tissue
- * and does nothing else. That inverts the rule `JointTarget` follows, where a
- * target with no movement fails the build because `pool.ts` would offer a slot it
- * cannot fill — see `focus.test.ts`, where both rules are asserted separately so
- * neither is ever copied onto the other.
+ * **Three values below have no member in the catalog, and that is the point.**
+ * `endurance`, `power-endurance` and `power` are declared so the app can state
+ * accurately that this catalog trains strength, conditions tissue and loads the
+ * trunk, and touches no energy system at all. That inverts the rule `JointTarget`
+ * follows, where a target with no movement fails the build because `pool.ts`
+ * would offer a slot it cannot fill — see `taxonomy.test.ts`, where both rules
+ * are asserted separately so neither is ever copied onto the other.
+ *
+ * Was four. `core` left the list when the trunk entries landed and six movements
+ * claimed it, which is precisely the sentence that paragraph exists to make
+ * someone rewrite.
  */
 export type Focus =
   | 'max-strength'

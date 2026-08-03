@@ -14,7 +14,7 @@ import { ExerciseDetail } from './ExerciseDetail';
  * One lane's movements, grouped by what they develop (T39, D54).
  *
  * **Grouped by focus inside the lane, never by target.** `focus` is declared on
- * all forty-nine entries and `target` on thirty-one, so a target-first grouping
+ * all fifty-six entries and `target` on thirty-eight, so a target-first grouping
  * would file a third of the catalog under no heading at all. The target rides on
  * the row instead, which is what it is — a fact about the movement rather than a
  * heading that has to exist for every one of them.

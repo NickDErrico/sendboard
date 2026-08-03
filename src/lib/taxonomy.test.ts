@@ -47,7 +47,7 @@ describe('focus coverage — empty is a supported state', () => {
     }
   });
 
-  it('declares exactly the four focuses nothing in the catalog trains', () => {
+  it('declares exactly the three focuses nothing in the catalog trains', () => {
     const untrained = ALL_FOCUSES.filter((f) => !EXERCISES.some((e) => e.focus === f));
     // Not a lint. If this list changes, the app's answer to "what do I not train"
     // has changed, and that is worth failing a build to notice in either
