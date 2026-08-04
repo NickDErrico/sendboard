@@ -330,6 +330,10 @@ describe('formatting reports facts and never a verdict (AC1, AC2)', () => {
     expect(describeTension({ holds: 1, seconds: 7, untimed: 0 })).toBe('1 hold · 7s under tension');
     expect(describeTension({ holds: 0, seconds: 0, untimed: 0 })).toBe('No holds recorded yet');
     expect(describeTension({ holds: 3, seconds: 0, untimed: 3 })).toBe('3 holds · no time recorded');
+    // Zero seconds is not on its own enough for "no time recorded" — both arms
+    // have to hold. Here two of the three holds were timed and recorded 0s, so
+    // the block still reports a duration rather than claiming nothing was timed.
+    expect(describeTension({ holds: 3, seconds: 0, untimed: 1 })).toBe('3 holds · 0s under tension');
   });
 
   it('reports the untimed remainder beside the total, and nothing when there is none', () => {
