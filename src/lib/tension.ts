@@ -39,7 +39,7 @@ export interface TensionTotals {
   untimed: number;
 }
 
-export interface TensionRow extends TensionTotals {
+interface TensionRow extends TensionTotals {
   /** 1-based block week (T24). */
   week: number;
   /** Completed rotating sessions that fell in this week. */
@@ -73,7 +73,7 @@ export interface EdgeWeekGrid {
   position: BlockPosition;
 }
 
-export interface TensionInput {
+interface TensionInput {
   logs: WorkoutLog[];
   routines: Routine[];
   exercises: Exercise[];

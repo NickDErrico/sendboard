@@ -20,7 +20,7 @@ import { variantsFor } from './block';
  * count and a declaration, testable without a session or a clock.
  */
 
-export interface SetSpec {
+interface SetSpec {
   min: number;
   max: number;
 }

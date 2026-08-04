@@ -33,7 +33,7 @@ import { describeWhen, formatSet, summarizeSets, type LastPerformance } from './
 /** One card, one minute. The unit the deck is measured in. */
 export const CARD_MS = 60_000;
 
-export type RestCardSource = 'how-to' | 'cue' | 'safety';
+type RestCardSource = 'how-to' | 'cue' | 'safety';
 
 export interface ProtocolCard {
   kind: 'protocol';
@@ -44,7 +44,7 @@ export interface ProtocolCard {
 }
 
 /** The numbers the next set is chosen against. The view renders it; this names it. */
-export interface ReportCard {
+interface ReportCard {
   kind: 'report';
   label: string;
 }

@@ -56,7 +56,7 @@ export type LaneId = 'collagen' | 'daily-isometric' | 'pool' | 'heavy';
  * carries one — a lane with no control would be a report the owner cannot act
  * on, and every tier here is something they can do today.
  */
-export type LaneAction =
+type LaneAction =
   /** Start a session against this routine. */
   | { kind: 'start-routine'; routineId: string; label: string }
   /** Open this tier's own screen, where its movements are ticked. */

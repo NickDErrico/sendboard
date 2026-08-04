@@ -17,7 +17,7 @@ import { lastLoadedByExercise, stalest } from './pool';
 // Pure, and built on `pool.ts`'s `stalest` rather than a second copy of it, so
 // "least recently loaded, catalog order breaks ties" means one thing in this app.
 
-export interface Variation {
+interface Variation {
   /** The `rotationGroup` string these entries share. */
   group: string;
   /** The member that is up this session. */

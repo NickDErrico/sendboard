@@ -265,7 +265,7 @@ function blocksToText(blocks: SourceBlock[]): string {
  * than the training, and a design document in a browser whose subject is where
  * the numbers come from would be answering a different question.
  */
-export type SourceId = 'plan' | 'joints';
+type SourceId = 'plan' | 'joints';
 
 export interface Source {
   id: SourceId;
@@ -320,14 +320,14 @@ export function queryTerms(query: string): string[] {
     .filter((term) => term.length >= 2);
 }
 
-export interface SourceHit {
+interface SourceHit {
   section: SourceSection;
   /** Up to `SNIPPET_LIMIT` lines of the section that contain a term. */
   snippets: string[];
   matches: number;
 }
 
-export const SNIPPET_LIMIT = 3;
+const SNIPPET_LIMIT = 3;
 
 /**
  * Sections containing every term, in the plan's own order.
@@ -371,7 +371,7 @@ function occurrences(haystack: string, needle: string): number {
 
 // ─── Inline rendering ────────────────────────────────────────────────────────
 
-export interface InlineSpan {
+interface InlineSpan {
   text: string;
   bold?: boolean;
   italic?: boolean;

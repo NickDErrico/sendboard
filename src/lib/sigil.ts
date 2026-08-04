@@ -36,7 +36,7 @@ export const SIGIL_OUTER = 1; // fraction a spoke at SIGIL_MAX_SEC reaches
 /** Angular share of the circle spent on the gaps between exercises. */
 export const SIGIL_GAP_DEG = 6;
 
-export interface SigilSpoke {
+interface SigilSpoke {
   /** Index among the session's holds, in logged order. */
   index: number;
   /** Which of the session's hold-exercises this set belongs to, 0-based. */
@@ -137,7 +137,7 @@ export function spokePoint(angleDeg: number, radius: number): { x: number; y: nu
   return { x: Math.cos(rad) * radius, y: Math.sin(rad) * radius };
 }
 
-export interface SessionFacts extends TensionTotals {
+interface SessionFacts extends TensionTotals {
   /** Distinct edges recorded on this session's holds, largest first. */
   edges: number[];
   /** Holds that ended for pain or a form breakdown (D27). */

@@ -20,11 +20,11 @@ export function keyToLocalDate(key: string): Date {
   return new Date(y, m - 1, d);
 }
 
-export function hasKind(checks: Check[], kind: CheckKind): boolean {
+function hasKind(checks: Check[], kind: CheckKind): boolean {
   return checks.some((c) => c.kind === kind);
 }
 
-export interface WeekClimbingStatus {
+interface WeekClimbingStatus {
   volume: boolean;
   limit: boolean;
   complete: boolean;
@@ -36,7 +36,7 @@ export function weekClimbingStatus(weekChecks: Check[]): WeekClimbingStatus {
   return { volume, limit, complete: volume && limit };
 }
 
-export interface DailyGtg {
+interface DailyGtg {
   general: boolean;
   pull: boolean;
 }
@@ -73,7 +73,7 @@ export function last7DayGtgCounts(
   return { general: countKind('gtg-general'), pull: countKind('gtg-pull') };
 }
 
-export interface WeekSummary {
+interface WeekSummary {
   weekStartKey: string; // Monday, yyyy-mm-dd
   volume: boolean;
   limit: boolean;

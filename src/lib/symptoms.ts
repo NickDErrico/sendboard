@@ -17,7 +17,7 @@ import type { Check, SymptomKind } from '../types';
 // never blocks a session and never marks a day unsafe. It reports which signals
 // are up and what the plan says to do about them, and the owner acts (D23).
 
-export interface SymptomSignal {
+interface SymptomSignal {
   /** Short name for the control that records it. */
   label: string;
   /** What the signal actually is, in the plan's terms — the thing to notice. */
@@ -81,7 +81,7 @@ export const SYMPTOM_SIGNALS: Record<SymptomKind, SymptomSignal> = {
 /** The kinds, in the order a recording control should offer them. */
 export const SYMPTOM_KINDS = Object.keys(SYMPTOM_SIGNALS) as SymptomKind[];
 
-export interface ActiveSymptom {
+interface ActiveSymptom {
   kind: SymptomKind;
   signal: SymptomSignal;
   /** The day it was recorded, as a local date key. The most recent, if several. */

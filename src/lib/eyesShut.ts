@@ -37,7 +37,7 @@ export type EyesShutAction =
   | 'advance' // the prescription's top is logged: mark done and move on (T32)
   | 'wait'; // the rest is running; nothing primary to do
 
-export interface EyesShutStep {
+interface EyesShutStep {
   action: EyesShutAction;
   /** True when the timer belongs to a *different* exercise (AC9). */
   otherRunning: boolean;

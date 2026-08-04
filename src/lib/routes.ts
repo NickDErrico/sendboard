@@ -63,7 +63,7 @@ export type Route =
  * of what happened. A route with no tab (a session, a tier detail) highlights
  * none, which is what a screen you have navigated *into* should do.
  */
-export type TabName = 'today' | 'library' | 'log' | 'settings';
+type TabName = 'today' | 'library' | 'log' | 'settings';
 
 export function tabFor(route: Route): TabName | null {
   switch (route.name) {

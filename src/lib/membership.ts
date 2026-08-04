@@ -72,7 +72,7 @@ export function laneOf(exercise: Exercise, routines: Routine[]): Membership {
   return null;
 }
 
-export interface LaneGroup {
+interface LaneGroup {
   lane: Membership;
   exercises: Exercise[];
 }
@@ -101,7 +101,7 @@ export function groupByLane(exercises: Exercise[], routines: Routine[]): LaneGro
 }
 
 /** How the Library names each group. `null` is named, never left blank. */
-export const LANE_LABELS: Record<string, string> = {
+const LANE_LABELS: Record<string, string> = {
   collagen: 'Collagen',
   'daily-isometric': 'Daily isometrics',
   pool: 'Rotating pool',

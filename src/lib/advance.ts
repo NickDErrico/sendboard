@@ -25,7 +25,7 @@
  * than in whichever view happens to have the routine in scope.
  */
 
-export type SessionStep =
+type SessionStep =
   /** Move to this exercise — the next one in the routine still unmarked. */
   | { kind: 'exercise'; exerciseId: string }
   /** Nothing left unmarked: the only place left to go is out of the session. */
