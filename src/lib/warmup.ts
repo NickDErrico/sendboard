@@ -31,7 +31,7 @@ import {
  */
 
 /** What form a warm-up's runner takes, decided by what the entry declares. */
-export interface StagedPlan {
+interface StagedPlan {
   form: 'staged';
   /** The plan's ordered stages, as transcribed at T2. */
   stages: string[];
@@ -182,7 +182,7 @@ export function roundLabel(round: number): string {
  * sequence and nothing is graded against it; the owner can stop anywhere and the
  * only thing that changes is which grip the screen names.
  */
-export interface GripPosition {
+interface GripPosition {
   block: GripBlock;
   /** 0-based index of the block in the sequence. */
   blockIndex: number;

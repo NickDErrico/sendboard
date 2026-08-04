@@ -333,7 +333,7 @@ export interface Exercise {
  * and every hangboard session already load, and §8's drop order runs through the
  * watch items first. It groups the surface; it never blocks anything (D23).
  */
-export interface GtgDose {
+interface GtgDose {
   /**
    * Which of §8's two sections this row belongs to (D48).
    *

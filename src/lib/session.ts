@@ -46,7 +46,7 @@ export function getSets(log: WorkoutLog, exerciseId: string): SetEntry[] {
   return log.entries.find((e) => e.exerciseId === exerciseId)?.sets ?? [];
 }
 
-export function getEntry(log: WorkoutLog, exerciseId: string): LoggedExercise | undefined {
+function getEntry(log: WorkoutLog, exerciseId: string): LoggedExercise | undefined {
   return log.entries.find((e) => e.exerciseId === exerciseId);
 }
 

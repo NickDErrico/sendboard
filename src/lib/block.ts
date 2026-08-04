@@ -51,7 +51,7 @@ export interface BlockPosition {
   label: string;
 }
 
-export interface BlockInput {
+interface BlockInput {
   logs: WorkoutLog[];
   routines: Routine[];
   settings: Settings;
@@ -205,7 +205,7 @@ export function formatPhaseWeeks(phase: BlockPhase): string {
   return min === max ? `Week ${min}` : `Weeks ${min}–${max}`;
 }
 
-export interface VariantView {
+interface VariantView {
   /** The variant the plan prescribes for this week, or null when no week is known. */
   live: PrescriptionVariant | null;
   /** Every other declared variant, in declaration order — readable, never hidden. */

@@ -127,6 +127,17 @@ describe('search finds sections, unranked, in the plan’s order (AC2, AC10)', (
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
+  it('caps the snippets it returns while still counting every match', () => {
+    // The snippet list is a preview, the count is the total. They are capped
+    // differently on purpose, and nothing exercised the cap before this.
+    const many = parseSections(
+      '# D\n\n## 1. Repetition\n\nhold one\n\nhold two\n\nhold three\n\nhold four\n\nhold five\n',
+    );
+    const [hit] = searchSource('hold', many);
+    expect(hit.snippets).toHaveLength(3);
+    expect(hit.matches).toBe(5);
+  });
+
   it('requires every term (AND), not any', () => {
     expect(searchSource('pima pulls', sections).map((h) => h.section.ref)).toContain('4B');
     expect(searchSource('pima kettlebell', sections).map((h) => h.section.ref)).toEqual(['4B']);

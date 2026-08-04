@@ -19,7 +19,7 @@ export const BACKUP_SCHEMA_VERSION = 2;
  * cannot know what it would be dropping, and a silent partial import of an
  * 8-week log is worse than a clear refusal.
  */
-export const MIN_READABLE_SCHEMA_VERSION = 1;
+const MIN_READABLE_SCHEMA_VERSION = 1;
 
 export interface BackupFile {
   schemaVersion: number;
@@ -56,7 +56,7 @@ export function backupFilename(exportedAt: string): string {
   return `sendboard-backup-${exportedAt.replace(/[:.]/g, '-')}.json`;
 }
 
-export type ParseResult =
+type ParseResult =
   | {
       ok: true;
       data: BackupFile;

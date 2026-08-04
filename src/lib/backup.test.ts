@@ -84,6 +84,16 @@ describe('parseBackup validation (AC3, AC5)', () => {
     expect(parseBackup('[1,2,3]')).toMatchObject({ ok: false, reason: 'malformed' });
   });
 
+  it('rejects JSON that parses but is not an object — a scalar, or null', () => {
+    // The array above covers one arm of the guard and was the only one covered.
+    // A bare scalar fails the `typeof` arm, and `null` needs an arm of its own
+    // because `typeof null` is 'object'. Without all three, a file containing
+    // `42` gets past the shape check and into the field reads.
+    for (const text of ['42', '"hello"', 'true', 'null']) {
+      expect(parseBackup(text)).toMatchObject({ ok: false, reason: 'malformed' });
+    }
+  });
+
   it('rejects an object missing the collections as malformed', () => {
     const result = parseBackup(JSON.stringify({ schemaVersion: BACKUP_SCHEMA_VERSION, settings: SETTINGS }));
     expect(result).toMatchObject({ ok: false, reason: 'malformed' });

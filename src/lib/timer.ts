@@ -34,7 +34,7 @@ export function isOpenHold(hold: HoldSpec): boolean {
  * — it is read as `(now - startedAt)` like every other interval in this module,
  * so a throttled tick costs a stale frame and never a drifted count.
  */
-export type TimerPhase = 'idle' | 'counting' | 'holding' | 'resting';
+type TimerPhase = 'idle' | 'counting' | 'holding' | 'resting';
 
 export interface TimerState {
   phase: TimerPhase;
@@ -379,7 +379,7 @@ export function isAutoAdvanceStale(
   return now - (state.startedAt + state.restMs) > graceMs;
 }
 
-export type HoldStatus = 'under' | 'in' | 'over';
+type HoldStatus = 'under' | 'in' | 'over';
 
 /**
  * True once a running hold has reached the top of its prescribed range (T13 AC4).

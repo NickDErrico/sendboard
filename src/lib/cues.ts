@@ -19,7 +19,7 @@ import type { HoldSpec } from './timer';
 /** Absent means 3 (D33): the count the plan implies for a max-effort pull. */
 export const DEFAULT_LEAD_IN_SEC = 3;
 /** A count longer than the rest between sets is not a count. 0 is "off". */
-export const MAX_LEAD_IN_SEC = 30;
+const MAX_LEAD_IN_SEC = 30;
 
 /** Absent means on — the owner asked for the voice (D34). */
 export function voiceEnabled(settings: Pick<Settings, 'voiceCues'>): boolean {

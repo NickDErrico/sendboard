@@ -20,7 +20,7 @@ import { Icon, btnPrimary, btnSecondary, kickerAccent } from '../components/ui';
  * record is made somewhere else, and a second control for it would be a second
  * answer to where the truth lives.
  */
-export interface DetailTodo {
+interface DetailTodo {
   /** What offered this movement — its slot and the tier, e.g. "Wrist · rotating pool". */
   label: string;
   /** That tier's dose. Shown in full here; the row it came from has no width for it. */

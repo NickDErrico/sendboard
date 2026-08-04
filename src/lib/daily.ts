@@ -40,9 +40,9 @@ export const RUNS_PER_DAY = 2;
 
 /** §10D / §8 / Baar: at least six hours between them. */
 export const SPACING_HOURS = 6;
-export const SPACING_MS = SPACING_HOURS * 3_600_000;
+const SPACING_MS = SPACING_HOURS * 3_600_000;
 
-export interface DailyStatus {
+interface DailyStatus {
   /** Qualifying sessions completed on today's local day (D10). */
   runsToday: number;
   /** ISO 8601 instant of the most recent qualifying completion, on any day. */

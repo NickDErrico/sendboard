@@ -43,8 +43,6 @@ export const DAILY_ISOMETRIC_SLOTS = [
   'ankle',
 ] as const satisfies readonly JointTarget[];
 
-export type DailyIsometricSlot = (typeof DAILY_ISOMETRIC_SLOTS)[number];
-
 /**
  * The pool's targets (research file §6, tier 4).
  *
@@ -64,7 +62,7 @@ export const POOL_TARGETS = [
   'trunk',
 ] as const satisfies readonly JointTarget[];
 
-export type PoolTarget = (typeof POOL_TARGETS)[number];
+type PoolTarget = (typeof POOL_TARGETS)[number];
 
 /**
  * Days between loadings for each pool target, from the research file's §4.

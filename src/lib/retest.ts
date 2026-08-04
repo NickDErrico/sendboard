@@ -25,7 +25,7 @@ export const INTERPRETATION_QUOTE = [
   'Declining numbers mean you accumulated fatigue faster than adaptation — that’s the signal to deload, not to push harder.',
 ] as const;
 
-export interface BatteryTest {
+interface BatteryTest {
   exerciseId: string;
   /** Short row label for a 390px-wide table; the catalog holds the full name. */
   label: string;
@@ -74,7 +74,7 @@ export const BATTERY_TESTS: BatteryTest[] = [
 ];
 
 /** The conditions a battery was produced under — every one derived (D29b). */
-export interface Conditions {
+interface Conditions {
   /** Local wall-clock time of day, "07:15". §4E asks for the same time of day both times. */
   timeOfDay: string;
   /** D16's completed flag on the warm-up entry — §4E's "after a thorough warm-up". */
@@ -89,7 +89,7 @@ export interface Conditions {
   bodyweightLb: number | null;
 }
 
-export interface OccasionRow {
+interface OccasionRow {
   test: BatteryTest;
   /** Best set for the metric, or null when this test was not recorded. */
   value: number | null;
@@ -216,7 +216,7 @@ export function batteryOccasions(
     });
 }
 
-export interface ComparisonRow {
+interface ComparisonRow {
   test: BatteryTest;
   baseline: OccasionRow;
   latest: OccasionRow;

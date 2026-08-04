@@ -83,9 +83,6 @@ async function withDb<T>(fn: (db: IDBPDatabase<SendboardDB>) => Promise<T>): Pro
 export async function getAllExercises(): Promise<Exercise[]> {
   return EXERCISES;
 }
-export async function getExercise(id: string): Promise<Exercise | undefined> {
-  return EXERCISES.find((e) => e.id === id);
-}
 export async function getAllRoutines(): Promise<Routine[]> {
   return ROUTINES;
 }

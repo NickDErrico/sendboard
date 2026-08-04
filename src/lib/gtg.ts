@@ -76,7 +76,7 @@ export function unnamedKinds(dayChecks: Check[]): Set<CheckKind> {
   );
 }
 
-export interface GtgKindToday {
+interface GtgKindToday {
   /** Movements of this kind checked off today. */
   done: number;
   /** Movements of this kind on §8's list. A population, never a quota (D23). */

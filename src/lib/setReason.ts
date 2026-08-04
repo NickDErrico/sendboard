@@ -9,7 +9,7 @@ import type { Exercise, SetEndReason } from '../types';
 // does not change a prescription, hide an exercise, or raise an alert (D23). The
 // surface that quotes §7/§8 when a plan-named stop condition fires is T17's.
 
-export interface ReasonConfig {
+interface ReasonConfig {
   /** Chip text, and what a screen reader announces. */
   label: string;
   /** Compact form for a one-line set summary. */

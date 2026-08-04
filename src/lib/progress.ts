@@ -30,7 +30,7 @@ import { pctOfBodyweight } from './bodyweight';
  */
 export type SeriesKind = ProgressMetric | 'addedPctBw';
 
-export interface MetricConfig {
+interface MetricConfig {
   label: string; // toggle text
   unit: string;
   /** True when a *smaller* number is the better performance (edge size). */

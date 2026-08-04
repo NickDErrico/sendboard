@@ -31,6 +31,14 @@ const values = (s: ReturnType<typeof buildSeries>) =>
   s!.segments.flatMap((seg) => seg.points.map((p) => p.value));
 
 describe('session aggregation (AC8)', () => {
+  it('ignores a non-finite metric value rather than plotting it', () => {
+    // `typeof NaN` is 'number', so the type check alone lets it through and the
+    // point becomes NaN — a gap the chart renders as a break with no warning.
+    // A set that carries only NaN leaves the session with nothing to plot.
+    const sets = [set({ holdSec: NaN })];
+    expect(buildSeries([log('a', '2026-06-02T18:00', sets)], EX, 'holdSec', false)).toBeNull();
+  });
+
   it('takes the best set — longest hold, heaviest load, smallest edge', () => {
     const sets = [
       set({ holdSec: 7.2, addedLb: 35, edgeMm: 20 }),

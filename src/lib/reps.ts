@@ -2,7 +2,6 @@ import type { Exercise, RepChain } from '../types';
 import { variantsFor } from './block';
 import {
   isAutoAdvanceStale,
-  restMsOf,
   shouldAutoAdvance,
   type HoldSpec,
   type TimerState,
@@ -88,11 +87,6 @@ export function isLastRep(chain: RepChain, rep: number): boolean {
  */
 export function restAfterRep(chain: RepChain, rep: number, setRestMs: number | null): number | null {
   return isLastRep(chain, rep) ? setRestMs : chain.betweenSec * 1000;
-}
-
-/** The between-sets rest, for callers that have an exercise rather than a number. */
-export function setRestMsOf(exercise: Exercise | undefined): number | null {
-  return restMsOf(exercise);
 }
 
 /**

@@ -20,7 +20,7 @@ import { localDayKey, rotates } from './rotation';
 // sessions. §4E's rubric is the one interpretation on the screen and it is
 // quoted by `RetestComparison`, applied by the owner (D23, D44).
 
-export interface PosterWeek {
+interface PosterWeek {
   week: number;
   /** §4F's row for this week, quoted where it renders (D23). */
   phase: ReturnType<typeof phaseFor>;
@@ -46,7 +46,7 @@ export interface Poster {
   batteryLogIds: Set<string>;
 }
 
-export interface PosterInput {
+interface PosterInput {
   logs: WorkoutLog[];
   routines: Routine[];
   exercises: Exercise[];
