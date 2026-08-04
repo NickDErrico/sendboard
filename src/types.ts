@@ -534,7 +534,6 @@ export type CheckKind =
  * this records that the day did.
  */
 export type SymptomKind = 'finger-pain' | 'elbow' | 'shoulder' | 'forearm-stiffness';
-export type CheckScope = 'weekly' | 'daily'; // climbing-* are weekly; the rest are daily
 
 export interface Check {
   id: string; // uuid
@@ -571,20 +570,6 @@ export interface Check {
    */
   symptom?: SymptomKind;
 }
-
-export const CHECK_SCOPE: Record<CheckKind, CheckScope> = {
-  'climbing-volume': 'weekly',
-  'climbing-limit': 'weekly',
-  'gtg-general': 'daily', // push-ups, squats, wrist extensors, external rotations, wall press
-  'gtg-pull': 'daily', // scapular pull-ups / dead hangs, full pull-ups — dose-limited, see D13
-  // Daily in scope even for pool movements on a 3- or 4-day interval: the scope
-  // is the granularity a check is *recorded* at, not how often the movement comes
-  // up. `pool.ts` owns the interval; nothing here needs to know it.
-  joint: 'daily',
-  // Recorded against the day it was noticed. The scope is not how long it lasts —
-  // a stop signal stays up until cleared, see `Check.symptom`.
-  symptom: 'daily',
-};
 
 export interface Settings {
   installGuideDismissed: boolean;
