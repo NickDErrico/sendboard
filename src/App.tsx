@@ -23,7 +23,8 @@ import { Signals } from './screens/Signals';
 import { Library } from './screens/Library';
 import { LaneLibrary } from './screens/LaneLibrary';
 import { TabBar } from './components/TabBar';
-import { btnPrimary } from './components/ui';
+import { btnGhost, btnPrimary } from './components/ui';
+import { storageFailureMessage } from './lib/storageFailure';
 
 // The tab bar is hidden on immersive/transient screens (active logging, the
 // focused routine start, the install guide, and not-found), which carry their
@@ -37,6 +38,7 @@ const NO_TAB_BAR = new Set(['session', 'routine', 'install', 'notFound']);
 export default function App() {
   const route = useRoute();
   const onboarding = useInstallOnboarding();
+  const { failure, dismissFailure } = useStorageFailure();
 
   // T13 AC1: ask to be moved out of the browser's best-effort storage bucket, on
   // every launch — a denial is not permanent, and the browser is more willing
@@ -58,10 +60,48 @@ export default function App() {
 
   return (
     <>
+      {failure !== null && (
+        <div
+          role="alert"
+          className="sticky top-0 z-40 flex items-start gap-3 bg-surface px-4 py-3 text-sm text-warn"
+        >
+          <span className="flex-1">{failure}</span>
+          <button type="button" className={btnGhost} onClick={dismissFailure}>
+            Dismiss
+          </button>
+        </div>
+      )}
       {renderRoute(route)}
       {!NO_TAB_BAR.has(route.name) && <TabBar />}
     </>
   );
+}
+
+/**
+ * Surfaces a failed storage operation, wherever in the app it came from.
+ *
+ * Listening for the rejection rather than guarding each call site is deliberate.
+ * There are 23 write calls across the screens and none of them caught anything;
+ * every one is either fire-and-forget (`void saveLog(next)`) or an unawaited
+ * async handler, so all of them arrive here. A guard added at 23 sites is also a
+ * guard that the 24th site forgets, and this is the failure the app can least
+ * afford to miss.
+ *
+ * The rejection is deliberately *not* marked handled: it still reaches the
+ * console for debugging. This only adds the half the owner can see. Anything
+ * that is not a `StorageError` is left entirely alone — see `storageFailure.ts`.
+ */
+function useStorageFailure(): { failure: string | null; dismissFailure: () => void } {
+  const [failure, setFailure] = useState<string | null>(null);
+  useEffect(() => {
+    const onRejection = (event: PromiseRejectionEvent) => {
+      const message = storageFailureMessage(event.reason);
+      if (message !== null) setFailure(message);
+    };
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => window.removeEventListener('unhandledrejection', onRejection);
+  }, []);
+  return { failure, dismissFailure: () => setFailure(null) };
 }
 
 function renderRoute(route: Route): ReactNode {
